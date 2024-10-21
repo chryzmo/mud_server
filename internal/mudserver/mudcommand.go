@@ -34,7 +34,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 			message := "You say: \""+msg+"\""
 			player.SendMessage(message)
 
-			for _,target_mp := range player.Location.UsersInZone {
+			for _,target_mp := range player.Location.UserMap {
 				if target_mp.Username != player.Username {
 					message := player.Username+" says: \""+msg+"\""
 						target_mp.SendMessage(message)

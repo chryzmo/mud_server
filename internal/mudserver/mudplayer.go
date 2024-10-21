@@ -4,6 +4,7 @@ import (
 	"fmt"
 	muddata "mud_server/internal/muddata"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,6 +17,9 @@ type MudPlayer struct {
 	Location *Room
 	Username string
 	Inventory *Inventory
+	AttackPower int
+	Defense int
+	send_mutex sync.Mutex
 }
 
 func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
@@ -24,10 +28,14 @@ func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
 		TimeConnected: time.Now(),
 		Location: room,
 		Inventory: CreateInventory(),
+		AttackPower: 0,
+		Defense: 0,
 	}
 }
 
 func (mp *MudPlayer) SendMessage(message string) (error){
+	mp.send_mutex.Lock()
+	defer mp.send_mutex.Unlock()
 	err := mp.Conn.WriteMessage(websocket.TextMessage, []byte(message))
 
 	if err != nil {
@@ -53,16 +61,18 @@ func (mp *MudPlayer) MoveRoom (dir string) int {
 		dir = "W"
 	}
 
-	if mp.Location.ExitList[dir] == nil {
+	if mp.Location.ExitMap[dir] == nil {
 		// Room does not exist
 		retcode = muddata.ERR_ROOM_DNE
 	} else {
 		// Clean up location info in old room, set new room
 		mp.Location.RemovePlayer(mp.Username)
+		mp.Location.Broadcast(mp.Username+" has left to the "+dir+".",mp.Username)
 
 		// Set new location for Player
-		newroom := mp.Location.ExitList[dir]
+		newroom := mp.Location.ExitMap[dir]
 		mp.Location = newroom
+		mp.Location.Broadcast(mp.Username+" has entered the room from the "+dir+".",mp.Username)
 		mp.Location.AddPlayer(mp)
 	}
 

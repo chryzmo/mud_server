@@ -1,10 +1,13 @@
 package mudserver
 
+/*
+	Message structure for messages coming from players
+*/
+
 type MudMessage struct {
-	Message string `json:"message"`
-	Command string `json:"command"`
+	Command          string `json:"command"`
 	CommandParameter string `json:"commandparameter"`
-	CommandTarget string `json:"commandtarget"`
+	CommandTarget    string `json:"commandtarget"`
 
 	SenderPlayer *MudPlayer
 }

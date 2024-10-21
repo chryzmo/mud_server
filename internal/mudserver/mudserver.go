@@ -117,7 +117,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				player.Username = msg.CommandParameter
 
 				// TODO:  Remove this when we persist locations
-				player.Location.UsersInZone[player.Username] = player
+				player.Location.UserMap[player.Username] = player
 			
 				player.SendMessage("You are now known as "+msg.CommandParameter+".\n")	
 			} else {
