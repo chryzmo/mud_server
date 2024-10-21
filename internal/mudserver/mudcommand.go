@@ -1,7 +1,9 @@
 package mudserver
 
 import (
+	"math/rand/v2"
 	muddata "mud_server/internal/muddata"
+	"strconv"
 	"strings"
 )
 
@@ -93,6 +95,43 @@ func GenerateCommandList() (map[string]*MudCommand) {
 		},
 	}
 
+	// ATTACK
+	c_attack := MudCommand {
+		action: func(player *MudPlayer, arguments string) (int) {
+
+			if arguments != "" {
+				npc_target_name := strings.ToUpper(arguments)
+
+				player.NPCTarget = player.Location.BaddieMap[npc_target_name]
+			}
+
+			if player.NPCTarget == nil {
+				player.SendMessage("You must have a target to attack.")
+			}
+
+			if player.NPCTarget.Location == player.Location {
+				// Perform attack!
+				attackRoll := rand.IntN(100)
+				if attackRoll > player.NPCTarget.Defense {
+					player.NPCTarget.HP -= player.AttackPower
+					player.SendMessage("You hit "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+" points of damage!")
+					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+ " points of damage!",player.Username)
+					if player.NPCTarget.HP <= 0 {
+						player.SendMessage("You kill "+player.NPCTarget.Name+"!")
+						player.Location.KillNPC(player.NPCTarget.Name,player.Username)
+
+					}
+				}
+				
+			} else {
+				player.NPCTarget = nil
+				player.SendMessage("You do not see that target here.")
+			}
+
+			return muddata.MUD_OK
+		},
+	}
+
 	// DROP
 	c_drop := MudCommand {
 		action: func(player *MudPlayer, arguments string) (int) {
@@ -135,6 +174,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	cList["GET"] = &c_get
 	cList["DROP"] = &c_drop
 	cList["INVENTORY"] = &c_inventory
+	cList["ATTACK"] = &c_attack
 
 	return cList
 }

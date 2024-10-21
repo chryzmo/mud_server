@@ -1,5 +1,7 @@
 package mudserver
 
+import "strings"
+
 /*
 	UsersInZone key is Player.Username
 	ExitList key is <direction> of exit
@@ -10,7 +12,7 @@ type Room struct {
 	Description string
 	RoomChannel chan(RoomMessage)
 	UserMap map[string]*MudPlayer
-	BaddieSlice []*BaddieNPC
+	BaddieMap map[string]*BaddieNPC
 	ExitMap map[string]*Room
 	Inventory *Inventory
 	BaddieSpawnerMap map[string]*BaddieSpawner
@@ -26,7 +28,7 @@ func CreateRoom(name string, description string) (*Room) {
 		ExitMap: make(map[string]*Room),
 		Inventory: CreateInventory(),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
-		BaddieSlice: []*BaddieNPC{},
+		BaddieMap: make(map[string]*BaddieNPC),
 	}
 
 	// Launch goroutine to continuously process broadcast messages
@@ -69,10 +71,10 @@ func (r Room) Broadcast(msg string, senderusername string) () {
 func (r Room) LookDescription() (string) {
 	desc := "You are in '"+r.Name+"'.\n\n"+r.Description+"\n"
 	
-	if len(r.BaddieSlice) > 0 {
+	if len(r.BaddieMap) > 0 {
 		desc += "\nThe monsters here are:\n"
 
-		for _,baddie := range r.BaddieSlice {
+		for _,baddie := range r.BaddieMap {
 			desc += baddie.Name+"\n"
 		}
 	}
@@ -97,6 +99,11 @@ func (r Room) LookDescription() (string) {
 
 func (r *Room) RemovePlayer(username string) () {
 	delete(r.UserMap,username)
+}
+
+func (r *Room) KillNPC(npcname string, attackername string) () {
+	delete(r.BaddieMap,strings.ToUpper(npcname))
+	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
 }
 
 func (r *Room) AddPlayer(mp *MudPlayer) () {

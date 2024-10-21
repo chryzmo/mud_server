@@ -120,6 +120,10 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				player.Location.UserMap[player.Username] = player
 			
 				player.SendMessage("You are now known as "+msg.CommandParameter+".\n")	
+				
+				// Send initial room description
+				c, _ := ms.getCommand("LOOK")
+				c.action(player,"")
 			} else {
 				player.SendMessage("That username is already in use.  Please try another username.\n")
 			}

@@ -9,6 +9,7 @@ type BaddieNPC struct {
 	State int8
 	Location *Room
 	Name string
+	Race string
 	AttackAccuracy int
 	AttackPower int
 	Defense int
@@ -25,4 +26,15 @@ func (npc *BaddieNPC) attack (player *MudPlayer) (int, int) {
 	}
 
 	return muddata.STATUS_ATTACK_MISS,0
+}
+
+// TODO:  Update this with a lookup table
+func (npc *BaddieNPC) GenerateName() (string) {
+	letterRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+	b := make([]rune, 5)
+	for i := range b {
+		b[i] = letterRunes[rand.IntN(len(letterRunes))]
+	}
+	return npc.Race+string(b)
 }

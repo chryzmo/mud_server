@@ -1,6 +1,9 @@
 package mudserver
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type BaddieSpawner struct {
 	TotalNumber int
@@ -10,10 +13,10 @@ type BaddieSpawner struct {
 	baddie BaddieNPC
 }
 
-func (spawner BaddieSpawner) countBaddiesInRoom (baddiename string) (int) {
+func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 	count := 0
-	for _, b := range spawner.Location.BaddieSlice {
-		if b.Name == baddiename {
+	for _, b := range spawner.Location.BaddieMap {
+		if b.Race == baddierace {
 			count++
 		}
 	}
@@ -26,11 +29,12 @@ func (spawner BaddieSpawner) RunTicker () {
 
 
 	for range spawner.ticker.C {
-		if spawner.countBaddiesInRoom(spawner.baddie.Name) < spawner.TotalNumber{
+		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
 			// Spawn another baddie!
 			newbaddie := &BaddieNPC{
-				Location: spawner.baddie.Location,
+				Location: spawner.Location,
 				Name: spawner.baddie.Name,
+				Race: spawner.baddie.Race,
 				AttackAccuracy: spawner.baddie.AttackAccuracy,
 				AttackPower: spawner.baddie.AttackPower,
 				Defense: spawner.baddie.Defense,
@@ -38,8 +42,12 @@ func (spawner BaddieSpawner) RunTicker () {
 				MP: spawner.baddie.MP,
 			}
 
-			spawner.Location.BaddieSlice = append(spawner.Location.BaddieSlice,newbaddie)
-			spawner.Location.Broadcast(spawner.baddie.Name+" appears in the room!","")
+			if newbaddie.Name == "" {
+				newbaddie.Name = newbaddie.GenerateName()
+			}
+
+			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
+			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
 		}
 	}
 }

@@ -19,6 +19,7 @@ type MudPlayer struct {
 	Inventory *Inventory
 	AttackPower int
 	Defense int
+	NPCTarget *BaddieNPC
 	send_mutex sync.Mutex
 }
 
@@ -28,7 +29,7 @@ func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
 		TimeConnected: time.Now(),
 		Location: room,
 		Inventory: CreateInventory(),
-		AttackPower: 0,
+		AttackPower: 99,
 		Defense: 0,
 	}
 }

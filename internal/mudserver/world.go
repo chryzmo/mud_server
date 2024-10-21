@@ -25,8 +25,8 @@ func createWorld() *World {
 	startroom.Inventory.AddItem(startkey)
 
 	// Spawner test
-	baddie := BaddieNPC{
-		Name:           "Orc",
+	orcbaddie := BaddieNPC{
+		Race:           "Orc",
 		AttackAccuracy: 0,
 		AttackPower:    0,
 		Defense:        0,
@@ -35,15 +35,15 @@ func createWorld() *World {
 	}
 
 	testspawn := &BaddieSpawner{
-		TotalNumber:    5,
-		tickDurationMS: 3000,
-		Location:       startroom,
-		baddie:         baddie,
+		TotalNumber:    1,
+		tickDurationMS: 30000,
+		Location:       battleroom,
+		baddie:         orcbaddie,
 	}
 
 	go testspawn.RunTicker()
 
-	startroom.BaddieSpawnerMap["orc"] = testspawn
+	battleroom.BaddieSpawnerMap["orc"] = testspawn
 
 	// Link sample rooms
 	startroom.ExitMap["N"] = northroom
