@@ -101,6 +101,7 @@ func (r *Room) RemovePlayer(username string) () {
 	delete(r.UserMap,username)
 }
 
+// Remove NPC and broadcast kill
 func (r *Room) KillNPC(npcname string, attackername string) () {
 	delete(r.BaddieMap,strings.ToUpper(npcname))
 	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
