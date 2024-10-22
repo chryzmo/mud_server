@@ -2,7 +2,7 @@ package mudserver
 
 import (
 	"fmt"
-	"mud_server/internal/muddata"
+	"mud_server/src/internal/muddata"
 )
 
 type Inventory struct {

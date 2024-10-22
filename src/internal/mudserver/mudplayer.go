@@ -2,7 +2,7 @@ package mudserver
 
 import (
 	"fmt"
-	muddata "mud_server/internal/muddata"
+	muddata "mud_server/src/internal/muddata"
 	"strings"
 	"sync"
 	"time"

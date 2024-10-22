@@ -2,7 +2,7 @@ package mudserver
 
 import (
 	"math/rand/v2"
-	muddata "mud_server/internal/muddata"
+	muddata "mud_server/src/internal/muddata"
 )
 
 type BaddieNPC struct {
