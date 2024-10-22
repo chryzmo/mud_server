@@ -13,7 +13,7 @@ func createWorld() *World {
 	// Build sample rooms
 	startroom := CreateRoom("Start Room", "You find yourself in a generic looking room.  There is a door to the North.")
 	northroom := CreateRoom("Balcony", "You are at a balcony overlooking the woods.  There is a door to the East and to the South.")
-	battleroom := CreateRoom("Balcony", "You are in the arena.  There is a door to the West.")
+	battleroom := CreateRoom("Arena", "You are in the arena.  There is a door to the West.")
 
 	// Item test
 	startkey := &Item{

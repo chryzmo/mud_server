@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	mudserver "mud_server/internal/mudserver"
+	mudserver "mud_server/src/internal/mudserver"
 )
 
 var upgrader = websocket.Upgrader{
@@ -23,11 +23,12 @@ func main() {
 
 	go serverinstance.HandleMessages()
 
-	fmt.Println("Server started on :8080")
-	err := http.ListenAndServe(":8080", nil)
+	fmt.Println("Server starting on "+serverinstance.Configuration.ListenPort)
+	err := http.ListenAndServe(serverinstance.Configuration.ListenPort, nil)
 	if err != nil {
 		panic("Error starting server: " + err.Error())
 	}
+	fmt.Println("Server started on "+serverinstance.Configuration.ListenPort)
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {

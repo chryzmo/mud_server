@@ -3,7 +3,7 @@ package mudserver
 import (
 	"bytes"
 	"fmt"
-	"mud_server/internal/muddata"
+	"mud_server/src/internal/muddata"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +15,7 @@ type MudServer struct {
 	Broadcast chan(MudMessage)
 	World *World
 	Commands map[string]*MudCommand
+	Configuration Configuration
 }
 
 /*
@@ -22,12 +23,14 @@ type MudServer struct {
 */
 func CreateMudServer() *MudServer {
 	w := createWorld()
+	c := Configuration{}
 
 	server := &MudServer{
 		playerList: make(map[*MudPlayer]*MudPlayer),
 		Broadcast: make(chan MudMessage),
 		World: w,
 		Commands: GenerateCommandList(),
+		Configuration: c.LoadConfig("config/server_config.json"),
 	}
 
 	return server

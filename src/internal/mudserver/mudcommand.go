@@ -2,7 +2,7 @@ package mudserver
 
 import (
 	"math/rand/v2"
-	muddata "mud_server/internal/muddata"
+	muddata "mud_server/src/internal/muddata"
 	"strconv"
 	"strings"
 )
@@ -119,7 +119,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 					if player.NPCTarget.HP <= 0 {
 						player.SendMessage("You kill "+player.NPCTarget.Name+"!")
 						player.Location.KillNPC(player.NPCTarget.Name,player.Username)
-
+						player.NPCTarget = nil
 					}
 				}
 				
