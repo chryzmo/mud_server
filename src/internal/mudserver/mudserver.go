@@ -3,6 +3,7 @@ package mudserver
 import (
 	"bytes"
 	"fmt"
+	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
 	"strings"
 
@@ -16,28 +17,36 @@ type MudServer struct {
 	World *World
 	Commands map[string]*MudCommand
 	Configuration Configuration
+	DB muddatabase.MudDatabase
 }
 
 /*
 	Use CreateMudServer() to generate a new server instance
 */
 func CreateMudServer() *MudServer {
-	w := createWorld()
 	c := Configuration{}
+	c = c.LoadConfig("config/server_config.json")
+
+	// Form DB URL
+	dburl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",c.Database.DatabaseUsername,c.Database.DatabasePassword,c.Database.DatabaseHost,c.Database.DatabasePort,c.Database.DatabaseName)
+	db := muddatabase.CreateDatabase(dburl) //postgres://uid:pwd@localhost:5432/my-database
+
+	w := createWorld(db)
 
 	server := &MudServer{
 		playerList: make(map[*MudPlayer]*MudPlayer),
 		Broadcast: make(chan MudMessage),
 		World: w,
 		Commands: GenerateCommandList(),
-		Configuration: c.LoadConfig("config/server_config.json"),
+		Configuration: c,
+		DB: db,
 	}
 
 	return server
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
-	mc := CreateMudPlayer(ws_conn,ms.World.getRoomByName("Start Room"))
+	mc := CreateMudPlayer(ws_conn,ms.World.getRoomByID(1))
 
 	// Add MudPlayer to Server connectionList
 	ms.playerList[mc] = mc

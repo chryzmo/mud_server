@@ -1,63 +1,94 @@
 package mudserver
 
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	muddatabase "mud_server/src/internal/database"
+
+	"github.com/jackc/pgx/v5"
+)
+
 type World struct {
 	StartingRooms map[string]*Room
-	RoomMap       map[string]*Room
+	RoomMap       map[int32]*Room
+	BaddieSpawnerMap map[string]*BaddieSpawner
 }
 
-func createWorld() *World {
+func createWorld(db muddatabase.MudDatabase) *World {
 	w := &World{
-		RoomMap: make(map[string]*Room),
+		RoomMap: make(map[int32]*Room),
+		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
 	}
+
+	// Load Items?
 
 	// Build sample rooms
-	startroom := CreateRoom("Start Room", "You find yourself in a generic looking room.  There is a door to the North.")
-	northroom := CreateRoom("Balcony", "You are at a balcony overlooking the woods.  There is a door to the East and to the South.")
-	battleroom := CreateRoom("Arena", "You are in the arena.  There is a door to the West.")
+	r := Room{}
 
-	// Item test
-	startkey := &Item{
-		Name:       "KEY",
-		Persistent: false,
-		Quantity:   1,
+	// Load rooms into RoomMap
+	roomIDList := w.RetrieveListofRoomIDs(db)
+	for _,id := range roomIDList {
+		w.RoomMap[id] = r.FetchFromDB(db,id)
 	}
 
-	startroom.Inventory.AddItem(startkey)
+	// Link rooms after loading
+	for _,room := range w.RoomMap {
+		w.LinkRoom(room)
+	}
 
 	// Spawner test
-	orcbaddie := BaddieNPC{
-		Race:           "Orc",
-		AttackAccuracy: 0,
-		AttackPower:    0,
-		Defense:        0,
-		HP:             5,
-		MP:             0,
-	}
+	orcbaddie := BaddieNPC{}
+	orcbaddie = orcbaddie.FetchGenericFromDB(db, "ORC")
 
 	testspawn := &BaddieSpawner{
 		TotalNumber:    1,
-		tickDurationMS: 30000,
-		Location:       battleroom,
+		tickDurationMS: 3000,
+		Location:       w.RoomMap[3],
 		baddie:         orcbaddie,
 	}
 
 	go testspawn.RunTicker()
 
-	battleroom.BaddieSpawnerMap["orc"] = testspawn
-
-	// Link sample rooms
-	startroom.ExitMap["N"] = northroom
-	northroom.ExitMap["S"] = startroom
-	northroom.ExitMap["E"] = battleroom
-	battleroom.ExitMap["W"] = northroom
-
-	w.RoomMap[startroom.Name] = startroom
-	w.RoomMap[northroom.Name] = northroom
-	w.RoomMap[battleroom.Name] = battleroom
+	w.BaddieSpawnerMap["orc"] = testspawn
 
 	return w
 }
 
-func (w World) getRoomByName(roomname string) *Room {
-	return w.RoomMap[roomname]
+func (w World) getRoomByID(roomid int32) *Room {
+	return w.RoomMap[roomid]
+}
+
+func (w World) LinkRoom(room *Room) {
+	jsonMap := make(map[string]interface{})
+	err := json.Unmarshal([]byte(room.ExitJSON), &jsonMap)
+
+	for direction, roomid := range jsonMap {
+		// JSON uses float64, so we need to assert interface{} to float64, then cast to int32
+		if rid, ok := roomid.(float64); ok { 
+			room.ExitMap[direction] = w.RoomMap[int32(rid)]
+		} else {
+			err = errors.New("RoomID assertion failed.  Received a non-int32 value!")
+		}
+	}
+
+	if err != nil {
+		fmt.Println("Room linking error: "+err.Error())
+	}
+}
+
+func (w World) RetrieveListofRoomIDs(db muddatabase.MudDatabase) []int32 {
+	query := "SELECT id FROM room"
+	var err error
+
+	rows,err := db.Connection.Query(db.Context,query)
+
+	if err != nil {
+		fmt.Println("Room List error: "+err.Error())
+	}
+
+	// Collect the ID list to []int32
+	numbers, err := pgx.CollectRows(rows, pgx.RowTo[int32])
+
+	return numbers
 }
