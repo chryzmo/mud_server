@@ -1,16 +1,20 @@
 package mudserver
 
 import (
+	"errors"
 	"fmt"
+	muddatabase "mud_server/src/internal/database"
 	muddata "mud_server/src/internal/muddata"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5"
 )
 
 type MudPlayer struct {
+	ID int32
 	Conn	*websocket.Conn
 	TimeConnected	time.Time
 	State int8
@@ -21,6 +25,15 @@ type MudPlayer struct {
 	Defense int
 	NPCTarget *BaddieNPC
 	send_mutex sync.Mutex
+}
+
+type MudPlayerDB struct {
+	ID int32
+	Username string
+	InventoryIDSlice []int32
+	AttackPower int
+	Defense int
+	RoomID int32
 }
 
 func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
@@ -80,3 +93,129 @@ func (mp *MudPlayer) MoveRoom (dir string) int {
 	return retcode
 }
 
+func (mp *MudPlayer) LoadFromDB (db muddatabase.MudDatabase, world *World, player *MudPlayer, playerid interface{}) error {
+	query := ""
+	var err error
+
+	switch playerid.(type) {
+	case string:
+		query = "SELECT id,username,inventoryidslice,attackpower,defense,roomid FROM player WHERE username=$1"
+	case int, int8, int32, int64:
+		query = "SELECT id,username,inventoryidslice,attackpower,defense,roomid FROM player id=$1"
+	default:
+		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
+	}
+
+	rows,err := db.Connection.Query(db.Context,query,playerid)
+
+	if err != nil {
+		fmt.Println("Player query error: "+err.Error())
+	}
+
+	ret,err := pgx.CollectOneRow(rows,pgx.RowToStructByName[MudPlayerDB])
+
+	if err != nil {
+		fmt.Println("Player row error: "+err.Error())
+	}
+
+	// Build Room from RoomDB struct
+	if err == nil {
+		// Load DB values into MudPlayer object
+		player.ID = ret.ID
+		player.Username = ret.Username
+		player.Location = world.RoomMap[ret.RoomID]
+		player.Inventory = CreateInventory()
+		player.AttackPower = ret.AttackPower
+		player.Defense = ret.Defense
+
+		// Build inventory
+		for _,item_id := range ret.InventoryIDSlice {
+			i := Item{}
+			player.Inventory.AddItem(i.FetchFromDB(db,item_id))
+		}
+	}
+
+	return err
+}
+
+func (mp *MudPlayer) CountUsernameFromDB (db muddatabase.MudDatabase, playerid interface{}) int32 {
+	query := ""
+	var err error
+	var usercount int32 = 0
+
+	switch playerid.(type) {
+	case string:
+		query = "SELECT count(*) FROM player WHERE username=$1"
+	case int, int8, int32, int64:
+		query = "SELECT count(*) FROM player id=$1"
+	default:
+		err = errors.New("Player.CountUsernameFromDB invalid ID.  ID must be string|int")
+	}
+
+	rows,err := db.Connection.Query(db.Context,query,playerid)
+
+	if err != nil {
+		fmt.Println("CountUsernameFromDB query error: "+err.Error())
+	}
+
+	usercount, err = pgx.CollectOneRow(rows, pgx.RowTo[int32])
+
+	if err != nil {
+		fmt.Println("CountUsernameFromDB scan error: "+err.Error())
+	}
+
+	return usercount
+}
+
+func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
+	query := ""
+
+	if mp.ID == 0 {
+		// User does not exist, do INSERT
+		query = "INSERT INTO player (username,inventoryidslice,attackpower,defense,roomid) VALUES (@username,@inventoryidslice,@attackpower,@defense,@roomid);"
+
+		args := pgx.NamedArgs{
+			"username": mp.Username,
+			"inventoryidslice": mp.Inventory.IDSlice(),
+			"attackpower": mp.AttackPower,
+			"defense": mp.Defense,
+			"roomid": mp.Location.ID,
+		  }
+		
+		  db.ExecWithArgs(query,args)
+
+	} else {
+		// User exists, do UPDATE
+		query = "UPDATE player SET username=@username, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, roomid=@roomid WHERE id=@playerid;"
+
+		args := pgx.NamedArgs{
+			"username": mp.Username,
+			"inventoryidslice": mp.Inventory.IDSlice(),
+			"attackpower": mp.AttackPower,
+			"defense": mp.Defense,
+			"roomid": mp.Location.ID,
+			"playerid": mp.ID,
+		  }
+		
+		  db.ExecWithArgs(query,args)
+	}
+}
+
+func (mp *MudPlayer) GetIDFromDB (db muddatabase.MudDatabase) int32 {
+	query := "SELECT id FROM player WHERE username=$1"
+	var err error
+
+	rows,err := db.Connection.Query(db.Context,query,mp.Username)
+
+	if err != nil {
+		fmt.Println("CountUsernameFromDB query error: "+err.Error())
+	}
+
+	userid, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
+
+	if err != nil {
+		fmt.Println("CountUsernameFromDB scan error: "+err.Error())
+	}
+
+	return userid
+}

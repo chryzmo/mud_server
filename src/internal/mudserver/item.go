@@ -18,6 +18,7 @@ type Item struct {
 // Create a copy of the item.  May be useful for breaking up stacks
 func (i Item) createCopy() (*Item) {
 	return &Item{
+		ID: i.ID,
 		Name: i.Name,
 		Quantity: i.Quantity,
 		Persistent: i.Persistent,

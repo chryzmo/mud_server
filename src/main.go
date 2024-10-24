@@ -22,6 +22,7 @@ func main() {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {handleConnections(serverinstance, w, r)})
 
 	go serverinstance.HandleMessages()
+	go serverinstance.RunMaintenanceactions()
 
 	fmt.Println("Server starting on "+serverinstance.Configuration.Server.ListenPort)
 	err := http.ListenAndServe(serverinstance.Configuration.Server.ListenPort, nil)
