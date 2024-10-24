@@ -63,6 +63,18 @@ func (i Inventory) ListAsString(withQuantity bool) (string) {
 	return invreturn
 }
 
+func (i Inventory) IDSlice() ([]int32) {
+	idslice := make([]int32,0)
+
+	if len(i.items) > 0 {
+		for _,v := range i.items {
+			idslice = append(idslice,v.ID)
+		}
+	}
+
+	return idslice
+}
+
 func (i Inventory) isEmpty() (bool) {
 	return len(i.items) == 0
 }

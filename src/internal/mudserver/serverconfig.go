@@ -9,6 +9,7 @@ type Configuration struct {
 	Server struct {
 		ServerName	string `json:"ServerName"`
 		ListenPort	string `json:"ListenPort"`
+		WorldSaveDelayMinutes int32 `json:"WorldSaveDelayMinutes"`
 	} `json:"Server"`
 	Database struct {
 		DatabaseHost string `json:"DatabaseHost"`

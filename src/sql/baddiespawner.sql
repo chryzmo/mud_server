@@ -16,3 +16,5 @@ INSERT INTO baddiespawner (totalnumber,tickdurationms,baddieid,roomid) VALUES
 
 ALTER TABLE IF EXISTS baddiespawner
     OWNER to mud;
+
+SELECT * FROM baddiespawner;

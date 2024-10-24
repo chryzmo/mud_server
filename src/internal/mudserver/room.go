@@ -32,7 +32,7 @@ type RoomDB struct {
 	Name string
 	Description string
 	ExitJSON string
-	InventoryIDArray []int32
+	InventoryIDSlice []int32
 }
 
 type RoomExits struct {
@@ -134,15 +134,15 @@ func (r *Room) AddPlayer(mp *MudPlayer) {
 }
 
 func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Room) {
-	query := "123"
+	query := ""
 	var err error
 	room := Room{}
 
 	switch roomid.(type) {
 	case string:
-		query = "SELECT id,name,description,exitjson,inventoryidarray FROM room WHERE name=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice FROM room WHERE name=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,name,description,exitjson,inventoryidarray FROM room WHERE id=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice FROM room WHERE id=$1"
 	default:
 		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
 	}
@@ -174,7 +174,7 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Ro
 		}
 
 		// Populate room inventory
-		for _,item_id := range ret.InventoryIDArray {
+		for _,item_id := range ret.InventoryIDSlice {
 			i := Item{}
 			room.Inventory.AddItem(i.FetchFromDB(db,item_id))
 		}

@@ -3,6 +3,7 @@ package muddatabase
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,5 +28,25 @@ func CreateDatabase(db_url string) (MudDatabase) {
 	}
 
 	return muddb
+}
+
+func (db MudDatabase) ExecWithArgs(query string, args pgx.NamedArgs) error {
+	tx, err := db.Connection.Begin(db.Context)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(db.Context)
+	_, err = tx.Exec(db.Context, query, args)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(db.Context)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 

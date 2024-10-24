@@ -6,6 +6,7 @@ import (
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -51,9 +52,9 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 	// Add MudPlayer to Server connectionList
 	ms.playerList[mc] = mc
 
-	fmt.Printf("Created new user.  Number of connected clients: %d\n", len(ms.playerList))
+	fmt.Printf("Client connection - number of connected clients: %d\n", len(ms.playerList))
 
-	mc.SendMessage("Welcome!  Please set your NICK.")
+	mc.SendMessage("Welcome!  Please select your NICK.")
 
 	return mc
 }
@@ -73,9 +74,10 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 }
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
+	mp.WriteToDB(ms.DB)
 	ms.playerList[mp].Conn.Close()
 	delete(ms.playerList, mp)
-	fmt.Printf("Deleted client.  Number of connected clients: %d\n",len(ms.playerList))
+	fmt.Printf("Client disconnect - number of connected clients: %d\n",len(ms.playerList))
 
 }
 
@@ -123,21 +125,42 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 
 		// Ensure that the user has selected a valid username
 		if player.Username == "" && msg.Command != "/NICK" {
-			ms.SendMessageToPlayer(player,"User not created.  Please send NICK command to create.")
+			ms.SendMessageToPlayer(player,"No NICK set.  Please send /NICK command to create.")
 		} else if player.Username == "" && msg.Command == "/NICK" {
 			if ms.GetPlayerByUsername(msg.CommandParameter) == nil {
-				player.Username = msg.CommandParameter
 
-				// TODO:  Remove this when we persist locations
-				player.Location.UserMap[player.Username] = player
-			
-				player.SendMessage("You are now known as "+msg.CommandParameter+".\n")	
+				username := msg.CommandParameter
 				
-				// Send initial room description
-				c, _ := ms.getCommand("LOOK")
-				c.action(player,"")
+				if player.CountUsernameFromDB(ms.DB,username) == 1 {
+					err := player.LoadFromDB(ms.DB, ms.World, player, username)
+					if err != nil {
+						fmt.Println("Error loading player: "+err.Error())
+						break
+					}
+					player.Location.UserMap[player.Username] = player
+
+					player.SendMessage("Welcome back, "+msg.CommandParameter+"!\n")	
+				
+					// Send initial room description
+					c, _ := ms.getCommand("LOOK")
+					c.action(player,"")
+				} else {
+					// User does not exist
+					player.Username = msg.CommandParameter
+					player.Location.UserMap[player.Username] = player
+					// Write to DB
+					player.WriteToDB(ms.DB)
+					// Get DB ID for MudPlayer
+					player.ID = player.GetIDFromDB(ms.DB)
+
+					// Send welcome message & start game
+					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")	
+					// Send initial room description
+					c, _ := ms.getCommand("LOOK")
+					c.action(player,"")
+				}
 			} else {
-				player.SendMessage("That username is already in use.  Please try another username.\n")
+				player.SendMessage("That username is already logged in!  Please try again.\n")
 			}
 		} else {
 			ms.Broadcast <- msg
@@ -150,6 +173,44 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 	Take action based on input (chat message, command, etc.)
 */
 func (ms *MudServer) HandleMessages() {
+	for {
+		// Pop message off queue
+		msg := <-ms.Broadcast
+
+		// Prepare variables for lookup & action
+		player := ms.GetPlayerByMudPlayer(msg.SenderPlayer)
+		command_name := msg.Command
+		arguments := msg.CommandParameter
+
+		// Translate aliases
+		command_name, arguments = ms.processAliases(command_name, arguments)
+
+		command, err := ms.getCommand(command_name)
+		if err == muddata.ERR_COMMAND_UNKNOWN {
+			ms.SendMessageToPlayer(player,"SERVER:  Unknown command.\n")
+		} else {
+			// Run command
+			command.action(player, arguments)
+		}
+
+	}
+}
+
+/*
+	Evaluate messages, commands, etc. which are queued in ms.Broadcast
+	Take action based on input (chat message, command, etc.)
+*/
+func (ms *MudServer) RunMaintenanceactions() {
+	maintenanceTicker := time.NewTicker(time.Minute * time.Duration(ms.Configuration.Server.WorldSaveDelayMinutes))
+
+	for range maintenanceTicker.C {
+		// Perform World Save
+		for _,player := range ms.playerList {
+			ms.SendMessageToPlayer(player, "SERVER:  World saving to DB.")
+			player.WriteToDB(ms.DB)
+		}
+	}
+
 	for {
 		// Pop message off queue
 		msg := <-ms.Broadcast
