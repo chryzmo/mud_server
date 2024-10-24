@@ -1,4 +1,13 @@
 {
-    "ServerName": "Development MUD",
-    "ListenPort": "127.0.0.1:8080"
+    "Server": {
+        "ServerName": "Development MUD",
+        "ListenPort": "127.0.0.1:8080"
+    },
+    "Database": {
+        "DatabaseHost": "localhost",
+        "DatabasePort": "5432",
+        "DatabaseUsername": "mud",
+        "DatabasePassword": "mud",
+        "DatabaseName": "mud"
+    }
 }

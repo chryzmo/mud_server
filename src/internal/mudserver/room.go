@@ -1,6 +1,14 @@
 package mudserver
 
-import "strings"
+import (
+	//muddatabase "mud_server/src/internal/database"
+	"errors"
+	"fmt"
+	muddatabase "mud_server/src/internal/database"
+	"strings"
+
+	"github.com/jackc/pgx/v5"
+)
 
 /*
 	UsersInZone key is Player.Username
@@ -8,15 +16,30 @@ import "strings"
 */
 
 type Room struct {
+	ID int32
 	Name string
 	Description string
+	ExitMap map[string]*Room
 	RoomChannel chan(RoomMessage)
 	UserMap map[string]*MudPlayer
 	BaddieMap map[string]*BaddieNPC
-	ExitMap map[string]*Room
 	Inventory *Inventory
-	BaddieSpawnerMap map[string]*BaddieSpawner
-	//ticker *time.Ticker
+	ExitJSON string
+}
+
+type RoomDB struct {
+	ID int32
+	Name string
+	Description string
+	ExitJSON string
+	InventoryIDArray []int32
+}
+
+type RoomExits struct {
+	N int32 `json:"N"`
+	S int32 `json:"S"`
+	E int32 `json:"E"`
+	W int32 `json:"W"`
 }
 
 func CreateRoom(name string, description string) (*Room) {
@@ -27,7 +50,6 @@ func CreateRoom(name string, description string) (*Room) {
 		UserMap: make(map[string]*MudPlayer),
 		ExitMap: make(map[string]*Room),
 		Inventory: CreateInventory(),
-		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
 		BaddieMap: make(map[string]*BaddieNPC),
 	}
 
@@ -97,16 +119,68 @@ func (r Room) LookDescription() (string) {
 	return desc
 }
 
-func (r *Room) RemovePlayer(username string) () {
+func (r *Room) RemovePlayer(username string) {
 	delete(r.UserMap,username)
 }
 
 // Remove NPC and broadcast kill
-func (r *Room) KillNPC(npcname string, attackername string) () {
+func (r *Room) KillNPC(npcname string, attackername string) {
 	delete(r.BaddieMap,strings.ToUpper(npcname))
 	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
 }
 
-func (r *Room) AddPlayer(mp *MudPlayer) () {
+func (r *Room) AddPlayer(mp *MudPlayer) {
 	r.UserMap[mp.Username] = mp
+}
+
+func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Room) {
+	query := "123"
+	var err error
+	room := Room{}
+
+	switch roomid.(type) {
+	case string:
+		query = "SELECT id,name,description,exitjson,inventoryidarray FROM room WHERE name=$1"
+	case int, int8, int32, int64:
+		query = "SELECT id,name,description,exitjson,inventoryidarray FROM room WHERE id=$1"
+	default:
+		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
+	}
+
+	rows,err := db.Connection.Query(db.Context,query,roomid)
+
+	if err != nil {
+		fmt.Println("Room error: "+err.Error())
+	}
+
+	ret,err := pgx.CollectOneRow(rows,pgx.RowToStructByName[RoomDB])
+
+	if err != nil {
+		fmt.Println("Room error: "+err.Error())
+	}
+
+	// Build Room from RoomDB struct
+	if err == nil {
+		room = Room{
+			ID: ret.ID,
+			Name: ret.Name,
+			Description: ret.Description,
+			Inventory: CreateInventory(),
+			RoomChannel: make(chan RoomMessage,5),
+			UserMap: make(map[string]*MudPlayer),
+			ExitMap: make(map[string]*Room),
+			BaddieMap: make(map[string]*BaddieNPC),
+			ExitJSON: ret.ExitJSON,
+		}
+
+		// Populate room inventory
+		for _,item_id := range ret.InventoryIDArray {
+			i := Item{}
+			room.Inventory.AddItem(i.FetchFromDB(db,item_id))
+		}
+
+		go room.ProcessBroadcast()
+	}
+
+	return &room
 }

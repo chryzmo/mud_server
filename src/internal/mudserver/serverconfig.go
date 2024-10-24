@@ -2,19 +2,26 @@ package mudserver
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 )
 
 type Configuration struct {
-	ServerName	string
-	ListenPort	string
+	Server struct {
+		ServerName	string `json:"ServerName"`
+		ListenPort	string `json:"ListenPort"`
+	} `json:"Server"`
+	Database struct {
+		DatabaseHost string `json:"DatabaseHost"`
+		DatabasePort string `json:"DatabasePort"`
+		DatabaseUsername string `json:"DatabaseUsername"`
+		DatabasePassword string `json:"DatabasePassword"`
+		DatabaseName string `json:"DatabaseName"`
+	} `json:"Database"`
 }
 
 func (c Configuration) LoadConfig (config_file string) (Configuration) {
 	pwd, _ := os.Getwd()
 	file, _ := os.Open(pwd+"/"+config_file)
-	fmt.Println(pwd+"/"+config_file)
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
@@ -24,9 +31,6 @@ func (c Configuration) LoadConfig (config_file string) (Configuration) {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println("Server Config!")
-	fmt.Println(serverconfig)
 
 	return serverconfig
 

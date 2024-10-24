@@ -23,12 +23,12 @@ func main() {
 
 	go serverinstance.HandleMessages()
 
-	fmt.Println("Server starting on "+serverinstance.Configuration.ListenPort)
-	err := http.ListenAndServe(serverinstance.Configuration.ListenPort, nil)
+	fmt.Println("Server starting on "+serverinstance.Configuration.Server.ListenPort)
+	err := http.ListenAndServe(serverinstance.Configuration.Server.ListenPort, nil)
 	if err != nil {
 		panic("Error starting server: " + err.Error())
 	}
-	fmt.Println("Server started on "+serverinstance.Configuration.ListenPort)
+	fmt.Println("Server started on "+serverinstance.Configuration.Server.ListenPort)
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {

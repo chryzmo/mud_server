@@ -6,11 +6,20 @@ import (
 )
 
 type BaddieSpawner struct {
+	ID int32
 	TotalNumber int
 	tickDurationMS int64
+	baddie BaddieNPC
 	ticker      *time.Ticker
 	Location *Room
-	baddie BaddieNPC
+}
+
+type BaddieSpawnerDB struct {
+	ID int32
+	TotalNumber int
+	tickDurationMS int64
+	baddieID int32
+	LocationID int32
 }
 
 func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
