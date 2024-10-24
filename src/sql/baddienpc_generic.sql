@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS baddienpc_generic
 	hp integer NOT NULL DEFAULT 0,
 	mp integer NOT NULL DEFAULT 0,
     CONSTRAINT "BADDIENPC_GENERIC_pkey" PRIMARY KEY (id)
-)
+);
 
 ALTER TABLE IF EXISTS baddienpc_generic
     OWNER to mud;

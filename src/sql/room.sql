@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS room
 	exitjson text COLLATE pg_catalog."default" NOT NULL,
     inventoryidarray integer[],
     CONSTRAINT "ROOM_pkey" PRIMARY KEY (id)
-)
+);
 
 INSERT INTO room (name,description,exitjson,inventoryidarray) VALUES 
     ('Start Room','You find yourself in a generic looking room.  There is a door to the North.','{"N": 2}',[1]);

@@ -21,36 +21,18 @@ func createWorld(db muddatabase.MudDatabase) *World {
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
 	}
 
-	// Load Items?
-
-	// Build sample rooms
-	r := Room{}
-
-	// Load rooms into RoomMap
+	// Load rooms into RoomMap; this ensures that all rooms are loaded prior to linking
 	roomIDList := w.RetrieveListofRoomIDs(db)
 	for _,id := range roomIDList {
+		r := Room{}
 		w.RoomMap[id] = r.FetchFromDB(db,id)
 	}
 
-	// Link rooms after loading
+	// Link rooms & BaddieSpawners after loading rooms
 	for _,room := range w.RoomMap {
-		w.LinkRoom(room)
+		w.LinkRoomExits(room)
+		w.LinkRoomBaddieSpawners(db,room)
 	}
-
-	// Spawner test
-	orcbaddie := BaddieNPC{}
-	orcbaddie = orcbaddie.FetchGenericFromDB(db, "ORC")
-
-	testspawn := &BaddieSpawner{
-		TotalNumber:    1,
-		tickDurationMS: 3000,
-		Location:       w.RoomMap[3],
-		baddie:         orcbaddie,
-	}
-
-	go testspawn.RunTicker()
-
-	w.BaddieSpawnerMap["orc"] = testspawn
 
 	return w
 }
@@ -59,7 +41,7 @@ func (w World) getRoomByID(roomid int32) *Room {
 	return w.RoomMap[roomid]
 }
 
-func (w World) LinkRoom(room *Room) {
+func (w World) LinkRoomExits(room *Room) {
 	jsonMap := make(map[string]interface{})
 	err := json.Unmarshal([]byte(room.ExitJSON), &jsonMap)
 
@@ -77,6 +59,33 @@ func (w World) LinkRoom(room *Room) {
 	}
 }
 
+func (w World) LinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *Room) {
+	query := "SELECT id FROM baddiespawner WHERE roomid=$1"
+	var err error
+	tmpspawner := BaddieSpawner{}
+
+	rows,err := db.Connection.Query(db.Context,query,room.ID)
+
+	if err != nil {
+		fmt.Println("LinkRoomBaddiespawners query error: "+err.Error())
+	}
+
+	// Collect the ID list to []int32
+	idslice, err := pgx.CollectRows(rows, pgx.RowTo[int32])
+
+	if err != nil {
+		fmt.Println("LinkRoomBaddiespawners row error: "+err.Error())
+	} else {
+		for _,id := range idslice {
+			spawner := tmpspawner.FetchGenericFromDB(db,id)
+			spawner.Location = room
+			go spawner.RunTicker()
+	
+			w.BaddieSpawnerMap[spawner.baddie.Race] = spawner
+		}
+	}
+}
+
 func (w World) RetrieveListofRoomIDs(db muddatabase.MudDatabase) []int32 {
 	query := "SELECT id FROM room"
 	var err error
@@ -88,7 +97,11 @@ func (w World) RetrieveListofRoomIDs(db muddatabase.MudDatabase) []int32 {
 	}
 
 	// Collect the ID list to []int32
-	numbers, err := pgx.CollectRows(rows, pgx.RowTo[int32])
+	idslice, err := pgx.CollectRows(rows, pgx.RowTo[int32])
 
-	return numbers
+	if err != nil {
+		fmt.Println("Room Row error: "+err.Error())
+	}
+
+	return idslice
 }

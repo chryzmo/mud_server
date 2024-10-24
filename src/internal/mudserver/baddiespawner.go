@@ -1,8 +1,12 @@
 package mudserver
 
 import (
+	"fmt"
+	muddatabase "mud_server/src/internal/database"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type BaddieSpawner struct {
@@ -17,9 +21,9 @@ type BaddieSpawner struct {
 type BaddieSpawnerDB struct {
 	ID int32
 	TotalNumber int
-	tickDurationMS int64
-	baddieID int32
-	LocationID int32
+	TickDurationMS int64
+	BaddieID int32
+	RoomID int32
 }
 
 func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
@@ -59,4 +63,33 @@ func (spawner BaddieSpawner) RunTicker () {
 			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
 		}
 	}
+}
+
+func (spawner BaddieSpawner) FetchGenericFromDB (db muddatabase.MudDatabase, roomid int32) (*BaddieSpawner) {
+	query := "SELECT id,totalnumber,tickdurationms,baddieid,roomid FROM baddiespawner WHERE id=$1"
+	var err error
+	tmpspawner := BaddieSpawner{}
+	tmpbaddie := BaddieNPC{}
+
+	rows,err := db.Connection.Query(db.Context,query,roomid)
+
+	if err != nil {
+		fmt.Println("BaddieSpawner error: "+err.Error())
+	}
+
+	ret,err := pgx.CollectOneRow(rows,pgx.RowToStructByName[BaddieSpawnerDB])
+
+	if err != nil {
+		fmt.Println("BaddieSpawner error: "+err.Error())
+	}
+
+	// Build Room from RoomDB struct
+	if err == nil {
+		tmpbaddie = tmpbaddie.FetchGenericFromDB(db,ret.BaddieID)
+		tmpspawner.TotalNumber = ret.TotalNumber
+		tmpspawner.tickDurationMS = ret.TickDurationMS
+		tmpspawner.baddie = tmpbaddie
+	}
+
+	return &tmpspawner
 }
