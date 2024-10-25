@@ -47,7 +47,7 @@ func CreateMudServer() *MudServer {
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
-	mc := CreateMudPlayer(ws_conn,ms.World.getRoomByID(1))
+	mc := CreateMudPlayer(ws_conn,ms.World.RoomMap[1])
 
 	// Add MudPlayer to Server connectionList
 	ms.playerList[mc] = mc
@@ -75,6 +75,7 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
 	mp.WriteToDB(ms.DB)
+	mp.Location.Broadcast(mp.Username+" has poofed away.",mp.Username)
 	ms.playerList[mp].Conn.Close()
 	delete(ms.playerList, mp)
 	fmt.Printf("Client disconnect - number of connected clients: %d\n",len(ms.playerList))
@@ -140,6 +141,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 					player.Location.UserMap[player.Username] = player
 
 					player.SendMessage("Welcome back, "+msg.CommandParameter+"!\n")	
+					player.Location.Broadcast(player.Username+" has appeared in the room.",player.Username)
 				
 					// Send initial room description
 					c, _ := ms.getCommand("LOOK")
@@ -154,7 +156,8 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 					player.ID = player.GetIDFromDB(ms.DB)
 
 					// Send welcome message & start game
-					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")	
+					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")
+					player.Location.Broadcast(player.Username+" has appeared in the room.",player.Username)
 					// Send initial room description
 					c, _ := ms.getCommand("LOOK")
 					c.action(player,"")
@@ -205,10 +208,14 @@ func (ms *MudServer) RunMaintenanceactions() {
 
 	for range maintenanceTicker.C {
 		// Perform World Save
+		// Save all MudPlayer states to DB
 		for _,player := range ms.playerList {
 			ms.SendMessageToPlayer(player, "SERVER:  World saving to DB.")
 			player.WriteToDB(ms.DB)
 		}
+
+		// Save all Room states to DB
+		ms.World.WriteWorldToDB(ms.DB)
 	}
 
 	for {
@@ -239,21 +246,27 @@ func (ms *MudServer) processAliases (cn string, args string) (string, string) {
 	arguments := args
 
 	switch command_name {
-	case "NORTH":
+	case "NORTH","N":
 		command_name = "MOVE"
 		arguments = "NORTH"
-	case "SOUTH":
+	case "SOUTH","S":
 		command_name = "MOVE"
 		arguments = "SOUTH"
-	case "EAST":
+	case "EAST","E":
 		command_name = "MOVE"
 		arguments = "EAST"
-	case "WEST":
+	case "WEST","W":
 		command_name = "MOVE"
 		arguments = "WEST"
+	case "UP":
+		command_name = "MOVE"
+		arguments = "UP"
+	case "DOWN":
+		command_name = "MOVE"
+		arguments = "DOWN"
 	case "L":
 		command_name = "LOOK"
-	case "I": 
+	case "I","INV": 
 		command_name = "INVENTORY"
 	}
 

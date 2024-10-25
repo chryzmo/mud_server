@@ -74,6 +74,12 @@ func (mp *MudPlayer) MoveRoom (dir string) int {
 	if strings.ToUpper(dir) == "WEST"{
 		dir = "W"
 	}
+	if strings.ToUpper(dir) == "UP"{
+		dir = "U"
+	}
+	if strings.ToUpper(dir) == "DOWN"{
+		dir = "D"
+	}
 
 	if mp.Location.ExitMap[dir] == nil {
 		// Room does not exist

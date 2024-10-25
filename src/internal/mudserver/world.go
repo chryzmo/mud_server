@@ -22,7 +22,7 @@ func createWorld(db muddatabase.MudDatabase) *World {
 	}
 
 	// Load rooms into RoomMap; this ensures that all rooms are loaded prior to linking
-	roomIDList := w.RetrieveListofRoomIDs(db)
+	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
 	for _,id := range roomIDList {
 		r := Room{}
 		w.RoomMap[id] = r.FetchFromDB(db,id)
@@ -35,10 +35,6 @@ func createWorld(db muddatabase.MudDatabase) *World {
 	}
 
 	return w
-}
-
-func (w World) getRoomByID(roomid int32) *Room {
-	return w.RoomMap[roomid]
 }
 
 func (w World) LinkRoomExits(room *Room) {
@@ -86,7 +82,7 @@ func (w World) LinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *Room) {
 	}
 }
 
-func (w World) RetrieveListofRoomIDs(db muddatabase.MudDatabase) []int32 {
+func (w World) RetrieveListofRoomIDsFromDB(db muddatabase.MudDatabase) []int32 {
 	query := "SELECT id FROM room"
 	var err error
 
@@ -104,4 +100,11 @@ func (w World) RetrieveListofRoomIDs(db muddatabase.MudDatabase) []int32 {
 	}
 
 	return idslice
+}
+
+func (w World) WriteWorldToDB(db muddatabase.MudDatabase) {
+	// Iterate over all rooms and write to DB
+	for _,room := range w.RoomMap {
+		room.WriteToDB(db)
+	}
 }
