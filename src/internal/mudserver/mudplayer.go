@@ -23,8 +23,13 @@ type MudPlayer struct {
 	Inventory *Inventory
 	AttackPower int
 	Defense int
+	HP int
+	MP int
+	MaxHP int
+	MaxMP int
 	NPCTarget *BaddieNPC
 	send_mutex sync.Mutex
+	SpawnLocation *Room
 }
 
 type MudPlayerDB struct {
@@ -33,7 +38,12 @@ type MudPlayerDB struct {
 	InventoryIDSlice []int32
 	AttackPower int
 	Defense int
+	HP int
+	MP int
+	MaxHP int
+	MaxMP int
 	RoomID int32
+	SpawnLocationID int32
 }
 
 func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
@@ -43,7 +53,12 @@ func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
 		Location: room,
 		Inventory: CreateInventory(),
 		AttackPower: 99,
-		Defense: 0,
+		Defense: 10,
+		HP: 5,
+		MaxHP: 5,
+		MP: 5,
+		MaxMP: 5,
+		SpawnLocation: room,
 	}
 }
 
@@ -105,9 +120,9 @@ func (mp *MudPlayer) LoadFromDB (db muddatabase.MudDatabase, world *World, playe
 
 	switch playerid.(type) {
 	case string:
-		query = "SELECT id,username,inventoryidslice,attackpower,defense,roomid FROM player WHERE username=$1"
+		query = "SELECT id,username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,username,inventoryidslice,attackpower,defense,roomid FROM player id=$1"
+		query = "SELECT id,username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player id=$1"
 	default:
 		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
 	}
@@ -133,6 +148,11 @@ func (mp *MudPlayer) LoadFromDB (db muddatabase.MudDatabase, world *World, playe
 		player.Inventory = CreateInventory()
 		player.AttackPower = ret.AttackPower
 		player.Defense = ret.Defense
+		player.HP = ret.HP
+		player.MaxHP = ret.MaxHP
+		player.MP = ret.MP
+		player.MaxMP = ret.MaxMP
+		player.SpawnLocation = world.RoomMap[ret.SpawnLocationID]
 
 		// Build inventory
 		for _,item_id := range ret.InventoryIDSlice {
@@ -178,32 +198,51 @@ func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
 
 	if mp.ID == 0 {
 		// User does not exist, do INSERT
-		query = "INSERT INTO player (username,inventoryidslice,attackpower,defense,roomid) VALUES (@username,@inventoryidslice,@attackpower,@defense,@roomid);"
+		query = "INSERT INTO player (username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,SpawnLocationID) VALUES (@username,@inventoryidslice,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
 
 		args := pgx.NamedArgs{
 			"username": mp.Username,
 			"inventoryidslice": mp.Inventory.IDSlice(),
 			"attackpower": mp.AttackPower,
 			"defense": mp.Defense,
+			"hp": mp.HP,
+			"maxhp": mp.MaxHP,
+			"mp": mp.MP,
+			"maxmp": mp.MaxMP,
 			"roomid": mp.Location.ID,
-		  }
+			"spawnlocationid": mp.SpawnLocation.ID,
+		}
 		
-		  db.ExecWithArgs(query,args)
+		err := db.ExecWithArgs(query,args)
+		if err != nil {
+			fmt.Println("MudPlauer.WriteToDB INSERT error:"+err.Error())
+		}
+		  
 
 	} else {
 		// User exists, do UPDATE
-		query = "UPDATE player SET username=@username, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, roomid=@roomid WHERE id=@playerid;"
+		query = "UPDATE player SET username=@username, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
 
 		args := pgx.NamedArgs{
 			"username": mp.Username,
 			"inventoryidslice": mp.Inventory.IDSlice(),
 			"attackpower": mp.AttackPower,
 			"defense": mp.Defense,
+			"hp": mp.HP,
+			"maxhp": mp.MaxHP,
+			"mp": mp.MP,
+			"maxmp": mp.MaxMP,
 			"roomid": mp.Location.ID,
 			"playerid": mp.ID,
-		  }
+			"spawnlocationid": mp.SpawnLocation.ID,
+		}
 		
-		  db.ExecWithArgs(query,args)
+		err := db.ExecWithArgs(query,args)
+
+		if err != nil {
+			fmt.Println("MudPlauer.WriteToDB UPDATE error:"+err.Error())
+		}
+		
 	}
 }
 
@@ -214,14 +253,25 @@ func (mp *MudPlayer) GetIDFromDB (db muddatabase.MudDatabase) int32 {
 	rows,err := db.Connection.Query(db.Context,query,mp.Username)
 
 	if err != nil {
-		fmt.Println("CountUsernameFromDB query error: "+err.Error())
+		fmt.Println("GetIDFromDB query error: "+err.Error())
 	}
 
 	userid, err := pgx.CollectOneRow(rows, pgx.RowTo[int32])
 
 	if err != nil {
-		fmt.Println("CountUsernameFromDB scan error: "+err.Error())
+		fmt.Println("GetIDFromDB scan error: "+err.Error())
 	}
 
 	return userid
+}
+
+func (mp *MudPlayer) Respawn () {
+	mp.Location.RemovePlayer(mp.Username)
+	mp.HP = mp.MaxHP
+	mp.MP = mp.MaxMP
+	mp.Location = mp.SpawnLocation
+	mp.Location.AddPlayer(mp)
+	mp.Location.Broadcast(mp.Username+" has appeared in the room.",mp.Username)
+	mp.SendMessage(mp.Location.LookDescription())
+
 }

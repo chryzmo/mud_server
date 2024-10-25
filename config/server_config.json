@@ -10,5 +10,8 @@
         "DatabaseUsername": "mud",
         "DatabasePassword": "mud",
         "DatabaseName": "mud"
+    },
+    "Game": {
+        "RoomTickDurationInMS": 250
     }
 }

@@ -53,6 +53,9 @@ func (spawner BaddieSpawner) RunTicker () {
 				Defense: spawner.baddie.Defense,
 				HP: spawner.baddie.HP,
 				MP: spawner.baddie.MP,
+				TurnAction: spawner.baddie.TurnAction,
+				combatTickerDurationInMS: spawner.baddie.combatTickerDurationInMS,
+				combatTicker: time.NewTicker(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
 			}
 
 			if newbaddie.Name == "" {

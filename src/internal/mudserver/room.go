@@ -6,6 +6,7 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -20,6 +21,8 @@ type Room struct {
 	BaddieMap map[string]*BaddieNPC
 	Inventory *Inventory
 	ExitJSON string
+	ticker *time.Ticker
+	tickDurationInMS int32
 }
 
 type RoomDB struct {
@@ -39,7 +42,7 @@ type RoomExits struct {
 	D int32 `json:"D"`
 }
 
-func CreateRoom(name string, description string) (*Room) {
+func CreateRoom(name string, description string, tickdur int32) (*Room) {
 	r := &Room{
 		Name: name,
 		Description: description,
@@ -48,22 +51,27 @@ func CreateRoom(name string, description string) (*Room) {
 		ExitMap: make(map[string]*Room),
 		Inventory: CreateInventory(),
 		BaddieMap: make(map[string]*BaddieNPC),
+		tickDurationInMS: tickdur,
 	}
 
 	// Launch goroutine to continuously process broadcast messages
 	go r.ProcessBroadcast()
+	go r.RunTicker()
 
 	return r
 }
 
-/*func (room *Room) RunTicker () {
-	room.ticker = time.NewTicker(time.Millisecond * 250) //TODO:  Server config?
+func (room *Room) RunTicker () {
+	room.ticker = time.NewTicker(time.Millisecond * time.Duration(room.tickDurationInMS))
 
-	for range room.ticker.C {
-		// check if RoomChannel is not empty
-			// Perform action (broadcast)
+	for {
+		for range room.ticker.C {
+			for _,npc := range room.BaddieMap {
+				npc.TurnAction(room,npc)
+			}
+		}
 	}
-}*/
+}
 
 func (r Room) ProcessBroadcast() {
 	for {
@@ -126,11 +134,18 @@ func (r *Room) KillNPC(npcname string, attackername string) {
 	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
 }
 
+// Remove NPC and broadcast kill
+func (r *Room) KillPC(player *MudPlayer, attackername string) {
+	r.Broadcast(attackername+" kills "+player.Username+"!",player.Username)
+	player.SendMessage("You were killed by "+attackername+"!")
+	player.Respawn()
+}
+
 func (r *Room) AddPlayer(mp *MudPlayer) {
 	r.UserMap[mp.Username] = mp
 }
 
-func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Room) {
+func (r *Room) FetchFromDB (db muddatabase.MudDatabase, tickdur int32, roomid interface{}) (*Room) {
 	query := ""
 	var err error
 	room := Room{}
@@ -168,6 +183,7 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Ro
 			ExitMap: make(map[string]*Room),
 			BaddieMap: make(map[string]*BaddieNPC),
 			ExitJSON: ret.ExitJSON,
+			tickDurationInMS: tickdur,
 		}
 
 		// Populate room inventory
@@ -177,6 +193,7 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Ro
 		}
 
 		go room.ProcessBroadcast()
+		go room.RunTicker()
 	}
 
 	return &room
