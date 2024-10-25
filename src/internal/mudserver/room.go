@@ -10,11 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-/*
-	UsersInZone key is Player.Username
-	ExitList key is <direction> of exit
-*/
-
 type Room struct {
 	ID int32
 	Name string
@@ -40,6 +35,8 @@ type RoomExits struct {
 	S int32 `json:"S"`
 	E int32 `json:"E"`
 	W int32 `json:"W"`
+	U int32 `json:"U"`
+	D int32 `json:"D"`
 }
 
 func CreateRoom(name string, description string) (*Room) {
@@ -183,4 +180,21 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, roomid interface{}) (*Ro
 	}
 
 	return &room
+}
+
+func (r *Room) WriteToDB (db muddatabase.MudDatabase) {
+	// User exists, do UPDATE
+	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson, inventoryidslice=@inventoryidslice WHERE id=@roomid;"
+
+	// Build ExitJSON
+
+	args := pgx.NamedArgs{
+		"name": r.Name,
+		"description": r.Description,
+		"exitjson": r.ExitJSON,
+		"inventoryidslice": r.Inventory.IDSlice(),
+		"roomid": r.ID,
+	  }
+	
+	  db.ExecWithArgs(query,args)
 }
