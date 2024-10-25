@@ -18,6 +18,9 @@ type Configuration struct {
 		DatabasePassword string `json:"DatabasePassword"`
 		DatabaseName string `json:"DatabaseName"`
 	} `json:"Database"`
+	Game struct {
+		RoomTickDurationInMS int32 `json:"RoomTickDurationInMS"`
+	} `json:"Game"`
 }
 
 func (c Configuration) LoadConfig (config_file string) (Configuration) {

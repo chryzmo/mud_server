@@ -32,7 +32,7 @@ func CreateMudServer() *MudServer {
 	dburl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",c.Database.DatabaseUsername,c.Database.DatabasePassword,c.Database.DatabaseHost,c.Database.DatabasePort,c.Database.DatabaseName)
 	db := muddatabase.CreateDatabase(dburl) //postgres://uid:pwd@localhost:5432/my-database
 
-	w := createWorld(db)
+	w := createWorld(db,c.Game.RoomTickDurationInMS)
 
 	server := &MudServer{
 		playerList: make(map[*MudPlayer]*MudPlayer),
@@ -76,6 +76,7 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
 	mp.WriteToDB(ms.DB)
 	mp.Location.Broadcast(mp.Username+" has poofed away.",mp.Username)
+	mp.Location.RemovePlayer(mp.Username)
 	ms.playerList[mp].Conn.Close()
 	delete(ms.playerList, mp)
 	fmt.Printf("Client disconnect - number of connected clients: %d\n",len(ms.playerList))
@@ -116,6 +117,11 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 
 			ms.DeleteConnection(player)
 			return
+		}
+
+		// If message is blank, disregard it
+		if len(messagebytes) == 0 {
+			continue
 		}
 
 		// Build MudMessage

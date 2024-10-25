@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	muddatabase "mud_server/src/internal/database"
-	muddata "mud_server/src/internal/muddata"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -21,6 +21,10 @@ type BaddieNPC struct {
 	Defense int
 	HP int
 	MP int
+	TargetPC *MudPlayer
+	TurnAction func(room *Room, baddie *BaddieNPC) int32
+	combatTicker *time.Ticker
+	combatTickerDurationInMS int32
 }
 
 type baddieNPC_GenericDB struct {
@@ -31,28 +35,43 @@ type baddieNPC_GenericDB struct {
 	Defense int
 	HP int
 	MP int
+	CombatTickerDurationInMS int32
+	TurnActionFunctionID int32
 }
 
-type baddieNPC_NamedDB struct {
-	ID int32
-	Name string
-	Race string
-	AttackAccuracy int
-	AttackPower int
-	Defense int
-	HP int
-	MP int
-}
+func (npc *BaddieNPC) attack (player *MudPlayer) {
+	select {
+	case <-npc.combatTicker.C:
+		// Do attack logic
+		attackRoll := rand.IntN(100) + npc.AttackAccuracy
+		broadcastmsg := fmt.Sprint(npc.Name," swings at ",player.Username," - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		npc.Location.Broadcast(broadcastmsg,player.Username)
+		pmsg := fmt.Sprint(npc.Name+" swings at you - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		player.SendMessage(pmsg)
+		if attackRoll > player.Defense {
+			// Hit!
+			broadcastmsg = fmt.Sprint(npc.Name," hits ",player.Username," for ",npc.AttackPower," damage.")
+			npc.Location.Broadcast(broadcastmsg,player.Username)
+			pmsg = fmt.Sprint(npc.Name," hits you for ",npc.AttackPower," damage!")
+			player.SendMessage(pmsg)
+			player.HP -= npc.AttackPower
 
-func (npc *BaddieNPC) attack (player *MudPlayer) (int, int) {
-	attackRoll := rand.IntN(100) + npc.AttackAccuracy
-	if attackRoll > player.Defense {
-		// Hit!
-
-		return muddata.STATUS_ATTACK_HIT, npc.AttackPower
+			// Check for player death
+			if player.HP <= 0 {
+				fmt.Println("Kill!")
+				npc.Location.KillPC(player,npc.Name)
+				npc.TargetPC = nil
+			}
+		} else {
+			// NPC missed player
+			npc.Location.Broadcast(npc.Name+" misses "+player.Username+".",player.Username)
+			player.SendMessage(npc.Name+" misses you.")
+		}
+	default:
+		// Do nothing as combat ticker is running
+		
 	}
 
-	return muddata.STATUS_ATTACK_MISS,0
 }
 
 // TODO:  Update this with a lookup table
@@ -66,19 +85,15 @@ func (npc *BaddieNPC) GenerateName() (string) {
 	return npc.Race+string(b)
 }
 
-type BaddieNPCID interface {
-	string | int32
-}
-
 func (npc BaddieNPC) FetchGenericFromDB (db muddatabase.MudDatabase, baddieid interface{}) (BaddieNPC) {
 	query := ""
 	var err error
 
 	switch baddieid.(type) {
 	case string:
-		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp FROM BADDIENPC_GENERIC WHERE race=$1"
+		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,combatTickerDurationInMS,turnActionFunctionID FROM BADDIENPC_GENERIC WHERE race=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp FROM BADDIENPC_GENERIC WHERE id=$1"
+		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,combatTickerDurationInMS,turnActionFunctionID FROM BADDIENPC_GENERIC WHERE id=$1"
 	default:
 		err = errors.New("BaddieNPC.FetchGenericFromDB invalid ID.  ID must be string|int32")
 	}
@@ -105,6 +120,8 @@ func (npc BaddieNPC) FetchGenericFromDB (db muddatabase.MudDatabase, baddieid in
 			Defense:        ret.Defense,
 			HP:             ret.HP,
 			MP:             ret.MP,
+			combatTickerDurationInMS: ret.CombatTickerDurationInMS,
+			TurnAction: GenerateNPCCommandList()[ret.TurnActionFunctionID].action,
 		}
 	}
 

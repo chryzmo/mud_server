@@ -13,9 +13,10 @@ type World struct {
 	StartingRooms map[string]*Room
 	RoomMap       map[int32]*Room
 	BaddieSpawnerMap map[string]*BaddieSpawner
+	NPCTurnActionMap map[int32]NPCCommand
 }
 
-func createWorld(db muddatabase.MudDatabase) *World {
+func createWorld(db muddatabase.MudDatabase, roomTickDuration int32) *World {
 	w := &World{
 		RoomMap: make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -25,13 +26,16 @@ func createWorld(db muddatabase.MudDatabase) *World {
 	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
 	for _,id := range roomIDList {
 		r := Room{}
-		w.RoomMap[id] = r.FetchFromDB(db,id)
+		w.RoomMap[id] = r.FetchFromDB(db,roomTickDuration,id)
 	}
+
+	// Load NPC TurnAction functions here
+	w.NPCTurnActionMap = GenerateNPCCommandList()
 
 	// Link rooms & BaddieSpawners after loading rooms
 	for _,room := range w.RoomMap {
 		w.LinkRoomExits(room)
-		w.LinkRoomBaddieSpawners(db,room)
+		w.LoadAndLinkRoomBaddieSpawners(db,room)
 	}
 
 	return w
@@ -55,7 +59,7 @@ func (w World) LinkRoomExits(room *Room) {
 	}
 }
 
-func (w World) LinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *Room) {
+func (w World) LoadAndLinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *Room) {
 	query := "SELECT id FROM baddiespawner WHERE roomid=$1"
 	var err error
 	tmpspawner := BaddieSpawner{}
