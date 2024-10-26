@@ -6,12 +6,12 @@ CREATE TABLE IF NOT EXISTS room
     name text COLLATE pg_catalog."default" NOT NULL,
     description text COLLATE pg_catalog."default" NOT NULL,
 	exitjson text COLLATE pg_catalog."default" NOT NULL,
-    inventoryidslice integer[],
+    inventoryidslice JSON,
     CONSTRAINT "ROOM_pkey" PRIMARY KEY (id)
 );
 
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 
-    ('Start Room','You find yourself in a generic looking room.  There is a door to the North.','{"N": 2}','{1}');
+    ('Start Room','You find yourself in a generic looking room.  There is a door to the North.','{"N": 2}','{"i1": 1}');
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 
     ('Balcony','You are at a balcony overlooking the woods.  There is a door to the East and to the South.','{"S": 1,"E": 3}','{}');
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 

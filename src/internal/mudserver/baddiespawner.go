@@ -56,6 +56,8 @@ func (spawner BaddieSpawner) RunTicker () {
 				TurnAction: spawner.baddie.TurnAction,
 				combatTickerDurationInMS: spawner.baddie.combatTickerDurationInMS,
 				combatTicker: time.NewTicker(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
+				LootGoldMin: spawner.baddie.LootGoldMin,
+				LootGoldMax: spawner.baddie.LootGoldMax,
 			}
 
 			if newbaddie.Name == "" {
@@ -68,7 +70,7 @@ func (spawner BaddieSpawner) RunTicker () {
 	}
 }
 
-func (spawner BaddieSpawner) FetchGenericFromDB (db muddatabase.MudDatabase, roomid int32) (*BaddieSpawner) {
+func (spawner BaddieSpawner) FetchGenericFromDB (db *muddatabase.MudDatabase, roomid int32) (*BaddieSpawner) {
 	query := "SELECT id,totalnumber,tickdurationms,baddieid,roomid FROM baddiespawner WHERE id=$1"
 	var err error
 	tmpspawner := BaddieSpawner{}

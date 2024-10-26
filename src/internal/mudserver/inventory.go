@@ -33,6 +33,15 @@ func (i Inventory) AddItem (item *Item) {
 	}
 }
 
+func (i Inventory) AddItemByQuantity (item *Item, quantity int32) {
+	if _, exists := i.items[item.Name]; exists {
+		i.items[item.Name].Quantity += quantity
+	} else {
+		i.items[item.Name] = item
+		i.items[item.Name].Quantity = quantity
+	}
+}
+
 func (i Inventory) RemoveItem (item *Item) (int) {
 	if _, exists := i.items[item.Name]; exists {
 		if i.items[item.Name].Quantity > 1 {
@@ -63,16 +72,21 @@ func (i Inventory) ListAsString(withQuantity bool) (string) {
 	return invreturn
 }
 
-func (i Inventory) IDSlice() ([]int32) {
-	idslice := make([]int32,0)
+// TODO:  This may ned to be JSON
+// inventory: {item_id,quantity}
+// Example?  https://gist.github.com/rrafal/46e58682cd1ca70a740b433e57f070cd
+func (i Inventory) IDMap() (map[string]int32) {
+	// map["i"<item_id>]quantity
+	idmap := make(map[string]int32)
 
 	if len(i.items) > 0 {
 		for _,v := range i.items {
-			idslice = append(idslice,v.ID)
+			iid := fmt.Sprint("i",v.ID)
+			idmap[iid] = v.Quantity
 		}
 	}
 
-	return idslice
+	return idmap
 }
 
 func (i Inventory) isEmpty() (bool) {
