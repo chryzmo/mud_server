@@ -25,6 +25,8 @@ type BaddieNPC struct {
 	TurnAction func(room *Room, baddie *BaddieNPC) int32
 	combatTicker *time.Ticker
 	combatTickerDurationInMS int32
+	LootGoldMin int32
+	LootGoldMax int32
 }
 
 type baddieNPC_GenericDB struct {
@@ -37,6 +39,8 @@ type baddieNPC_GenericDB struct {
 	MP int
 	CombatTickerDurationInMS int32
 	TurnActionFunctionID int32
+	LootGoldMin int32
+	LootGoldMax int32
 }
 
 func (npc *BaddieNPC) attack (player *MudPlayer) {
@@ -85,15 +89,19 @@ func (npc *BaddieNPC) GenerateName() (string) {
 	return npc.Race+string(b)
 }
 
-func (npc BaddieNPC) FetchGenericFromDB (db muddatabase.MudDatabase, baddieid interface{}) (BaddieNPC) {
+func (npc BaddieNPC) FetchGenericFromDB (db *muddatabase.MudDatabase, baddieid interface{}) (BaddieNPC) {
 	query := ""
 	var err error
 
 	switch baddieid.(type) {
 	case string:
-		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,combatTickerDurationInMS,turnActionFunctionID FROM BADDIENPC_GENERIC WHERE race=$1"
+		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,lootgoldmax,lootgoldmin,"+
+				"combatTickerDurationInMS,turnActionFunctionID"+
+				" FROM BADDIENPC_GENERIC WHERE race=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,combatTickerDurationInMS,turnActionFunctionID FROM BADDIENPC_GENERIC WHERE id=$1"
+		query = "SELECT id,race,attackaccuracy,attackpower,defense,hp,mp,lootgoldmax,lootgoldmin,"+
+				"combatTickerDurationInMS,turnActionFunctionID"+
+				" FROM BADDIENPC_GENERIC WHERE id=$1"
 	default:
 		err = errors.New("BaddieNPC.FetchGenericFromDB invalid ID.  ID must be string|int32")
 	}
@@ -122,6 +130,8 @@ func (npc BaddieNPC) FetchGenericFromDB (db muddatabase.MudDatabase, baddieid in
 			MP:             ret.MP,
 			combatTickerDurationInMS: ret.CombatTickerDurationInMS,
 			TurnAction: GenerateNPCCommandList()[ret.TurnActionFunctionID].action,
+			LootGoldMin: ret.LootGoldMin,
+			LootGoldMax: ret.LootGoldMax,
 		}
 	}
 

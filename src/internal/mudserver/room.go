@@ -4,7 +4,9 @@ import (
 	//muddatabase "mud_server/src/internal/database"
 	"errors"
 	"fmt"
+	"math/rand"
 	muddatabase "mud_server/src/internal/database"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 
 type Room struct {
 	ID int32
+	DB *muddatabase.MudDatabase
 	Name string
 	Description string
 	ExitMap map[string]*Room
@@ -30,7 +33,7 @@ type RoomDB struct {
 	Name string
 	Description string
 	ExitJSON string
-	InventoryIDSlice []int32
+	InventoryIDSlice map[string]int32
 }
 
 type RoomExits struct {
@@ -130,6 +133,17 @@ func (r *Room) RemovePlayer(username string) {
 
 // Remove NPC and broadcast kill
 func (r *Room) KillNPC(npcname string, attackername string) {
+	
+	// Set up loot for victorious MudPlayer
+	if r.UserMap[attackername] != nil {
+		if r.UserMap[attackername].NPCTarget.LootGoldMax > 0 {
+			i := Item{}
+			gploot_quantity := rand.Int31n(r.BaddieMap[strings.ToUpper(npcname)].LootGoldMax-r.BaddieMap[strings.ToUpper(npcname)].LootGoldMin) + r.BaddieMap[strings.ToUpper(npcname)].LootGoldMin
+			msg := fmt.Sprint("You receive ",gploot_quantity," gold.\n")
+			r.UserMap[attackername].SendMessage(msg)			
+			r.UserMap[attackername].Inventory.AddItemByQuantity(i.FetchFromDB(r.DB,"GOLD"),gploot_quantity)
+		}
+	}
 	delete(r.BaddieMap,strings.ToUpper(npcname))
 	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
 }
@@ -145,7 +159,7 @@ func (r *Room) AddPlayer(mp *MudPlayer) {
 	r.UserMap[mp.Username] = mp
 }
 
-func (r *Room) FetchFromDB (db muddatabase.MudDatabase, tickdur int32, roomid interface{}) (*Room) {
+func (r *Room) FetchFromDB (db *muddatabase.MudDatabase, tickdur int32, roomid interface{}) (*Room) {
 	query := ""
 	var err error
 	room := Room{}
@@ -175,6 +189,7 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, tickdur int32, roomid in
 	if err == nil {
 		room = Room{
 			ID: ret.ID,
+			DB: db,
 			Name: ret.Name,
 			Description: ret.Description,
 			Inventory: CreateInventory(),
@@ -187,9 +202,12 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, tickdur int32, roomid in
 		}
 
 		// Populate room inventory
-		for _,item_id := range ret.InventoryIDSlice {
+		for iid,_ := range ret.InventoryIDSlice {
 			i := Item{}
-			room.Inventory.AddItem(i.FetchFromDB(db,item_id))
+			sid,_ := strconv.ParseInt(iid[1:],10,32)
+			item_id := int32(sid)
+			
+			room.Inventory.AddItemByQuantity(i.FetchFromDB(db,item_id),ret.InventoryIDSlice[iid])
 		}
 
 		go room.ProcessBroadcast()
@@ -199,7 +217,7 @@ func (r *Room) FetchFromDB (db muddatabase.MudDatabase, tickdur int32, roomid in
 	return &room
 }
 
-func (r *Room) WriteToDB (db muddatabase.MudDatabase) {
+func (r *Room) WriteToDB (db *muddatabase.MudDatabase) {
 	// User exists, do UPDATE
 	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson, inventoryidslice=@inventoryidslice WHERE id=@roomid;"
 
@@ -209,7 +227,7 @@ func (r *Room) WriteToDB (db muddatabase.MudDatabase) {
 		"name": r.Name,
 		"description": r.Description,
 		"exitjson": r.ExitJSON,
-		"inventoryidslice": r.Inventory.IDSlice(),
+		"inventoryidslice": r.Inventory.IDMap(),
 		"roomid": r.ID,
 	  }
 	

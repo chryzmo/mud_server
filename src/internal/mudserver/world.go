@@ -16,7 +16,7 @@ type World struct {
 	NPCTurnActionMap map[int32]NPCCommand
 }
 
-func createWorld(db muddatabase.MudDatabase, roomTickDuration int32) *World {
+func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32) *World {
 	w := &World{
 		RoomMap: make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -59,7 +59,7 @@ func (w World) LinkRoomExits(room *Room) {
 	}
 }
 
-func (w World) LoadAndLinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *Room) {
+func (w World) LoadAndLinkRoomBaddieSpawners(db *muddatabase.MudDatabase, room *Room) {
 	query := "SELECT id FROM baddiespawner WHERE roomid=$1"
 	var err error
 	tmpspawner := BaddieSpawner{}
@@ -86,7 +86,7 @@ func (w World) LoadAndLinkRoomBaddieSpawners(db muddatabase.MudDatabase, room *R
 	}
 }
 
-func (w World) RetrieveListofRoomIDsFromDB(db muddatabase.MudDatabase) []int32 {
+func (w World) RetrieveListofRoomIDsFromDB(db *muddatabase.MudDatabase) []int32 {
 	query := "SELECT id FROM room"
 	var err error
 
@@ -106,7 +106,7 @@ func (w World) RetrieveListofRoomIDsFromDB(db muddatabase.MudDatabase) []int32 {
 	return idslice
 }
 
-func (w World) WriteWorldToDB(db muddatabase.MudDatabase) {
+func (w World) WriteWorldToDB(db *muddatabase.MudDatabase) {
 	// Iterate over all rooms and write to DB
 	for _,room := range w.RoomMap {
 		room.WriteToDB(db)

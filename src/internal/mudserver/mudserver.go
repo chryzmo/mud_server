@@ -32,7 +32,7 @@ func CreateMudServer() *MudServer {
 	dburl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",c.Database.DatabaseUsername,c.Database.DatabasePassword,c.Database.DatabaseHost,c.Database.DatabasePort,c.Database.DatabaseName)
 	db := muddatabase.CreateDatabase(dburl) //postgres://uid:pwd@localhost:5432/my-database
 
-	w := createWorld(db,c.Game.RoomTickDurationInMS)
+	w := createWorld(&db,c.Game.RoomTickDurationInMS)
 
 	server := &MudServer{
 		playerList: make(map[*MudPlayer]*MudPlayer),
@@ -74,7 +74,7 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 }
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
-	mp.WriteToDB(ms.DB)
+	mp.WriteToDB(&ms.DB)
 	mp.Location.Broadcast(mp.Username+" has poofed away.",mp.Username)
 	mp.Location.RemovePlayer(mp.Username)
 	ms.playerList[mp].Conn.Close()
@@ -138,8 +138,8 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 
 				username := msg.CommandParameter
 				
-				if player.CountUsernameFromDB(ms.DB,username) == 1 {
-					err := player.LoadFromDB(ms.DB, ms.World, player, username)
+				if player.CountUsernameFromDB(&ms.DB,username) == 1 {
+					err := player.LoadFromDB(&ms.DB, ms.World, player, username)
 					if err != nil {
 						fmt.Println("Error loading player: "+err.Error())
 						break
@@ -157,9 +157,9 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 					player.Username = msg.CommandParameter
 					player.Location.UserMap[player.Username] = player
 					// Write to DB
-					player.WriteToDB(ms.DB)
+					player.WriteToDB(&ms.DB)
 					// Get DB ID for MudPlayer
-					player.ID = player.GetIDFromDB(ms.DB)
+					player.ID = player.GetIDFromDB(&ms.DB)
 
 					// Send welcome message & start game
 					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")
@@ -217,11 +217,11 @@ func (ms *MudServer) RunMaintenanceactions() {
 		// Save all MudPlayer states to DB
 		for _,player := range ms.playerList {
 			ms.SendMessageToPlayer(player, "SERVER:  World saving to DB.")
-			player.WriteToDB(ms.DB)
+			player.WriteToDB(&ms.DB)
 		}
 
 		// Save all Room states to DB
-		ms.World.WriteWorldToDB(ms.DB)
+		ms.World.WriteWorldToDB(&ms.DB)
 	}
 
 	for {
