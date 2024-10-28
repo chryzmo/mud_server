@@ -21,7 +21,7 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 					for k, _ := range baddie.Location.UserMap {
 						baddie.TargetPC = baddie.Location.UserMap[k]
 						baddie.Location.Broadcast(baddie.Name+" looks at "+baddie.Location.UserMap[k].Username+".", "")
-						break
+						continue
 					}
 				}
 			} else {

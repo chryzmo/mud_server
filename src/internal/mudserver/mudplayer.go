@@ -5,6 +5,7 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	muddata "mud_server/src/internal/muddata"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ type MudPlayer struct {
 type MudPlayerDB struct {
 	ID int32
 	Username string
-	InventoryIDSlice []int32
+	InventoryIDSlice map[string]int32
 	AttackPower int
 	Defense int
 	HP int
@@ -114,7 +115,7 @@ func (mp *MudPlayer) MoveRoom (dir string) int {
 	return retcode
 }
 
-func (mp *MudPlayer) LoadFromDB (db muddatabase.MudDatabase, world *World, player *MudPlayer, playerid interface{}) error {
+func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, player *MudPlayer, playerid interface{}) error {
 	query := ""
 	var err error
 
@@ -155,16 +156,17 @@ func (mp *MudPlayer) LoadFromDB (db muddatabase.MudDatabase, world *World, playe
 		player.SpawnLocation = world.RoomMap[ret.SpawnLocationID]
 
 		// Build inventory
-		for _,item_id := range ret.InventoryIDSlice {
+		for iid,_ := range ret.InventoryIDSlice {
 			i := Item{}
-			player.Inventory.AddItem(i.FetchFromDB(db,item_id))
+			sid,_ := strconv.ParseInt(iid[1:],10,32)
+			player.Inventory.AddItemByQuantity(i.FetchFromDB(db,sid),ret.InventoryIDSlice[iid])
 		}
 	}
 
 	return err
 }
 
-func (mp *MudPlayer) CountUsernameFromDB (db muddatabase.MudDatabase, playerid interface{}) int32 {
+func (mp *MudPlayer) CountUsernameFromDB (db *muddatabase.MudDatabase, playerid interface{}) int32 {
 	query := ""
 	var err error
 	var usercount int32 = 0
@@ -193,7 +195,7 @@ func (mp *MudPlayer) CountUsernameFromDB (db muddatabase.MudDatabase, playerid i
 	return usercount
 }
 
-func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
+func (mp *MudPlayer) WriteToDB (db *muddatabase.MudDatabase) {
 	query := ""
 
 	if mp.ID == 0 {
@@ -202,7 +204,7 @@ func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
 
 		args := pgx.NamedArgs{
 			"username": mp.Username,
-			"inventoryidslice": mp.Inventory.IDSlice(),
+			"inventoryidslice": mp.Inventory.IDMap(),
 			"attackpower": mp.AttackPower,
 			"defense": mp.Defense,
 			"hp": mp.HP,
@@ -225,7 +227,7 @@ func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
 
 		args := pgx.NamedArgs{
 			"username": mp.Username,
-			"inventoryidslice": mp.Inventory.IDSlice(),
+			"inventoryidslice": mp.Inventory.IDMap(),
 			"attackpower": mp.AttackPower,
 			"defense": mp.Defense,
 			"hp": mp.HP,
@@ -246,7 +248,7 @@ func (mp *MudPlayer) WriteToDB (db muddatabase.MudDatabase) {
 	}
 }
 
-func (mp *MudPlayer) GetIDFromDB (db muddatabase.MudDatabase) int32 {
+func (mp *MudPlayer) GetIDFromDB (db *muddatabase.MudDatabase) int32 {
 	query := "SELECT id FROM player WHERE username=$1"
 	var err error
 
