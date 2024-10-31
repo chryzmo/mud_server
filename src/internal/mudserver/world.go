@@ -16,7 +16,7 @@ type World struct {
 	NPCTurnActionMap map[int32]NPCCommand
 }
 
-func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32) *World {
+func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whisperchan chan(MudMessage)) *World {
 	w := &World{
 		RoomMap: make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -25,7 +25,7 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32) *World {
 	// Load rooms into RoomMap; this ensures that all rooms are loaded prior to linking
 	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
 	for _,id := range roomIDList {
-		r := Room{}
+		r := Room{GlobalWhisperChannel: whisperchan}
 		w.RoomMap[id] = r.FetchFromDB(db,roomTickDuration,id)
 	}
 
@@ -41,6 +41,7 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32) *World {
 	return w
 }
 
+// Use JSON column - Inventory for example?
 func (w World) LinkRoomExits(room *Room) {
 	jsonMap := make(map[string]interface{})
 	err := json.Unmarshal([]byte(room.ExitJSON), &jsonMap)

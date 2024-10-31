@@ -5,6 +5,7 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
+	"mud_server/src/internal/mudutils"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ type MudServer struct {
 	playerList map[*MudPlayer]*MudPlayer
 	//ticker *time.Ticker
 	Broadcast chan(MudMessage)
+	WhisperChan chan(MudMessage)
 	World *World
 	Commands map[string]*MudCommand
 	Configuration Configuration
@@ -32,16 +34,20 @@ func CreateMudServer() *MudServer {
 	dburl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",c.Database.DatabaseUsername,c.Database.DatabasePassword,c.Database.DatabaseHost,c.Database.DatabasePort,c.Database.DatabaseName)
 	db := muddatabase.CreateDatabase(dburl) //postgres://uid:pwd@localhost:5432/my-database
 
-	w := createWorld(&db,c.Game.RoomTickDurationInMS)
+	serverWhisperChannel := make(chan MudMessage)
+	w := createWorld(&db,c.Game.RoomTickDurationInMS, serverWhisperChannel)
 
 	server := &MudServer{
 		playerList: make(map[*MudPlayer]*MudPlayer),
 		Broadcast: make(chan MudMessage),
+		WhisperChan: serverWhisperChannel,
 		World: w,
 		Commands: GenerateCommandList(),
 		Configuration: c,
 		DB: db,
 	}
+
+	go server.ProcessGlobalWhispers()
 
 	return server
 }
@@ -75,7 +81,7 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
 	mp.WriteToDB(&ms.DB)
-	mp.Location.Broadcast(mp.Username+" has poofed away.",mp.Username)
+	mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has poofed away.",mp.Username)
 	mp.Location.RemovePlayer(mp.Username)
 	ms.playerList[mp].Conn.Close()
 	delete(ms.playerList, mp)
@@ -99,6 +105,23 @@ func (ms *MudServer) getCommand(commandname string) (*MudCommand, int) {
 		return nil, muddata.ERR_COMMAND_UNKNOWN
 	}
 	return c, muddata.MUD_OK
+}
+
+func (ms *MudServer) ProcessGlobalWhispers() {
+	for {
+		fmt.Println("Server whisper chan:")
+		fmt.Println(ms.WhisperChan)
+		whisperMUDMessage := <-ms.WhisperChan
+
+		fmt.Println("Have a message to process!")
+
+		targetPlayer := ms.GetPlayerByUsername(whisperMUDMessage.CommandTarget)
+		messageContent := whisperMUDMessage.CommandParameter
+		senderUsername := whisperMUDMessage.SenderPlayer.Username
+
+		msg := mudutils.ColorString(senderUsername + " whispers, \""+messageContent+"\"", mudutils.COLOR_MAGENTA)
+		targetPlayer.SendMessage(msg);
+	}
 }
 
 /*
@@ -147,7 +170,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 					player.Location.UserMap[player.Username] = player
 
 					player.SendMessage("Welcome back, "+msg.CommandParameter+"!\n")	
-					player.Location.Broadcast(player.Username+" has appeared in the room.",player.Username)
+					player.Location.Broadcast(mudutils.ColorString(player.Username,mudutils.COLOR_BLUE)+" has appeared in the room.",player.Username)
 				
 					// Send initial room description
 					c, _ := ms.getCommand("LOOK")
@@ -163,7 +186,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 
 					// Send welcome message & start game
 					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")
-					player.Location.Broadcast(player.Username+" has appeared in the room.",player.Username)
+					player.Location.Broadcast(mudutils.ColorString(player.Username,mudutils.COLOR_BLUE)+" has appeared in the room.",player.Username)
 					// Send initial room description
 					c, _ := ms.getCommand("LOOK")
 					c.action(player,"")

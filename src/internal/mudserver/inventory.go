@@ -3,6 +3,7 @@ package mudserver
 import (
 	"fmt"
 	"mud_server/src/internal/muddata"
+	"mud_server/src/internal/mudutils"
 )
 
 type Inventory struct {
@@ -62,9 +63,10 @@ func (i Inventory) ListAsString(withQuantity bool) (string) {
 	if len(i.items) > 0 {
 		for k := range i.items {
 			if withQuantity {
-				invreturn += fmt.Sprint(i.items[k].Quantity, "x ", k, "\n")
+				itemstring := fmt.Sprint(i.items[k].Quantity, "x ", k)
+				invreturn += mudutils.ColorString(itemstring,mudutils.COLOR_GREEN) + "\n"
 			} else {
-				invreturn += fmt.Sprint(k, "\n")
+				invreturn += mudutils.ColorString(k,mudutils.COLOR_GREEN) + "\n"
 			}
 		}
 	}

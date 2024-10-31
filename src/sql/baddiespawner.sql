@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS baddiespawner
 );
 
 INSERT INTO baddiespawner (totalnumber,tickdurationms,baddieid,roomid) VALUES
-    (1,3000,1,3);
+    (1,5000,1,3);
 
 ALTER TABLE IF EXISTS baddiespawner
     OWNER to mud;

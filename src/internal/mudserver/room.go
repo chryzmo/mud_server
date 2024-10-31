@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	muddatabase "mud_server/src/internal/database"
+	mudutils "mud_server/src/internal/mudutils"
 	"strconv"
 	"strings"
 	"time"
@@ -19,13 +20,14 @@ type Room struct {
 	Name string
 	Description string
 	ExitMap map[string]*Room
-	RoomChannel chan(RoomMessage)
+	RoomBroadcastChannel chan(RoomMessage)
 	UserMap map[string]*MudPlayer
 	BaddieMap map[string]*BaddieNPC
 	Inventory *Inventory
 	ExitJSON string
 	ticker *time.Ticker
 	tickDurationInMS int32
+	GlobalWhisperChannel chan(MudMessage)
 }
 
 type RoomDB struct {
@@ -45,16 +47,17 @@ type RoomExits struct {
 	D int32 `json:"D"`
 }
 
-func CreateRoom(name string, description string, tickdur int32) (*Room) {
+func CreateRoom(name string, description string, tickdur int32, whisperchan chan(MudMessage)) (*Room) {
 	r := &Room{
 		Name: name,
 		Description: description,
-		RoomChannel: make(chan RoomMessage,5),
+		RoomBroadcastChannel: make(chan RoomMessage,5),
 		UserMap: make(map[string]*MudPlayer),
 		ExitMap: make(map[string]*Room),
 		Inventory: CreateInventory(),
 		BaddieMap: make(map[string]*BaddieNPC),
 		tickDurationInMS: tickdur,
+		GlobalWhisperChannel: whisperchan,
 	}
 
 	// Launch goroutine to continuously process broadcast messages
@@ -78,7 +81,7 @@ func (room *Room) RunTicker () {
 
 func (r Room) ProcessBroadcast() {
 	for {
-		msg := <-r.RoomChannel
+		msg := <-r.RoomBroadcastChannel
 
 		for _,player := range r.UserMap {
 			if player.Username != msg.SenderUsername {
@@ -95,17 +98,17 @@ func (r Room) Broadcast(msg string, senderusername string) () {
 		SenderUsername: senderusername,
 	}
 
-	r.RoomChannel <- roommsg
+	r.RoomBroadcastChannel <- roommsg
 }
 
 func (r Room) LookDescription() (string) {
-	desc := "You are in '"+r.Name+"'.\n\n"+r.Description+"\n"
+	desc := "You are in '"+r.Name+"'\n"+r.Description+"\n"
 	
 	if len(r.BaddieMap) > 0 {
 		desc += "\nThe monsters here are:\n"
 
 		for _,baddie := range r.BaddieMap {
-			desc += baddie.Name+"\n"
+			desc += mudutils.ColorString(baddie.Name,mudutils.COLOR_RED)+"\n"
 		}
 	}
 
@@ -113,7 +116,7 @@ func (r Room) LookDescription() (string) {
 		desc += "\nThe players here are:\n"
 
 		for k := range r.UserMap {
-			desc += k+"\n"
+			desc += mudutils.ColorString(k,mudutils.COLOR_BLUE)+"\n"
 		}
 	}
 
@@ -193,12 +196,13 @@ func (r *Room) FetchFromDB (db *muddatabase.MudDatabase, tickdur int32, roomid i
 			Name: ret.Name,
 			Description: ret.Description,
 			Inventory: CreateInventory(),
-			RoomChannel: make(chan RoomMessage,5),
+			RoomBroadcastChannel: make(chan RoomMessage,5),
 			UserMap: make(map[string]*MudPlayer),
 			ExitMap: make(map[string]*Room),
 			BaddieMap: make(map[string]*BaddieNPC),
 			ExitJSON: ret.ExitJSON,
 			tickDurationInMS: tickdur,
+			GlobalWhisperChannel: r.GlobalWhisperChannel,
 		}
 
 		// Populate room inventory
