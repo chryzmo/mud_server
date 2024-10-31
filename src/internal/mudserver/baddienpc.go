@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	muddatabase "mud_server/src/internal/database"
+	"mud_server/src/internal/mudutils"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,16 +48,18 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 	select {
 	case <-npc.combatTicker.C:
 		// Do attack logic
+		npcstyledname := (mudutils.ColorString(npc.Name,mudutils.COLOR_RED))
 		attackRoll := rand.IntN(100) + npc.AttackAccuracy
-		broadcastmsg := fmt.Sprint(npc.Name," swings at ",player.Username," - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		broadcastmsg := fmt.Sprint(npcstyledname," swings at ",player.Username," - (ATT:",attackRoll," vs DEF:",player.Defense,")")
 		npc.Location.Broadcast(broadcastmsg,player.Username)
-		pmsg := fmt.Sprint(npc.Name+" swings at you - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		pmsg := fmt.Sprint(npcstyledname+" swings at you - (ATT:",attackRoll," vs DEF:",player.Defense,")")
 		player.SendMessage(pmsg)
 		if attackRoll > player.Defense {
 			// Hit!
-			broadcastmsg = fmt.Sprint(npc.Name," hits ",player.Username," for ",npc.AttackPower," damage.")
+			broadcastmsg = fmt.Sprint(npcstyledname," hits ",player.Username," for ",npc.AttackPower," damage.")
 			npc.Location.Broadcast(broadcastmsg,player.Username)
-			pmsg = fmt.Sprint(npc.Name," hits you for ",npc.AttackPower," damage!")
+
+			pmsg = fmt.Sprint(npcstyledname," hits you for ",npc.AttackPower," damage!")
 			player.SendMessage(pmsg)
 			player.HP -= npc.AttackPower
 
@@ -68,8 +71,8 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 			}
 		} else {
 			// NPC missed player
-			npc.Location.Broadcast(npc.Name+" misses "+player.Username+".",player.Username)
-			player.SendMessage(npc.Name+" misses you.")
+			npc.Location.Broadcast(npcstyledname+" misses "+player.Username+".",player.Username)
+			player.SendMessage(npcstyledname+" misses you.")
 		}
 	default:
 		// Do nothing as combat ticker is running

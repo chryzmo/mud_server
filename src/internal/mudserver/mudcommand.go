@@ -1,8 +1,10 @@
 package mudserver
 
 import (
+	"fmt"
 	"math/rand/v2"
 	muddata "mud_server/src/internal/muddata"
+	"mud_server/src/internal/mudutils"
 	"strconv"
 	"strings"
 )
@@ -17,8 +19,9 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	// TEMPLATE
 	/*
 	c_name := MudCommand {
-		action: func(player *MudPlayer, arguments string) {
+		action: func(player *MudPlayer, arguments string) (int) {
 			fmt.Println("Do stuff")
+			return muddata.MUD_OK
 		},
 	}
 	*/
@@ -38,7 +41,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 
 			for _,target_mp := range player.Location.UserMap {
 				if target_mp.Username != player.Username {
-					message := player.Username+" says: \""+msg+"\""
+					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" says: \""+msg+"\""
 						target_mp.SendMessage(message)
 				}
 			}
@@ -67,6 +70,34 @@ func GenerateCommandList() (map[string]*MudCommand) {
 				player.SendMessage(player.Location.LookDescription())
 			}
 
+			return muddata.MUD_OK
+		},
+	}
+
+	// WHISPER
+	c_whisper := MudCommand {
+		action: func(player *MudPlayer, arguments string) (int) {
+			// WHISPER <target> <message>
+			words := strings.Split(arguments, " ")
+			target := words[0]
+			message := strings.Join(words[1:], " ")
+
+			if (target == player.Username) {
+				player.SendMessage("Talking to yourself, eh?")
+			} else {
+				mudMessage := MudMessage{
+					Command: "WHISPER",
+					CommandTarget: target,
+					CommandParameter: message,
+					SenderPlayer: player,
+				}
+	
+				fmt.Println(player.Location.GlobalWhisperChannel)
+	
+				player.Location.GlobalWhisperChannel <- mudMessage
+				player.SendMessage(mudutils.ColorString("You whisper to "+target+", \""+message+"\"", mudutils.COLOR_MAGENTA))
+			}
+			
 			return muddata.MUD_OK
 		},
 	}
@@ -107,9 +138,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 
 			if player.NPCTarget == nil {
 				player.SendMessage("You must have a target to attack.")
-			}
-
-			if player.NPCTarget.Location == player.Location {
+			} else if player.NPCTarget.Location == player.Location {
 				// Perform attack!
 				attackRoll := rand.IntN(100)
 				if attackRoll > player.NPCTarget.Defense {
@@ -175,6 +204,7 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	cList["DROP"] = &c_drop
 	cList["INVENTORY"] = &c_inventory
 	cList["ATTACK"] = &c_attack
+	cList["WHISPER"] = &c_whisper
 
 	return cList
 }

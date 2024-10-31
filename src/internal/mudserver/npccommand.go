@@ -1,5 +1,7 @@
 package mudserver
 
+import "mud_server/src/internal/mudutils"
+
 type NPCCommand struct {
 	action func(room *Room, baddie *BaddieNPC) int32
 }
@@ -20,7 +22,7 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 					// Janky way to select first PC in Room Map
 					for k, _ := range baddie.Location.UserMap {
 						baddie.TargetPC = baddie.Location.UserMap[k]
-						baddie.Location.Broadcast(baddie.Name+" looks at "+baddie.Location.UserMap[k].Username+".", "")
+						baddie.Location.Broadcast(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED)+" looks at "+baddie.Location.UserMap[k].Username+".", "")
 						continue
 					}
 				}
