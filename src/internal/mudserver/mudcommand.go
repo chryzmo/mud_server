@@ -3,6 +3,7 @@ package mudserver
 import (
 	"fmt"
 	"math/rand/v2"
+	muddatabase "mud_server/src/internal/database"
 	muddata "mud_server/src/internal/muddata"
 	"mud_server/src/internal/mudutils"
 	"strconv"
@@ -13,7 +14,7 @@ type MudCommand struct {
 	action func(player *MudPlayer, arguments string) (int)
 }
 
-func GenerateCommandList() (map[string]*MudCommand) {
+func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 	cList := make(map[string]*MudCommand)
 
 	// TEMPLATE
@@ -39,12 +40,14 @@ func GenerateCommandList() (map[string]*MudCommand) {
 			message := "You say: \""+msg+"\""
 			player.SendMessage(message)
 
-			for _,target_mp := range player.Location.UserMap {
+			player.Location.userMu.RLock()
+			for _, target_mp := range player.Location.UserMap {
 				if target_mp.Username != player.Username {
-					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" says: \""+msg+"\""
-						target_mp.SendMessage(message)
+					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE) + " says: \"" + msg + "\""
+					target_mp.SendMessage(message)
 				}
 			}
+			player.Location.userMu.RUnlock()
 
 			return muddata.MUD_OK
 		},
@@ -111,15 +114,16 @@ func GenerateCommandList() (map[string]*MudCommand) {
 			if i == nil {
 				player.SendMessage("You do not see that item here.")
 			} else {
-				player.SendMessage("You pick up "+i.Name+".")
-				
+				player.SendMessage("You pick up " + i.Name + ".")
+
 				p_item := i.createCopy()
 				p_item.Quantity = 1
 				player.Inventory.AddItem(p_item)
 
-				if ! i.Persistent {
+				if !i.Persistent {
 					player.Location.Inventory.RemoveItem(i)
 				}
+				go player.WriteToDB(db)
 			}
 
 			return muddata.MUD_OK
@@ -133,7 +137,9 @@ func GenerateCommandList() (map[string]*MudCommand) {
 			if arguments != "" {
 				npc_target_name := strings.ToUpper(arguments)
 
+				player.Location.baddieMu.RLock()
 				player.NPCTarget = player.Location.BaddieMap[npc_target_name]
+				player.Location.baddieMu.RUnlock()
 			}
 
 			if player.NPCTarget == nil {
@@ -146,9 +152,10 @@ func GenerateCommandList() (map[string]*MudCommand) {
 					player.SendMessage("You hit "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+" points of damage!")
 					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+ " points of damage!",player.Username)
 					if player.NPCTarget.HP <= 0 {
-						player.SendMessage("You kill "+player.NPCTarget.Name+"!")
-						player.Location.KillNPC(player.NPCTarget.Name,player.Username)
+						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
+						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
 						player.NPCTarget = nil
+						go player.WriteToDB(db)
 					}
 				}
 				

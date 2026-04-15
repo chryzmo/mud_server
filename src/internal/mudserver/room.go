@@ -1,40 +1,43 @@
 package mudserver
 
 import (
-	//muddatabase "mud_server/src/internal/database"
 	"errors"
 	"fmt"
 	"math/rand"
 	muddatabase "mud_server/src/internal/database"
 	mudutils "mud_server/src/internal/mudutils"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Room struct {
-	ID int32
-	DB *muddatabase.MudDatabase
-	Name string
-	Description string
-	ExitMap map[string]*Room
-	RoomBroadcastChannel chan(RoomMessage)
-	UserMap map[string]*MudPlayer
-	BaddieMap map[string]*BaddieNPC
-	Inventory *Inventory
-	ExitJSON string
-	ticker *time.Ticker
-	tickDurationInMS int32
-	GlobalWhisperChannel chan(MudMessage)
+	ID                   int32
+	DB                   *muddatabase.MudDatabase
+	Name                 string
+	Description          string
+	ExitMap              map[string]*Room
+	RoomBroadcastChannel chan RoomMessage
+	UserMap              map[string]*MudPlayer
+	BaddieMap            map[string]*BaddieNPC
+	Inventory            *Inventory
+	ExitJSON             string
+	ticker               *time.Ticker
+	tickDurationInMS     int32
+	GlobalWhisperChannel chan MudMessage
+	userMu               sync.RWMutex
+	baddieMu             sync.RWMutex
 }
 
 type RoomDB struct {
-	ID int32
-	Name string
-	Description string
-	ExitJSON string
+	ID               int32
+	Name             string
+	Description      string
+	ExitJSON         string
 	InventoryIDSlice map[string]int32
 }
 
@@ -47,122 +50,170 @@ type RoomExits struct {
 	D int32 `json:"D"`
 }
 
-func CreateRoom(name string, description string, tickdur int32, whisperchan chan(MudMessage)) (*Room) {
-	r := &Room{
-		Name: name,
+// NewRoom builds a minimal Room for DB operations (no goroutines, no tick).
+func NewRoom(name string, description string, exitJSON string) *Room {
+	return &Room{
+		Name:      name,
 		Description: description,
-		RoomBroadcastChannel: make(chan RoomMessage,5),
-		UserMap: make(map[string]*MudPlayer),
-		ExitMap: make(map[string]*Room),
-		Inventory: CreateInventory(),
+		ExitJSON:  exitJSON,
+		UserMap:   make(map[string]*MudPlayer),
+		ExitMap:   make(map[string]*Room),
 		BaddieMap: make(map[string]*BaddieNPC),
-		tickDurationInMS: tickdur,
+		Inventory: CreateInventory(),
+	}
+}
+
+func CreateRoom(name string, description string, tickdur int32, whisperchan chan MudMessage) *Room {
+	r := &Room{
+		Name:                 name,
+		Description:          description,
+		RoomBroadcastChannel: make(chan RoomMessage, 5),
+		UserMap:              make(map[string]*MudPlayer),
+		ExitMap:              make(map[string]*Room),
+		Inventory:            CreateInventory(),
+		BaddieMap:            make(map[string]*BaddieNPC),
+		tickDurationInMS:     tickdur,
 		GlobalWhisperChannel: whisperchan,
 	}
 
-	// Launch goroutine to continuously process broadcast messages
 	go r.ProcessBroadcast()
 	go r.RunTicker()
 
 	return r
 }
 
-func (room *Room) RunTicker () {
+func (room *Room) RunTicker() {
 	room.ticker = time.NewTicker(time.Millisecond * time.Duration(room.tickDurationInMS))
 
-	for {
-		for range room.ticker.C {
-			for _,npc := range room.BaddieMap {
-				npc.TurnAction(room,npc)
-			}
+	for range room.ticker.C {
+		// Snapshot BaddieMap so TurnAction (which may call KillNPC) can safely
+		// acquire the write lock without deadlocking the ticker.
+		room.baddieMu.RLock()
+		npcs := make([]*BaddieNPC, 0, len(room.BaddieMap))
+		for _, npc := range room.BaddieMap {
+			npcs = append(npcs, npc)
+		}
+		room.baddieMu.RUnlock()
+
+		for _, npc := range npcs {
+			npc.TurnAction(room, npc)
 		}
 	}
 }
 
-func (r Room) ProcessBroadcast() {
+func (r *Room) ProcessBroadcast() {
 	for {
 		msg := <-r.RoomBroadcastChannel
 
-		for _,player := range r.UserMap {
+		r.userMu.RLock()
+		for _, player := range r.UserMap {
 			if player.Username != msg.SenderUsername {
 				player.SendMessage(msg.CommandParameter)
 			}
 		}
+		r.userMu.RUnlock()
 	}
 }
 
-func (r Room) Broadcast(msg string, senderusername string) () {
+func (r *Room) Broadcast(msg string, senderusername string) {
 	roommsg := RoomMessage{
-		Command: "BROADCAST",
+		Command:          "BROADCAST",
 		CommandParameter: msg,
-		SenderUsername: senderusername,
+		SenderUsername:   senderusername,
 	}
-
 	r.RoomBroadcastChannel <- roommsg
 }
 
-func (r Room) LookDescription() (string) {
-	desc := "You are in '"+r.Name+"'\n"+r.Description+"\n"
-	
+func (r *Room) LookDescription() string {
+	desc := "You are in '" + r.Name + "'\n" + r.Description + "\n"
+
+	r.baddieMu.RLock()
 	if len(r.BaddieMap) > 0 {
 		desc += "\nThe monsters here are:\n"
-
-		for _,baddie := range r.BaddieMap {
-			desc += mudutils.ColorString(baddie.Name,mudutils.COLOR_RED)+"\n"
+		for _, baddie := range r.BaddieMap {
+			desc += mudutils.ColorString(baddie.Name, mudutils.COLOR_RED) + "\n"
 		}
 	}
+	r.baddieMu.RUnlock()
 
+	r.userMu.RLock()
 	if len(r.UserMap) > 0 {
 		desc += "\nThe players here are:\n"
-
 		for k := range r.UserMap {
-			desc += mudutils.ColorString(k,mudutils.COLOR_BLUE)+"\n"
+			desc += mudutils.ColorString(k, mudutils.COLOR_BLUE) + "\n"
 		}
 	}
+	r.userMu.RUnlock()
 
 	if !r.Inventory.isEmpty() {
 		desc += "\nYou see:\n"
 		desc += r.Inventory.ListAsString(false)
 	}
 
-	desc += "\n"
+	if len(r.ExitMap) > 0 {
+		exits := make([]string, 0, len(r.ExitMap))
+		for dir := range r.ExitMap {
+			exits = append(exits, dir)
+		}
+		sort.Strings(exits)
+		desc += "\nExits: [" + strings.Join(exits, "] [") + "]\n"
+	}
 
+	desc += "\n"
 	return desc
 }
 
 func (r *Room) RemovePlayer(username string) {
-	delete(r.UserMap,username)
+	r.userMu.Lock()
+	delete(r.UserMap, username)
+	r.userMu.Unlock()
 }
 
-// Remove NPC and broadcast kill
+// KillNPC removes the named NPC, distributes loot to the attacker, and
+// broadcasts the kill to the room.
 func (r *Room) KillNPC(npcname string, attackername string) {
-	
-	// Set up loot for victorious MudPlayer
-	if r.UserMap[attackername] != nil {
-		if r.UserMap[attackername].NPCTarget.LootGoldMax > 0 {
+	npcKey := strings.ToUpper(npcname)
+
+	// Read loot info before acquiring the write lock.
+	r.baddieMu.RLock()
+	deadNPC := r.BaddieMap[npcKey]
+	r.baddieMu.RUnlock()
+
+	if deadNPC != nil && deadNPC.LootGoldMax > 0 {
+		r.userMu.RLock()
+		attacker := r.UserMap[attackername]
+		r.userMu.RUnlock()
+
+		if attacker != nil {
 			i := Item{}
-			gploot_quantity := rand.Int31n(r.BaddieMap[strings.ToUpper(npcname)].LootGoldMax-r.BaddieMap[strings.ToUpper(npcname)].LootGoldMin) + r.BaddieMap[strings.ToUpper(npcname)].LootGoldMin
-			msg := fmt.Sprint("You receive ",gploot_quantity," gold.\n")
-			r.UserMap[attackername].SendMessage(msg)			
-			r.UserMap[attackername].Inventory.AddItemByQuantity(i.FetchFromDB(r.DB,"GOLD"),gploot_quantity)
+			gploot_quantity := rand.Int31n(deadNPC.LootGoldMax-deadNPC.LootGoldMin) + deadNPC.LootGoldMin
+			msg := fmt.Sprint("You receive ", gploot_quantity, " gold.\n")
+			attacker.SendMessage(msg)
+			attacker.Inventory.AddItemByQuantity(i.FetchFromDB(r.DB, "GOLD"), gploot_quantity)
 		}
 	}
-	delete(r.BaddieMap,strings.ToUpper(npcname))
-	r.Broadcast(attackername+" kills "+npcname+"!",attackername)
+
+	r.baddieMu.Lock()
+	delete(r.BaddieMap, npcKey)
+	r.baddieMu.Unlock()
+
+	r.Broadcast(attackername+" kills "+npcname+"!", attackername)
 }
 
-// Remove NPC and broadcast kill
+// KillPC respawns the player at their spawn location and broadcasts the kill.
 func (r *Room) KillPC(player *MudPlayer, attackername string) {
-	r.Broadcast(attackername+" kills "+player.Username+"!",player.Username)
-	player.SendMessage("You were killed by "+attackername+"!")
+	r.Broadcast(attackername+" kills "+player.Username+"!", player.Username)
+	player.SendMessage("You were killed by " + attackername + "!")
 	player.Respawn()
 }
 
 func (r *Room) AddPlayer(mp *MudPlayer) {
+	r.userMu.Lock()
 	r.UserMap[mp.Username] = mp
+	r.userMu.Unlock()
 }
 
-func (r *Room) FetchFromDB (db *muddatabase.MudDatabase, tickdur int32, roomid interface{}) (*Room) {
+func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid interface{}) *Room {
 	query := ""
 	var err error
 	room := Room{}
@@ -176,42 +227,39 @@ func (r *Room) FetchFromDB (db *muddatabase.MudDatabase, tickdur int32, roomid i
 		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
 	}
 
-	rows,err := db.Connection.Query(db.Context,query,roomid)
+	rows, err := db.Connection.Query(db.Context, query, roomid)
 
 	if err != nil {
-		fmt.Println("Room error: "+err.Error())
+		fmt.Println("Room error: " + err.Error())
 	}
 
-	ret,err := pgx.CollectOneRow(rows,pgx.RowToStructByName[RoomDB])
+	ret, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[RoomDB])
 
 	if err != nil {
-		fmt.Println("Room error: "+err.Error())
+		fmt.Println("Room error: " + err.Error())
 	}
 
-	// Build Room from RoomDB struct
 	if err == nil {
 		room = Room{
-			ID: ret.ID,
-			DB: db,
-			Name: ret.Name,
-			Description: ret.Description,
-			Inventory: CreateInventory(),
-			RoomBroadcastChannel: make(chan RoomMessage,5),
-			UserMap: make(map[string]*MudPlayer),
-			ExitMap: make(map[string]*Room),
-			BaddieMap: make(map[string]*BaddieNPC),
-			ExitJSON: ret.ExitJSON,
-			tickDurationInMS: tickdur,
+			ID:                   ret.ID,
+			DB:                   db,
+			Name:                 ret.Name,
+			Description:          ret.Description,
+			Inventory:            CreateInventory(),
+			RoomBroadcastChannel: make(chan RoomMessage, 5),
+			UserMap:              make(map[string]*MudPlayer),
+			ExitMap:              make(map[string]*Room),
+			BaddieMap:            make(map[string]*BaddieNPC),
+			ExitJSON:             ret.ExitJSON,
+			tickDurationInMS:     tickdur,
 			GlobalWhisperChannel: r.GlobalWhisperChannel,
 		}
 
-		// Populate room inventory
-		for iid,_ := range ret.InventoryIDSlice {
+		for iid := range ret.InventoryIDSlice {
 			i := Item{}
-			sid,_ := strconv.ParseInt(iid[1:],10,32)
+			sid, _ := strconv.ParseInt(iid[1:], 10, 32)
 			item_id := int32(sid)
-			
-			room.Inventory.AddItemByQuantity(i.FetchFromDB(db,item_id),ret.InventoryIDSlice[iid])
+			room.Inventory.AddItemByQuantity(i.FetchFromDB(db, item_id), ret.InventoryIDSlice[iid])
 		}
 
 		go room.ProcessBroadcast()
@@ -221,19 +269,43 @@ func (r *Room) FetchFromDB (db *muddatabase.MudDatabase, tickdur int32, roomid i
 	return &room
 }
 
-func (r *Room) WriteToDB (db *muddatabase.MudDatabase) {
-	// User exists, do UPDATE
+// UpdateRoomMetadataInDB updates only the name, description, and exitjson of a
+// room without touching its inventory. Used by the worldbuilder API.
+func UpdateRoomMetadataInDB(db *muddatabase.MudDatabase, roomID int32, name, description, exitJSON string) error {
+	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson WHERE id=@roomid"
+	args := pgx.NamedArgs{
+		"name":        name,
+		"description": description,
+		"exitjson":    exitJSON,
+		"roomid":      roomID,
+	}
+	return db.ExecWithArgs(query, args)
+}
+
+// CreateInDB inserts a new room record and returns the assigned ID.
+func (r *Room) CreateInDB(db *muddatabase.MudDatabase) (int32, error) {
+	query := "INSERT INTO room (name, description, exitjson, inventoryidslice) VALUES ($1, $2, $3, $4) RETURNING id"
+	var newID int32
+	err := db.Connection.QueryRow(db.Context, query, r.Name, r.Description, r.ExitJSON, r.Inventory.IDMap()).Scan(&newID)
+	return newID, err
+}
+
+// DeleteFromDB removes the room record from the database.
+func (r *Room) DeleteFromDB(db *muddatabase.MudDatabase) error {
+	_, err := db.Connection.Exec(db.Context, "DELETE FROM room WHERE id=$1", r.ID)
+	return err
+}
+
+func (r *Room) WriteToDB(db *muddatabase.MudDatabase) {
 	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson, inventoryidslice=@inventoryidslice WHERE id=@roomid;"
 
-	// Build ExitJSON
-
 	args := pgx.NamedArgs{
-		"name": r.Name,
-		"description": r.Description,
-		"exitjson": r.ExitJSON,
+		"name":             r.Name,
+		"description":      r.Description,
+		"exitjson":         r.ExitJSON,
 		"inventoryidslice": r.Inventory.IDMap(),
-		"roomid": r.ID,
-	  }
-	
-	  db.ExecWithArgs(query,args)
+		"roomid":           r.ID,
+	}
+
+	db.ExecWithArgs(query, args)
 }

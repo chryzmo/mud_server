@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -42,6 +43,13 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whispercha
 }
 
 // Use JSON column - Inventory for example?
+// ReLinkRoomExits clears the room's ExitMap and re-populates it from its
+// current ExitJSON. Call this after updating a room's exits at runtime.
+func (w *World) ReLinkRoomExits(room *Room) {
+	room.ExitMap = make(map[string]*Room)
+	w.LinkRoomExits(room)
+}
+
 func (w World) LinkRoomExits(room *Room) {
 	jsonMap := make(map[string]interface{})
 	err := json.Unmarshal([]byte(room.ExitJSON), &jsonMap)
@@ -112,4 +120,96 @@ func (w World) WriteWorldToDB(db *muddatabase.MudDatabase) {
 	for _,room := range w.RoomMap {
 		room.WriteToDB(db)
 	}
+}
+
+/* For API export */
+func (w World) PrintWorldRoomsAsJSON()  string {
+	type roomjson struct {
+		Name string
+		Description string
+		ExitJSON string
+		InventorySliceID string
+	}
+	jsonreadymap := make(map[string]roomjson)
+
+	for id, room := range(w.RoomMap) {
+		exitmap := make(map[string]string)
+		for dir, r := range room.ExitMap {
+			exitmap[dir] = strconv.Itoa(int(r.ID))
+		}
+
+		jsonexit, _ := json.Marshal(exitmap)
+
+		jsonroom := roomjson {
+			Name: room.Name,
+			Description: room.Description,
+			ExitJSON: string(jsonexit),
+		}
+		jsonreadymap[strconv.Itoa(int(id))] = jsonroom
+
+	}
+
+	jsonreturn, err := json.Marshal(jsonreadymap)
+
+	if err != nil {
+		fmt.Println("PrinWorldRoomsAsJSON error: "+err.Error())
+	}
+
+	return string(jsonreturn);
+}
+
+/* For API export */
+func (w World) PrintWorldEdgesAsJSON()  string {
+	type edgejson struct {
+		ID string
+		Source string
+		Target string
+	}
+
+	jsonreadymap := make(map[string]edgejson)
+
+	for _, room := range(w.RoomMap) {
+		jsonMap := make(map[string]interface{})
+		err := json.Unmarshal([]byte(room.ExitJSON), &jsonMap)
+	
+		for _, roomid := range jsonMap {
+			// JSON uses float64, so we need to assert interface{} to float64, then cast to int32
+			if rid, ok := roomid.(float64); ok { 
+				sourceid := strconv.Itoa(int(room.ID))
+				targetid := strconv.Itoa(int(rid))
+				idstring := fmt.Sprintf("%s_%s", sourceid, targetid)
+
+				// Janky way to avoid duplicate edges for now
+				reverseidstring := fmt.Sprintf("%s_%s", targetid, sourceid)
+
+				roomedge := edgejson{
+					ID: idstring,
+					Source: sourceid,
+					Target: targetid,
+				}
+
+				// If the reverse edge does not exist, create this edge
+				_, alreadyexists := jsonreadymap[reverseidstring]
+				if (!alreadyexists) {
+					jsonreadymap[idstring] = roomedge;
+				}
+				
+			} else {
+				err = errors.New("PrintWorldEdgesAsJSON assertion failed.  Received a non-int32 value!")
+			}
+		}
+	
+		if err != nil {
+			fmt.Println("PrintWorldEdgesAsJSON error: "+err.Error())
+		}
+
+	}
+
+	jsonreturn, err := json.Marshal(jsonreadymap)
+
+	if err != nil {
+		fmt.Println("PrintWorldEdgesAsJSON JSON error: "+err.Error())
+	}
+
+	return string(jsonreturn);
 }

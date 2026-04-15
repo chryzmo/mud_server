@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//usr/bin/**)",
+      "Read(//usr/**)",
+      "Bash(/mnt/c/Program Files/Git/cmd/git.exe *)",
+      "Bash(git *)",
+      "Bash(ssh *)",
+      "Read(//root/**)",
+      "Bash(ssh-keyscan github.com)",
+      "Bash(mkdir -p ~/.ssh)",
+      "Bash(chmod 700 ~/.ssh)",
+      "Bash(ssh-keygen *)"
+    ]
+  }
+}

@@ -20,6 +20,12 @@ type Configuration struct {
 	} `json:"Database"`
 	Game struct {
 		RoomTickDurationInMS int32 `json:"RoomTickDurationInMS"`
+		PlayerStartHP        int   `json:"PlayerStartHP"`
+		PlayerStartMaxHP     int   `json:"PlayerStartMaxHP"`
+		PlayerStartMP        int   `json:"PlayerStartMP"`
+		PlayerStartMaxMP     int   `json:"PlayerStartMaxMP"`
+		PlayerStartAttack    int   `json:"PlayerStartAttack"`
+		PlayerStartDefense   int   `json:"PlayerStartDefense"`
 	} `json:"Game"`
 }
 

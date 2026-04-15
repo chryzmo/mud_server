@@ -42,7 +42,7 @@ func CreateMudServer() *MudServer {
 		Broadcast: make(chan MudMessage),
 		WhisperChan: serverWhisperChannel,
 		World: w,
-		Commands: GenerateCommandList(),
+		Commands: GenerateCommandList(&db),
 		Configuration: c,
 		DB: db,
 	}
@@ -53,14 +53,22 @@ func CreateMudServer() *MudServer {
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
-	mc := CreateMudPlayer(ws_conn,ms.World.RoomMap[1])
+	stats := PlayerStartStats{
+		HP:      ms.Configuration.Game.PlayerStartHP,
+		MaxHP:   ms.Configuration.Game.PlayerStartMaxHP,
+		MP:      ms.Configuration.Game.PlayerStartMP,
+		MaxMP:   ms.Configuration.Game.PlayerStartMaxMP,
+		Attack:  ms.Configuration.Game.PlayerStartAttack,
+		Defense: ms.Configuration.Game.PlayerStartDefense,
+	}
+	mc := CreateMudPlayer(ws_conn, ms.World.RoomMap[1], stats)
 
 	// Add MudPlayer to Server connectionList
 	ms.playerList[mc] = mc
 
 	fmt.Printf("Client connection - number of connected clients: %d\n", len(ms.playerList))
 
-	mc.SendMessage("Welcome!  Please select your NICK.")
+	mc.SendMessage("Welcome to the MUD!\nType /REGISTER <username> <password> to create an account.\nType /LOGIN <username> <password> to log in.\n")
 
 	return mc
 }
@@ -80,9 +88,12 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 }
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
-	mp.WriteToDB(&ms.DB)
-	mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has poofed away.",mp.Username)
-	mp.Location.RemovePlayer(mp.Username)
+	if (mp.Username != "") {
+		mp.WriteToDB(&ms.DB)
+		mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has poofed away.",mp.Username)
+		mp.Location.RemovePlayer(mp.Username)
+	}
+	
 	ms.playerList[mp].Conn.Close()
 	delete(ms.playerList, mp)
 	fmt.Printf("Client disconnect - number of connected clients: %d\n",len(ms.playerList))
@@ -109,18 +120,19 @@ func (ms *MudServer) getCommand(commandname string) (*MudCommand, int) {
 
 func (ms *MudServer) ProcessGlobalWhispers() {
 	for {
-		fmt.Println("Server whisper chan:")
-		fmt.Println(ms.WhisperChan)
 		whisperMUDMessage := <-ms.WhisperChan
-
-		fmt.Println("Have a message to process!")
 
 		targetPlayer := ms.GetPlayerByUsername(whisperMUDMessage.CommandTarget)
 		messageContent := whisperMUDMessage.CommandParameter
 		senderUsername := whisperMUDMessage.SenderPlayer.Username
 
-		msg := mudutils.ColorString(senderUsername + " whispers, \""+messageContent+"\"", mudutils.COLOR_MAGENTA)
-		targetPlayer.SendMessage(msg);
+		if targetPlayer == nil {
+			whisperMUDMessage.SenderPlayer.SendMessage("Player '" + whisperMUDMessage.CommandTarget + "' is not online.\n")
+			continue
+		}
+
+		msg := mudutils.ColorString(senderUsername+" whispers, \""+messageContent+"\"", mudutils.COLOR_MAGENTA)
+		targetPlayer.SendMessage(msg)
 	}
 }
 
@@ -153,47 +165,77 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 		msg.CommandParameter = string(bytes.Join(messagefields[1:],[]byte(" ")))
 		msg.SenderPlayer = player
 
-		// Ensure that the user has selected a valid username
-		if player.Username == "" && msg.Command != "/NICK" {
-			ms.SendMessageToPlayer(player,"No NICK set.  Please send /NICK command to create.")
-		} else if player.Username == "" && msg.Command == "/NICK" {
-			if ms.GetPlayerByUsername(msg.CommandParameter) == nil {
-
-				username := msg.CommandParameter
-				
-				if player.CountUsernameFromDB(&ms.DB,username) == 1 {
-					err := player.LoadFromDB(&ms.DB, ms.World, player, username)
-					if err != nil {
-						fmt.Println("Error loading player: "+err.Error())
-						break
-					}
-					player.Location.UserMap[player.Username] = player
-
-					player.SendMessage("Welcome back, "+msg.CommandParameter+"!\n")	
-					player.Location.Broadcast(mudutils.ColorString(player.Username,mudutils.COLOR_BLUE)+" has appeared in the room.",player.Username)
-				
-					// Send initial room description
-					c, _ := ms.getCommand("LOOK")
-					c.action(player,"")
-				} else {
-					// User does not exist
-					player.Username = msg.CommandParameter
-					player.Location.UserMap[player.Username] = player
-					// Write to DB
-					player.WriteToDB(&ms.DB)
-					// Get DB ID for MudPlayer
-					player.ID = player.GetIDFromDB(&ms.DB)
-
-					// Send welcome message & start game
-					player.SendMessage("You are now known as "+msg.CommandParameter+".\n")
-					player.Location.Broadcast(mudutils.ColorString(player.Username,mudutils.COLOR_BLUE)+" has appeared in the room.",player.Username)
-					// Send initial room description
-					c, _ := ms.getCommand("LOOK")
-					c.action(player,"")
-				}
-			} else {
-				player.SendMessage("That username is already logged in!  Please try again.\n")
+		// Require login before processing game commands.
+		if player.Username == "" && msg.Command != "/LOGIN" && msg.Command != "/REGISTER" {
+			ms.SendMessageToPlayer(player, "Please /LOGIN or /REGISTER first.\n")
+		} else if player.Username == "" && msg.Command == "/REGISTER" {
+			parts := strings.SplitN(msg.CommandParameter, " ", 2)
+			if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+				player.SendMessage("Usage: /REGISTER <username> <password>\n")
+				continue
 			}
+			username, password := parts[0], parts[1]
+
+			if ms.GetPlayerByUsername(username) != nil {
+				player.SendMessage("That username is already online.\n")
+				continue
+			}
+			if player.CountUsernameFromDB(&ms.DB, username) > 0 {
+				player.SendMessage("That username is already taken.\n")
+				continue
+			}
+
+			player.Username = username
+			if err := player.SetPassword(password); err != nil {
+				fmt.Println("SetPassword error: " + err.Error())
+				player.SendMessage("Registration failed. Please try again.\n")
+				player.Username = ""
+				continue
+			}
+			player.Location.AddPlayer(player)
+			player.WriteToDB(&ms.DB)
+			player.ID = player.GetIDFromDB(&ms.DB)
+
+			player.SendMessage("Account created! Welcome, " + username + ".\n")
+			player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
+			c, _ := ms.getCommand("LOOK")
+			c.action(player, "")
+
+		} else if player.Username == "" && msg.Command == "/LOGIN" {
+			parts := strings.SplitN(msg.CommandParameter, " ", 2)
+			if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+				player.SendMessage("Usage: /LOGIN <username> <password>\n")
+				continue
+			}
+			username, password := parts[0], parts[1]
+
+			if ms.GetPlayerByUsername(username) != nil {
+				player.SendMessage("That user is already logged in.\n")
+				continue
+			}
+			if player.CountUsernameFromDB(&ms.DB, username) == 0 {
+				player.SendMessage("Unknown username. Use /REGISTER to create an account.\n")
+				continue
+			}
+
+			if err := player.LoadFromDB(&ms.DB, ms.World, player, username); err != nil {
+				fmt.Println("LoadFromDB error: " + err.Error())
+				player.SendMessage("Login failed. Please try again.\n")
+				continue
+			}
+
+			if !player.CheckPassword(password) {
+				player.Username = ""
+				player.SendMessage("Incorrect password.\n")
+				continue
+			}
+
+			player.Location.AddPlayer(player)
+			player.SendMessage("Welcome back, " + username + "!\n")
+			player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
+			c, _ := ms.getCommand("LOOK")
+			c.action(player, "")
+
 		} else {
 			ms.Broadcast <- msg
 		}
@@ -236,37 +278,14 @@ func (ms *MudServer) RunMaintenanceactions() {
 	maintenanceTicker := time.NewTicker(time.Minute * time.Duration(ms.Configuration.Server.WorldSaveDelayMinutes))
 
 	for range maintenanceTicker.C {
-		// Perform World Save
 		// Save all MudPlayer states to DB
-		for _,player := range ms.playerList {
+		for _, player := range ms.playerList {
 			ms.SendMessageToPlayer(player, "SERVER:  World saving to DB.")
 			player.WriteToDB(&ms.DB)
 		}
 
 		// Save all Room states to DB
 		ms.World.WriteWorldToDB(&ms.DB)
-	}
-
-	for {
-		// Pop message off queue
-		msg := <-ms.Broadcast
-
-		// Prepare variables for lookup & action
-		player := ms.GetPlayerByMudPlayer(msg.SenderPlayer)
-		command_name := msg.Command
-		arguments := msg.CommandParameter
-
-		// Translate aliases
-		command_name, arguments = ms.processAliases(command_name, arguments)
-
-		command, err := ms.getCommand(command_name)
-		if err == muddata.ERR_COMMAND_UNKNOWN {
-			ms.SendMessageToPlayer(player,"SERVER:  Unknown command.\n")
-		} else {
-			// Run command
-			command.action(player, arguments)
-		}
-
 	}
 }
 

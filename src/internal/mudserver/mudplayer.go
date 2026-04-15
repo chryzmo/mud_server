@@ -13,58 +13,86 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type MudPlayer struct {
-	ID int32
-	Conn	*websocket.Conn
-	TimeConnected	time.Time
-	State int8
-	Location *Room
-	Username string
-	Inventory *Inventory
-	AttackPower int
-	Defense int
-	HP int
-	MP int
-	MaxHP int
-	MaxMP int
-	NPCTarget *BaddieNPC
-	send_mutex sync.Mutex
+	ID            int32
+	Conn          *websocket.Conn
+	TimeConnected time.Time
+	State         int8
+	Location      *Room
+	Username      string
+	PasswordHash  string
+	Inventory     *Inventory
+	AttackPower   int
+	Defense       int
+	HP            int
+	MP            int
+	MaxHP         int
+	MaxMP         int
+	NPCTarget     *BaddieNPC
+	send_mutex    sync.Mutex
 	SpawnLocation *Room
 }
 
 type MudPlayerDB struct {
-	ID int32
-	Username string
+	ID               int32
+	Username         string
+	PasswordHash     string
 	InventoryIDSlice map[string]int32
-	AttackPower int
-	Defense int
-	HP int
-	MP int
-	MaxHP int
-	MaxMP int
-	RoomID int32
-	SpawnLocationID int32
+	AttackPower      int
+	Defense          int
+	HP               int
+	MP               int
+	MaxHP            int
+	MaxMP            int
+	RoomID           int32
+	SpawnLocationID  int32
 }
 
-func CreateMudPlayer(ws_conn *websocket.Conn, room *Room) (*MudPlayer) {
+type PlayerStartStats struct {
+	HP        int
+	MaxHP     int
+	MP        int
+	MaxMP     int
+	Attack    int
+	Defense   int
+}
+
+func CreateMudPlayer(ws_conn *websocket.Conn, room *Room, stats PlayerStartStats) *MudPlayer {
 	return &MudPlayer{
-		Conn: ws_conn,
+		Conn:          ws_conn,
 		TimeConnected: time.Now(),
-		Location: room,
-		Inventory: CreateInventory(),
-		AttackPower: 99,
-		Defense: 10,
-		HP: 5,
-		MaxHP: 5,
-		MP: 5,
-		MaxMP: 5,
+		Location:      room,
+		Inventory:     CreateInventory(),
+		AttackPower:   stats.Attack,
+		Defense:       stats.Defense,
+		HP:            stats.HP,
+		MaxHP:         stats.MaxHP,
+		MP:            stats.MP,
+		MaxMP:         stats.MaxMP,
 		SpawnLocation: room,
 	}
 }
 
-func (mp *MudPlayer) SendMessage(message string) (error){
+// SetPassword hashes and stores the player's password using bcrypt.
+func (mp *MudPlayer) SetPassword(password string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	mp.PasswordHash = string(hash)
+	return nil
+}
+
+// CheckPassword returns true if the given password matches the stored hash.
+func (mp *MudPlayer) CheckPassword(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(mp.PasswordHash), []byte(password))
+	return err == nil
+}
+
+func (mp *MudPlayer) SendMessage(message string) error {
 	mp.send_mutex.Lock()
 	defer mp.send_mutex.Unlock()
 	err := mp.Conn.WriteMessage(websocket.TextMessage, []byte(message))
@@ -122,9 +150,9 @@ func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, play
 
 	switch playerid.(type) {
 	case string:
-		query = "SELECT id,username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player id=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE id=$1"
 	default:
 		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
 	}
@@ -146,7 +174,11 @@ func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, play
 		// Load DB values into MudPlayer object
 		player.ID = ret.ID
 		player.Username = ret.Username
+		player.PasswordHash = ret.PasswordHash
 		player.Location = world.RoomMap[ret.RoomID]
+		if player.Location == nil {
+			player.Location = world.RoomMap[1]
+		}
 		player.Inventory = CreateInventory()
 		player.AttackPower = ret.AttackPower
 		player.Defense = ret.Defense
@@ -155,6 +187,9 @@ func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, play
 		player.MP = ret.MP
 		player.MaxMP = ret.MaxMP
 		player.SpawnLocation = world.RoomMap[ret.SpawnLocationID]
+		if player.SpawnLocation == nil {
+			player.SpawnLocation = world.RoomMap[1]
+		}
 
 		// Build inventory
 		for iid,_ := range ret.InventoryIDSlice {
@@ -201,51 +236,50 @@ func (mp *MudPlayer) WriteToDB (db *muddatabase.MudDatabase) {
 
 	if mp.ID == 0 {
 		// User does not exist, do INSERT
-		query = "INSERT INTO player (username,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,SpawnLocationID) VALUES (@username,@inventoryidslice,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
+		query = "INSERT INTO player (username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
 
 		args := pgx.NamedArgs{
-			"username": mp.Username,
+			"username":         mp.Username,
+			"passwordhash":     mp.PasswordHash,
 			"inventoryidslice": mp.Inventory.IDMap(),
-			"attackpower": mp.AttackPower,
-			"defense": mp.Defense,
-			"hp": mp.HP,
-			"maxhp": mp.MaxHP,
-			"mp": mp.MP,
-			"maxmp": mp.MaxMP,
-			"roomid": mp.Location.ID,
-			"spawnlocationid": mp.SpawnLocation.ID,
+			"attackpower":      mp.AttackPower,
+			"defense":          mp.Defense,
+			"hp":               mp.HP,
+			"maxhp":            mp.MaxHP,
+			"mp":               mp.MP,
+			"maxmp":            mp.MaxMP,
+			"roomid":           mp.Location.ID,
+			"spawnlocationid":  mp.SpawnLocation.ID,
 		}
-		
-		err := db.ExecWithArgs(query,args)
+
+		err := db.ExecWithArgs(query, args)
 		if err != nil {
-			fmt.Println("MudPlauer.WriteToDB INSERT error:"+err.Error())
+			fmt.Println("MudPlayer.WriteToDB INSERT error: " + err.Error())
 		}
-		  
 
 	} else {
 		// User exists, do UPDATE
-		query = "UPDATE player SET username=@username, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
+		query = "UPDATE player SET username=@username, passwordhash=@passwordhash, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
 
 		args := pgx.NamedArgs{
-			"username": mp.Username,
+			"username":         mp.Username,
+			"passwordhash":     mp.PasswordHash,
 			"inventoryidslice": mp.Inventory.IDMap(),
-			"attackpower": mp.AttackPower,
-			"defense": mp.Defense,
-			"hp": mp.HP,
-			"maxhp": mp.MaxHP,
-			"mp": mp.MP,
-			"maxmp": mp.MaxMP,
-			"roomid": mp.Location.ID,
-			"playerid": mp.ID,
-			"spawnlocationid": mp.SpawnLocation.ID,
+			"attackpower":      mp.AttackPower,
+			"defense":          mp.Defense,
+			"hp":               mp.HP,
+			"maxhp":            mp.MaxHP,
+			"mp":               mp.MP,
+			"maxmp":            mp.MaxMP,
+			"roomid":           mp.Location.ID,
+			"playerid":         mp.ID,
+			"spawnlocationid":  mp.SpawnLocation.ID,
 		}
-		
-		err := db.ExecWithArgs(query,args)
 
+		err := db.ExecWithArgs(query, args)
 		if err != nil {
-			fmt.Println("MudPlauer.WriteToDB UPDATE error:"+err.Error())
+			fmt.Println("MudPlayer.WriteToDB UPDATE error: " + err.Error())
 		}
-		
 	}
 }
 
@@ -268,13 +302,14 @@ func (mp *MudPlayer) GetIDFromDB (db *muddatabase.MudDatabase) int32 {
 	return userid
 }
 
-func (mp *MudPlayer) Respawn () {
+func (mp *MudPlayer) Respawn() {
 	mp.Location.RemovePlayer(mp.Username)
 	mp.HP = mp.MaxHP
 	mp.MP = mp.MaxMP
-	mp.Location = mp.SpawnLocation
+	if mp.SpawnLocation != nil {
+		mp.Location = mp.SpawnLocation
+	}
 	mp.Location.AddPlayer(mp)
-	mp.Location.Broadcast(mp.Username+" has appeared in the room.",mp.Username)
+	mp.Location.Broadcast(mp.Username+" has appeared in the room.", mp.Username)
 	mp.SendMessage(mp.Location.LookDescription())
-
 }

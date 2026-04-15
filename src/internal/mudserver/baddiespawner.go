@@ -3,6 +3,7 @@ package mudserver
 import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
+	"mud_server/src/internal/mudutils"
 	"strings"
 	"time"
 
@@ -26,46 +27,46 @@ type BaddieSpawnerDB struct {
 	RoomID int32
 }
 
-func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
-	count := 0
-	for _, b := range spawner.Location.BaddieMap {
-		if b.Race == baddierace {
-			count++
-		}
-	}
-
-	return count
-}
-
-func (spawner BaddieSpawner) RunTicker () {
+func (spawner *BaddieSpawner) RunTicker() {
 	spawner.ticker = time.NewTicker(time.Millisecond * time.Duration(spawner.tickDurationMS))
 
-
 	for range spawner.ticker.C {
-		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
-			// Spawn another baddie!
+		// Count existing baddies of this race under read lock.
+		spawner.Location.baddieMu.RLock()
+		count := 0
+		for _, b := range spawner.Location.BaddieMap {
+			if b.Race == spawner.baddie.Race {
+				count++
+			}
+		}
+		spawner.Location.baddieMu.RUnlock()
+
+		if count < spawner.TotalNumber {
 			newbaddie := &BaddieNPC{
-				Location: spawner.Location,
-				Name: spawner.baddie.Name,
-				Race: spawner.baddie.Race,
-				AttackAccuracy: spawner.baddie.AttackAccuracy,
-				AttackPower: spawner.baddie.AttackPower,
-				Defense: spawner.baddie.Defense,
-				HP: spawner.baddie.HP,
-				MP: spawner.baddie.MP,
-				TurnAction: spawner.baddie.TurnAction,
+				Location:                 spawner.Location,
+				Name:                     spawner.baddie.Name,
+				Race:                     spawner.baddie.Race,
+				AttackAccuracy:           spawner.baddie.AttackAccuracy,
+				AttackPower:              spawner.baddie.AttackPower,
+				Defense:                  spawner.baddie.Defense,
+				HP:                       spawner.baddie.HP,
+				MP:                       spawner.baddie.MP,
+				TurnAction:               spawner.baddie.TurnAction,
 				combatTickerDurationInMS: spawner.baddie.combatTickerDurationInMS,
-				combatTicker: time.NewTicker(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
-				LootGoldMin: spawner.baddie.LootGoldMin,
-				LootGoldMax: spawner.baddie.LootGoldMax,
+				combatTicker:             time.NewTicker(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
+				LootGoldMin:              spawner.baddie.LootGoldMin,
+				LootGoldMax:              spawner.baddie.LootGoldMax,
 			}
 
 			if newbaddie.Name == "" {
 				newbaddie.Name = newbaddie.GenerateName()
 			}
 
+			spawner.Location.baddieMu.Lock()
 			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
-			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
+			spawner.Location.baddieMu.Unlock()
+
+			spawner.Location.Broadcast(mudutils.ColorString(newbaddie.Name, mudutils.COLOR_RED)+" - "+newbaddie.Race+" - appears in the room!", "")
 		}
 	}
 }

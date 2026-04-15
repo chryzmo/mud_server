@@ -6,6 +6,8 @@ import (
 	"math/rand/v2"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/mudutils"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -81,15 +83,24 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 
 }
 
-// TODO:  Update this with a lookup table
-func (npc *BaddieNPC) GenerateName() (string) {
-	letterRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+// npcNamePool maps race names to a pool of thematic names.
+var npcNamePool = map[string][]string{
+	"ORC":    {"Grak", "Morg", "Durg", "Thrak", "Bolgur", "Skrag", "Vrosh", "Hagak", "Orzug", "Krul"},
+	"GOBLIN": {"Nib", "Skix", "Fizz", "Wret", "Grix", "Snig", "Pikk", "Dreg", "Yigg", "Zort"},
+	"TROLL":  {"Grumble", "Stonefist", "Mudrock", "Bogmaw", "Crumble", "Ironhide", "Slagfoot", "Grimtoe", "Warthud", "Boulderback"},
+	"SPIDER": {"Silkfang", "Darkweave", "Venom", "Gossamer", "Nightcrawl", "Skitter", "Tangle", "Dreadspinner", "Blackmaw", "Lurker"},
+	"UNDEAD": {"Rattlebone", "Grimshaw", "Deathmask", "Soulless", "Wraithclaw", "Moaning", "Fetid", "Hollowed", "Desecrated", "Ashenform"},
+}
 
-	b := make([]rune, 5)
-	for i := range b {
-		b[i] = letterRunes[rand.IntN(len(letterRunes))]
+// GenerateName picks a thematic name from the race's name pool, falling back
+// to a simple race+index label if the race is unknown.
+func (npc *BaddieNPC) GenerateName() string {
+	race := strings.ToUpper(npc.Race)
+	if pool, ok := npcNamePool[race]; ok {
+		return pool[rand.IntN(len(pool))]
 	}
-	return npc.Race+string(b)
+	// Fallback for races not in the pool.
+	return npc.Race + strconv.Itoa(rand.IntN(1000))
 }
 
 func (npc BaddieNPC) FetchGenericFromDB (db *muddatabase.MudDatabase, baddieid interface{}) (BaddieNPC) {

@@ -2,7 +2,7 @@
     "Server": {
         "ServerName": "Development MUD",
         "ListenPort": "127.0.0.1:8080",
-        "WorldSaveDelayMinutes": 60
+        "WorldSaveDelayMinutes": 5
     },
     "Database": {
         "DatabaseHost": "localhost",
@@ -12,6 +12,12 @@
         "DatabaseName": "mud"
     },
     "Game": {
-        "RoomTickDurationInMS": 250
+        "RoomTickDurationInMS": 250,
+        "PlayerStartHP": 20,
+        "PlayerStartMaxHP": 20,
+        "PlayerStartMP": 10,
+        "PlayerStartMaxMP": 10,
+        "PlayerStartAttack": 5,
+        "PlayerStartDefense": 10
     }
 }
