@@ -52,11 +52,12 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 		// Do attack logic
 		npcstyledname := (mudutils.ColorString(npc.Name,mudutils.COLOR_RED))
 		attackRoll := rand.IntN(100) + npc.AttackAccuracy
-		broadcastmsg := fmt.Sprint(npcstyledname," swings at ",player.Username," - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		effDef := player.EffectiveDefense()
+		broadcastmsg := fmt.Sprint(npcstyledname," swings at ",player.Username," - (ATT:",attackRoll," vs DEF:",effDef,")")
 		npc.Location.Broadcast(broadcastmsg,player.Username)
-		pmsg := fmt.Sprint(npcstyledname+" swings at you - (ATT:",attackRoll," vs DEF:",player.Defense,")")
+		pmsg := fmt.Sprint(npcstyledname+" swings at you - (ATT:",attackRoll," vs DEF:",effDef,")")
 		player.SendMessage(pmsg)
-		if attackRoll > player.Defense {
+		if attackRoll > effDef {
 			// Hit!
 			broadcastmsg = fmt.Sprint(npcstyledname," hits ",player.Username," for ",npc.AttackPower," damage.")
 			npc.Location.Broadcast(broadcastmsg,player.Username)
@@ -64,6 +65,7 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 			pmsg = fmt.Sprint(npcstyledname," hits you for ",npc.AttackPower," damage!")
 			player.SendMessage(pmsg)
 			player.HP -= npc.AttackPower
+			player.SendStatUpdate()
 
 			// Check for player death
 			if player.HP <= 0 {

@@ -74,6 +74,9 @@ func handleNodeCreate(ms *mudserver.MudServer, w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	room.ID = newID
+	ms.World.RoomMap[newID] = room
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int32{"id": newID})
 }

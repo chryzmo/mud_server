@@ -25,6 +25,7 @@ type MudPlayer struct {
 	Username      string
 	PasswordHash  string
 	Inventory     *Inventory
+	Equipment     *EquipmentSlots
 	AttackPower   int
 	Defense       int
 	HP            int
@@ -41,6 +42,7 @@ type MudPlayerDB struct {
 	Username         string
 	PasswordHash     string
 	InventoryIDSlice map[string]int32
+	EquipmentSlots   map[string]int32
 	AttackPower      int
 	Defense          int
 	HP               int
@@ -66,6 +68,7 @@ func CreateMudPlayer(ws_conn *websocket.Conn, room *Room, stats PlayerStartStats
 		TimeConnected: time.Now(),
 		Location:      room,
 		Inventory:     CreateInventory(),
+		Equipment:     NewEquipmentSlots(),
 		AttackPower:   stats.Attack,
 		Defense:       stats.Defense,
 		HP:            stats.HP,
@@ -74,6 +77,26 @@ func CreateMudPlayer(ws_conn *websocket.Conn, room *Room, stats PlayerStartStats
 		MaxMP:         stats.MaxMP,
 		SpawnLocation: room,
 	}
+}
+
+// EffectiveAttackPower returns base attack plus all equipment bonuses.
+func (mp *MudPlayer) EffectiveAttackPower() int {
+	return mp.AttackPower + mp.Equipment.TotalBonusAttackPower()
+}
+
+// EffectiveDefense returns base defense plus all equipment bonuses.
+func (mp *MudPlayer) EffectiveDefense() int {
+	return mp.Defense + mp.Equipment.TotalBonusDefense()
+}
+
+// EffectiveMaxHP returns base MaxHP plus all equipment bonuses.
+func (mp *MudPlayer) EffectiveMaxHP() int {
+	return mp.MaxHP + mp.Equipment.TotalBonusMaxHP()
+}
+
+// EffectiveMaxMP returns base MaxMP plus all equipment bonuses.
+func (mp *MudPlayer) EffectiveMaxMP() int {
+	return mp.MaxMP + mp.Equipment.TotalBonusMaxMP()
 }
 
 // SetPassword hashes and stores the player's password using bcrypt.
@@ -101,6 +124,21 @@ func (mp *MudPlayer) SendMessage(message string) error {
 		fmt.Println(err)
 	}
 	return err
+}
+
+// SendStatUpdate pushes a STATUPDATE line to the client.  The frontend
+// intercepts lines with this prefix and updates the stats bar without
+// displaying them in the chat log.
+func (mp *MudPlayer) SendStatUpdate() {
+	atkBonus := mp.Equipment.TotalBonusAttackPower()
+	defBonus := mp.Equipment.TotalBonusDefense()
+	line := fmt.Sprintf("STATUPDATE:hp=%d,maxhp=%d,mp=%d,maxmp=%d,atk=%d,atkbonus=%d,def=%d,defbonus=%d\n",
+		mp.HP, mp.EffectiveMaxHP(),
+		mp.MP, mp.EffectiveMaxMP(),
+		mp.EffectiveAttackPower(), atkBonus,
+		mp.EffectiveDefense(), defBonus,
+	)
+	mp.SendMessage(line)
 }
 
 func (mp *MudPlayer) MoveRoom (dir string) int {
@@ -150,9 +188,9 @@ func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, play
 
 	switch playerid.(type) {
 	case string:
-		query = "SELECT id,username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE id=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE id=$1"
 	default:
 		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
 	}
@@ -180,6 +218,8 @@ func (mp *MudPlayer) LoadFromDB (db *muddatabase.MudDatabase, world *World, play
 			player.Location = world.RoomMap[1]
 		}
 		player.Inventory = CreateInventory()
+		player.Equipment = NewEquipmentSlots()
+		player.Equipment.LoadFromIDMap(db, ret.EquipmentSlots)
 		player.AttackPower = ret.AttackPower
 		player.Defense = ret.Defense
 		player.HP = ret.HP
@@ -236,12 +276,13 @@ func (mp *MudPlayer) WriteToDB (db *muddatabase.MudDatabase) {
 
 	if mp.ID == 0 {
 		// User does not exist, do INSERT
-		query = "INSERT INTO player (username,passwordhash,inventoryidslice,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
+		query = "INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@equipmentslots,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
 
 		args := pgx.NamedArgs{
 			"username":         mp.Username,
 			"passwordhash":     mp.PasswordHash,
 			"inventoryidslice": mp.Inventory.IDMap(),
+			"equipmentslots":   mp.Equipment.ToIDMap(),
 			"attackpower":      mp.AttackPower,
 			"defense":          mp.Defense,
 			"hp":               mp.HP,
@@ -259,12 +300,13 @@ func (mp *MudPlayer) WriteToDB (db *muddatabase.MudDatabase) {
 
 	} else {
 		// User exists, do UPDATE
-		query = "UPDATE player SET username=@username, passwordhash=@passwordhash, inventoryidslice=@inventoryidslice, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
+		query = "UPDATE player SET username=@username, passwordhash=@passwordhash, inventoryidslice=@inventoryidslice, equipmentslots=@equipmentslots, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
 
 		args := pgx.NamedArgs{
 			"username":         mp.Username,
 			"passwordhash":     mp.PasswordHash,
 			"inventoryidslice": mp.Inventory.IDMap(),
+			"equipmentslots":   mp.Equipment.ToIDMap(),
 			"attackpower":      mp.AttackPower,
 			"defense":          mp.Defense,
 			"hp":               mp.HP,

@@ -15,3 +15,8 @@ const (
 func ColorString (message string, colorcode string) (string) {
 	return fmt.Sprintf("\033[1;%s%s\033[0m",colorcode,message)
 }
+
+// BoldString wraps a message in ANSI bold without changing its colour.
+func BoldString(message string) string {
+	return fmt.Sprintf("\033[1m%s\033[0m", message)
+}

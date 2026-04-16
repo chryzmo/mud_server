@@ -200,6 +200,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
 			c, _ := ms.getCommand("LOOK")
 			c.action(player, "")
+			player.SendStatUpdate()
 
 		} else if player.Username == "" && msg.Command == "/LOGIN" {
 			parts := strings.SplitN(msg.CommandParameter, " ", 2)
@@ -235,6 +236,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
 			c, _ := ms.getCommand("LOOK")
 			c.action(player, "")
+			player.SendStatUpdate()
 
 		} else {
 			ms.Broadcast <- msg

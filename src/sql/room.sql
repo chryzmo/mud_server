@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS room
 );
 
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 
-    ('Start Room','You find yourself in a generic looking room.  There is a door to the North.','{"N": 2}','{"i1": 1}');
+    ('Start Room','You find yourself in a generic looking room.  There is a door to the North.','{"N": 2}','{"i1": 1, "i2": 3, "i3": 1}');
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 
     ('Balcony','You are at a balcony overlooking the woods.  There is a door to the East and to the South.','{"S": 1,"E": 3}','{}');
 INSERT INTO room (name,description,exitjson,inventoryidslice) VALUES 
