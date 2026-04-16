@@ -1,0 +1,10 @@
+# Debug binaries
+src/__debug_bin*.exe
+*.exe
+
+# Go build output
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
