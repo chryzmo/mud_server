@@ -3,6 +3,7 @@ package mudserver
 import (
 	"fmt"
 	"math/rand/v2"
+	muddatabase "mud_server/src/internal/database"
 	muddata "mud_server/src/internal/muddata"
 	"mud_server/src/internal/mudutils"
 	"strconv"
@@ -10,25 +11,17 @@ import (
 )
 
 type MudCommand struct {
-	action func(player *MudPlayer, arguments string) (int)
+	description string
+	action      func(player *MudPlayer, arguments string) int
 }
 
-func GenerateCommandList() (map[string]*MudCommand) {
+func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 	cList := make(map[string]*MudCommand)
 
-	// TEMPLATE
-	/*
-	c_name := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
-			fmt.Println("Do stuff")
-			return muddata.MUD_OK
-		},
-	}
-	*/
-
 	// SAY
-	c_say := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_say := MudCommand{
+		description: "Speak aloud to everyone in your current room.  Usage: SAY <message>",
+		action: func(player *MudPlayer, arguments string) int {
 			msg := arguments
 
 			if msg == "" {
@@ -36,13 +29,13 @@ func GenerateCommandList() (map[string]*MudCommand) {
 				return muddata.MUD_OK
 			}
 
-			message := "You say: \""+msg+"\""
+			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 
-			for _,target_mp := range player.Location.UserMap {
+			for _, target_mp := range player.Location.UserMap {
 				if target_mp.Username != player.Username {
-					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" says: \""+msg+"\""
-						target_mp.SendMessage(message)
+					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE) + " says: \"" + msg + "\""
+					target_mp.SendMessage(message)
 				}
 			}
 
@@ -51,18 +44,20 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	}
 
 	// LOOK
-	c_look := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_look := MudCommand{
+		description: "Describe your current room, its exits, monsters, and other players.",
+		action: func(player *MudPlayer, arguments string) int {
 			player.SendMessage(player.Location.LookDescription())
 			return muddata.MUD_OK
 		},
 	}
 
 	// MOVE
-	c_move := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_move := MudCommand{
+		description: "Move in a direction.  Usage: MOVE <N|S|E|W|U|D>",
+		action: func(player *MudPlayer, arguments string) int {
 			direction := arguments
-			
+
 			if player.MoveRoom(direction) == muddata.ERR_ROOM_DNE {
 				player.SendMessage("You cannot move there.\n")
 			} else {
@@ -75,51 +70,52 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	}
 
 	// WHISPER
-	c_whisper := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_whisper := MudCommand{
+		description: "Send a private message to any online player.  Usage: WHISPER <player> <message>",
+		action: func(player *MudPlayer, arguments string) int {
 			// WHISPER <target> <message>
 			words := strings.Split(arguments, " ")
 			target := words[0]
 			message := strings.Join(words[1:], " ")
 
-			if (target == player.Username) {
+			if target == player.Username {
 				player.SendMessage("Talking to yourself, eh?")
 			} else {
 				mudMessage := MudMessage{
-					Command: "WHISPER",
-					CommandTarget: target,
+					Command:          "WHISPER",
+					CommandTarget:    target,
 					CommandParameter: message,
-					SenderPlayer: player,
+					SenderPlayer:     player,
 				}
-	
-				fmt.Println(player.Location.GlobalWhisperChannel)
-	
+
 				player.Location.GlobalWhisperChannel <- mudMessage
 				player.SendMessage(mudutils.ColorString("You whisper to "+target+", \""+message+"\"", mudutils.COLOR_MAGENTA))
 			}
-			
+
 			return muddata.MUD_OK
 		},
 	}
 
 	// GET
-	c_get := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_get := MudCommand{
+		description: "Pick up an item from the room.  Usage: GET <item>",
+		action: func(player *MudPlayer, arguments string) int {
 			itemname := strings.ToUpper(arguments)
-			
+
 			i := player.Location.Inventory.GetItem(itemname)
 			if i == nil {
 				player.SendMessage("You do not see that item here.")
 			} else {
-				player.SendMessage("You pick up "+i.Name+".")
-				
+				player.SendMessage("You pick up " + i.Name + ".")
+
 				p_item := i.createCopy()
 				p_item.Quantity = 1
 				player.Inventory.AddItem(p_item)
 
-				if ! i.Persistent {
+				if !i.Persistent {
 					player.Location.Inventory.RemoveItem(i)
 				}
+				go player.WriteToDB(db)
 			}
 
 			return muddata.MUD_OK
@@ -127,12 +123,12 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	}
 
 	// ATTACK
-	c_attack := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_attack := MudCommand{
+		description: "Attack a monster.  Repeating ATTACK continues on the same target.  Usage: ATTACK <monster>",
+		action: func(player *MudPlayer, arguments string) int {
 
 			if arguments != "" {
 				npc_target_name := strings.ToUpper(arguments)
-
 				player.NPCTarget = player.Location.BaddieMap[npc_target_name]
 			}
 
@@ -141,17 +137,19 @@ func GenerateCommandList() (map[string]*MudCommand) {
 			} else if player.NPCTarget.Location == player.Location {
 				// Perform attack!
 				attackRoll := rand.IntN(100)
+				effAtk := player.EffectiveAttackPower()
 				if attackRoll > player.NPCTarget.Defense {
-					player.NPCTarget.HP -= player.AttackPower
-					player.SendMessage("You hit "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+" points of damage!")
-					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(player.AttackPower)+ " points of damage!",player.Username)
+					player.NPCTarget.HP -= effAtk
+					player.SendMessage("You hit " + player.NPCTarget.Name + " for " + strconv.Itoa(effAtk) + " points of damage!")
+					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(effAtk)+" points of damage!", player.Username)
 					if player.NPCTarget.HP <= 0 {
-						player.SendMessage("You kill "+player.NPCTarget.Name+"!")
-						player.Location.KillNPC(player.NPCTarget.Name,player.Username)
+						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
+						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
 						player.NPCTarget = nil
+						go player.WriteToDB(db)
 					}
 				}
-				
+
 			} else {
 				player.NPCTarget = nil
 				player.SendMessage("You do not see that target here.")
@@ -162,16 +160,17 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	}
 
 	// DROP
-	c_drop := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_drop := MudCommand{
+		description: "Drop an item from your inventory into the room.  Usage: DROP <item>",
+		action: func(player *MudPlayer, arguments string) int {
 			itemname := strings.ToUpper(arguments)
-			
+
 			i := player.Inventory.GetItem(itemname)
 			if i == nil {
 				player.SendMessage("You do not have that item.")
 			} else {
-				player.SendMessage("You drop "+i.Name+".")
-				
+				player.SendMessage("You drop " + i.Name + ".")
+
 				p_item := i.createCopy()
 				p_item.Quantity = 1
 				player.Location.Inventory.AddItem(p_item)
@@ -184,14 +183,177 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	}
 
 	// INVENTORY
-	c_inventory := MudCommand {
-		action: func(player *MudPlayer, arguments string) (int) {
+	c_inventory := MudCommand{
+		description: "List everything you are carrying.",
+		action: func(player *MudPlayer, arguments string) int {
 			if player.Inventory.isEmpty() {
 				player.SendMessage("Your inventory is empty.")
 			} else {
-				player.SendMessage("Your inventory contains:\n\n"+player.Inventory.ListAsString(true))
+				player.SendMessage("Your inventory contains:\n\n" + player.Inventory.ListAsString(true))
 			}
 
+			return muddata.MUD_OK
+		},
+	}
+
+	// STATS
+	c_stats := MudCommand{
+		description: "Show your current HP, MP, attack, and defense, including any equipment bonuses.",
+		action: func(player *MudPlayer, arguments string) int {
+			atkBonus := player.Equipment.TotalBonusAttackPower()
+			defBonus := player.Equipment.TotalBonusDefense()
+
+			fmtStat := func(label string, effective, bonus int) string {
+				valStr := strconv.Itoa(effective)
+				if bonus > 0 {
+					valStr = mudutils.BoldString(fmt.Sprintf("%d (+%d from equipment)", effective, bonus))
+				}
+				return fmt.Sprintf("  %-12s %s\n", label+":", valStr)
+			}
+
+			msg := "Your stats:\n"
+			msg += fmt.Sprintf("  %-12s %d / %d\n", "HP:", player.HP, player.EffectiveMaxHP())
+			msg += fmt.Sprintf("  %-12s %d / %d\n", "MP:", player.MP, player.EffectiveMaxMP())
+			msg += fmtStat("Attack", player.EffectiveAttackPower(), atkBonus)
+			msg += fmtStat("Defense", player.EffectiveDefense(), defBonus)
+			msg += "\n"
+			player.SendMessage(msg)
+			player.SendStatUpdate()
+			return muddata.MUD_OK
+		},
+	}
+
+	// EQUIP
+	// EQUIP          — list what the player has equipped
+	// EQUIP <item>   — equip a named item from inventory
+	c_equip := MudCommand{
+		description: "Equip an item from your inventory, or show what you have equipped.  Usage: EQUIP [item name]",
+		action: func(player *MudPlayer, arguments string) int {
+			if arguments == "" {
+				// Show currently equipped items
+				msg := "Your equipment:\n"
+				for _, slot := range player.Equipment.AllSlots() {
+					if slot.Item != nil {
+						msg += fmt.Sprintf("  %-8s %s %s\n", "["+slot.Name+"]", slot.Item.Name, slot.Item.BonusSummary())
+					} else {
+						msg += fmt.Sprintf("  %-8s (empty)\n", "["+slot.Name+"]")
+					}
+				}
+				msg += "\n"
+				player.SendMessage(msg)
+				return muddata.MUD_OK
+			}
+
+			itemName := strings.ToUpper(arguments)
+
+			// Check player has it in inventory
+			invItem := player.Inventory.GetItem(itemName)
+			if invItem == nil {
+				player.SendMessage("You don't have a " + arguments + " in your inventory.\n")
+				return muddata.MUD_OK
+			}
+
+			// Look up in equipment catalog
+			equipItem := FetchEquipmentByItemName(db, itemName)
+			if equipItem == nil {
+				player.SendMessage(arguments + " is not equippable.\n")
+				return muddata.MUD_OK
+			}
+
+			// Determine the target slot; rings fill ring1 first, then ring2
+			targetSlot := equipItem.Slot
+			if targetSlot == "ring" {
+				if player.Equipment.Ring1 == nil {
+					targetSlot = "ring1"
+				} else {
+					targetSlot = "ring2"
+				}
+			}
+
+			slotPtr := player.Equipment.GetSlotPtr(targetSlot)
+			if slotPtr == nil {
+				player.SendMessage("Unknown equipment slot: " + targetSlot + "\n")
+				return muddata.MUD_OK
+			}
+
+			// Both ring slots full
+			if targetSlot == "ring2" && player.Equipment.Ring2 != nil {
+				player.SendMessage("Both ring slots are occupied. Unequip a ring first.\n")
+				return muddata.MUD_OK
+			}
+
+			// Unequip existing item in that slot → return to inventory
+			if *slotPtr != nil {
+				old := *slotPtr
+				oldItem := &Item{ID: old.ItemID, Name: old.Name, Quantity: 1}
+				player.Inventory.AddItem(oldItem)
+				player.SendMessage("You unequip " + old.Name + ".\n")
+			}
+
+			// Equip the new item
+			*slotPtr = equipItem
+			player.Inventory.RemoveItem(invItem)
+			player.SendMessage("You equip " + equipItem.Name + ". " + equipItem.BonusSummary() + "\n")
+			player.SendStatUpdate()
+			go player.WriteToDB(db)
+			return muddata.MUD_OK
+		},
+	}
+
+	// UNEQUIP <slot>  — remove gear from the named slot and return it to inventory
+	c_unequip := MudCommand{
+		description: "Remove equipped gear from a slot and return it to your inventory.  Usage: UNEQUIP <slot>  (slots: weapon shield helmet chest legs hands ring1 ring2 neck)",
+		action: func(player *MudPlayer, arguments string) int {
+			slotName := strings.ToLower(strings.TrimSpace(arguments))
+			if slotName == "" {
+				player.SendMessage("Usage: UNEQUIP <slot>\nSlots: weapon shield helmet chest legs hands ring1 ring2 neck\n")
+				return muddata.MUD_OK
+			}
+
+			slotPtr := player.Equipment.GetSlotPtr(slotName)
+			if slotPtr == nil {
+				player.SendMessage("Unknown slot '" + arguments + "'. Valid slots: weapon shield helmet chest legs hands ring1 ring2 neck\n")
+				return muddata.MUD_OK
+			}
+
+			if *slotPtr == nil {
+				player.SendMessage("Nothing equipped in " + slotName + ".\n")
+				return muddata.MUD_OK
+			}
+
+			old := *slotPtr
+			oldItem := &Item{ID: old.ItemID, Name: old.Name, Quantity: 1}
+			player.Inventory.AddItem(oldItem)
+			*slotPtr = nil
+			player.SendMessage("You unequip " + old.Name + " and stow it in your inventory.\n")
+			player.SendStatUpdate()
+			go player.WriteToDB(db)
+			return muddata.MUD_OK
+		},
+	}
+
+	// HELP
+	c_help := MudCommand{
+		description: "Show all available commands and what they do.",
+		action: func(player *MudPlayer, arguments string) int {
+			// Collect and sort command names for a stable, readable listing.
+			names := make([]string, 0, len(cList))
+			for name := range cList {
+				names = append(names, name)
+			}
+			// Simple insertion sort — command list is small.
+			for i := 1; i < len(names); i++ {
+				for j := i; j > 0 && names[j] < names[j-1]; j-- {
+					names[j], names[j-1] = names[j-1], names[j]
+				}
+			}
+
+			msg := "Available commands:\n\n"
+			for _, name := range names {
+				msg += mudutils.ColorString(name, mudutils.COLOR_GREEN) + " — " + cList[name].description + "\n"
+			}
+			msg += "\n"
+			player.SendMessage(msg)
 			return muddata.MUD_OK
 		},
 	}
@@ -205,6 +367,11 @@ func GenerateCommandList() (map[string]*MudCommand) {
 	cList["INVENTORY"] = &c_inventory
 	cList["ATTACK"] = &c_attack
 	cList["WHISPER"] = &c_whisper
+	cList["STATS"] = &c_stats
+	cList["EQUIP"] = &c_equip
+	cList["UNEQUIP"] = &c_unequip
+	cList["HELP"] = &c_help
+	cList["?"] = &c_help
 
 	return cList
 }

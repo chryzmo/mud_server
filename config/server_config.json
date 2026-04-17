@@ -12,6 +12,12 @@
         "DatabaseName": "mud"
     },
     "Game": {
-        "RoomTickDurationInMS": 250
+        "RoomTickDurationInMS": 250,
+        "PlayerStartHP": 20,
+        "PlayerStartMaxHP": 20,
+        "PlayerStartMP": 10,
+        "PlayerStartMaxMP": 10,
+        "PlayerStartAttack": 5,
+        "PlayerStartDefense": 10
     }
 }
