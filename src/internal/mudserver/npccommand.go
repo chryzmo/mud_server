@@ -13,18 +13,16 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 	c_orc := NPCCommand{
 		action: func(room *Room, baddie *BaddieNPC) int32 {
 			// If NPC does not have a target, select a target
-			if baddie.TargetPC != nil && baddie.Location.UserMap[baddie.TargetPC.Username] == nil {
+			if baddie.TargetPC != nil && baddie.Location.GetPlayer(baddie.TargetPC.Username) == nil {
 				// Target is no longer in the room
 				baddie.TargetPC = nil
 			}
 			if baddie.TargetPC == nil {
-				if len(baddie.Location.UserMap) > 0 {
-					// Janky way to select first PC in Room Map
-					for k, _ := range baddie.Location.UserMap {
-						baddie.TargetPC = baddie.Location.UserMap[k]
-						baddie.Location.Broadcast(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED)+" looks at "+baddie.Location.UserMap[k].Username+".", "")
-						continue
-					}
+				// Janky way to select first PC in Room Map. (It actually looks at every
+				// player in turn and keeps the last; kept as-is, see the plan's Phase 4 combat fixes.)
+				for _, p := range baddie.Location.Players() {
+					baddie.TargetPC = p
+					baddie.Location.Broadcast(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED)+" looks at "+p.Username+".", "")
 				}
 			} else {
 				// If NPC has target, attack

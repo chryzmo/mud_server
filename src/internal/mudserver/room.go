@@ -166,6 +166,26 @@ func (r *Room) LookDescription() string {
 	return desc
 }
 
+// Players returns a snapshot of the players in the room. Iterate over this,
+// never over UserMap directly: disconnects remove players from other
+// goroutines, and an unlocked map iteration during a write crashes the server.
+func (r *Room) Players() []*MudPlayer {
+	r.userMu.RLock()
+	defer r.userMu.RUnlock()
+	players := make([]*MudPlayer, 0, len(r.UserMap))
+	for _, p := range r.UserMap {
+		players = append(players, p)
+	}
+	return players
+}
+
+// GetPlayer returns the named player if they're in the room, or nil.
+func (r *Room) GetPlayer(username string) *MudPlayer {
+	r.userMu.RLock()
+	defer r.userMu.RUnlock()
+	return r.UserMap[username]
+}
+
 func (r *Room) RemovePlayer(username string) {
 	r.userMu.Lock()
 	delete(r.UserMap, username)

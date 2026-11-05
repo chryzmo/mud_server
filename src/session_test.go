@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"syscall"
@@ -74,8 +75,8 @@ func await(t *testing.T, ch <-chan string, want string) string {
 // Before sessions had their own queues, a client that stopped reading blocked
 // the shared command loop on a websocket write, freezing the game for everyone.
 func TestStalledClientDoesNotBlockOthers(t *testing.T) {
+	// Default queue size; a short write timeout so the stalled writer gives up quickly.
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
-		c.Connection.OutboundQueueSize = 32
 		c.Connection.WriteTimeoutMS = 500
 	})
 
@@ -89,14 +90,19 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 	activeIn := reader(active)
 
 	// Every SAY is also sent to the stalled client: about 8 MB in all, far more
-	// than socket buffers can absorb.
+	// than socket buffers can absorb. Send in batches and wait for each batch's
+	// echo, as a real client reading its own output would; flooding thousands
+	// of commands unread would (correctly) get the active client dropped too.
 	chatter := strings.Repeat("x", 2000)
 	start := time.Now()
-	for i := 0; i < 4000; i++ {
-		send(t, active, "SAY "+chatter)
+	for batch := 0; batch < 40; batch++ {
+		for i := 0; i < 100; i++ {
+			send(t, active, "SAY "+chatter)
+		}
+		marker := fmt.Sprintf("batch %d", batch)
+		send(t, active, "SAY "+marker)
+		await(t, activeIn, `You say: "`+marker+`"`)
 	}
-	send(t, active, "SAY done")
-	await(t, activeIn, `You say: "done"`)
 	t.Logf("4000 broadcasts handled in %v", time.Since(start).Round(time.Millisecond))
 
 	// The stalled client is dropped, and the game carries on without it.
