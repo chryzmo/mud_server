@@ -15,6 +15,7 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
+	Subprotocols: []string{mudserver.Subprotocol},
 	CheckOrigin: func(r *http.Request) bool {
 	 return true
 	},
@@ -63,6 +64,10 @@ func handleConnections(si *mudserver.MudServer,w http.ResponseWriter, r *http.Re
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println(err)
+		return
+	}
+
+	if !mudserver.RefuseUnlessProtocol(conn) {
 		return
 	}
 

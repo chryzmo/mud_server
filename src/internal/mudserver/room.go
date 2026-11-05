@@ -60,7 +60,12 @@ func (r *Room) tick(now time.Time) {
 
 // Broadcast sends msg to everyone in the room except senderusername.
 func (r *Room) Broadcast(msg string, senderusername string) {
-	frame := encodeText(msg)
+	r.BroadcastFrame(encodeText(msg), senderusername)
+}
+
+// BroadcastFrame queues one already-encoded frame to everyone in the room
+// except senderusername: format once, share the bytes.
+func (r *Room) BroadcastFrame(frame []byte, senderusername string) {
 	for _, player := range r.UserMap {
 		if player.Username != senderusername {
 			player.Session.Send(frame)

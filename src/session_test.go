@@ -18,6 +18,7 @@ import (
 func dialWithTinyReceiveBuffer(t *testing.T, wsURL string) *websocket.Conn {
 	t.Helper()
 	d := websocket.Dialer{
+		Subprotocols: []string{mudserver.Subprotocol},
 		NetDialContext: (&net.Dialer{
 			Control: func(_, _ string, c syscall.RawConn) error {
 				return c.Control(func(fd uintptr) {

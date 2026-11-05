@@ -1,57 +1,68 @@
 package mudserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
-
-	"mud_server/src/internal/mudutils"
 )
 
 // queuedText returns the game text inside a queued text frame.
 func queuedText(frame []byte) string {
-	var env struct {
-		T string `json:"t"`
-		D struct {
-			Text string `json:"text"`
-		} `json:"d"`
+	var m struct {
+		T    string `json:"t"`
+		Text string `json:"text"`
 	}
-	if json.Unmarshal(frame, &env) != nil || env.T != msgText {
+	if json.Unmarshal(frame, &m) != nil || m.T != msgText {
 		return string(frame)
 	}
-	return env.D.Text
+	return m.Text
 }
 
-func TestTextKindFollowsLeadingColour(t *testing.T) {
-	for _, tc := range []struct{ text, want string }{
-		{mudutils.ColorString("Grak", mudutils.COLOR_RED) + " looks at you.", "combat"},
-		{mudutils.ColorString("bob", mudutils.COLOR_BLUE) + " says: \"hi\"", "player"},
-		{mudutils.ColorString("sword", mudutils.COLOR_GREEN) + " lies here.", "item"},
-		{mudutils.ColorString("You whisper", mudutils.COLOR_MAGENTA), "plain"},
-		{"A plain line.", "plain"},
-		{"A line with " + mudutils.ColorString("Grak", mudutils.COLOR_RED) + " inside.", "plain"},
-		{"", "plain"},
-	} {
-		if got := textKind(tc.text); got != tc.want {
-			t.Errorf("textKind(%q) = %q, want %q", tc.text, got, tc.want)
-		}
-	}
-}
-
-func TestEnvelopeShapes(t *testing.T) {
+func TestFrameShapes(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		frame []byte
 		want  string
 	}{
-		{"text", encodeText("\x1b[1;31mGrak\x1b[0m"), `{"v":1,"t":"text","d":{"text":"\u001b[1;31mGrak\u001b[0m","kind":"combat"}}`},
-		{"auth ok", encodeEnvelope(msgAuth, authPayload{OK: true, Message: "hi"}), `{"v":1,"t":"auth","d":{"ok":true,"message":"hi"}}`},
-		{"auth refused", encodeEnvelope(msgAuth, authPayload{Code: codeNameTaken, Message: "taken"}), `{"v":1,"t":"auth","d":{"ok":false,"code":"name_taken","message":"taken"}}`},
-		{"error", encodeEnvelope(msgError, errorPayload{Code: codeRateLimited, Message: "slow"}), `{"v":1,"t":"error","d":{"code":"rate_limited","message":"slow"}}`},
-		{"room", encodeEnvelope(msgRoom, roomPayload{Name: "Hall", Exits: []string{"N", "S"}}), `{"v":1,"t":"room","d":{"name":"Hall","exits":["N","S"]}}`},
-		{"room without exits", encodeEnvelope(msgRoom, roomPayload{Name: "Closet", Exits: []string{}}), `{"v":1,"t":"room","d":{"name":"Closet","exits":[]}}`},
+		{"text", encodeText("\x1b[1;31mGrak\x1b[0m"), `{"t":"text","text":"\u001b[1;31mGrak\u001b[0m"}`},
+		{"text is not HTML-escaped", encodeText("a <b> & c"), `{"t":"text","text":"a <b> & c"}`},
+		{"say", encodeSay("bob", `hi "there"`), `{"t":"say","who":"bob","text":"hi \"there\""}`},
+		{"arrive from a direction", encodeArrive("bob", "N"), `{"t":"arrive","who":"bob","from":"N"}`},
+		{"arrive from nowhere", encodeArrive("bob", ""), `{"t":"arrive","who":"bob"}`},
+		{"leave toward a direction", encodeLeave("bob", "S"), `{"t":"leave","who":"bob","to":"S"}`},
+		{"leave vanishing", encodeLeave("bob", ""), `{"t":"leave","who":"bob"}`},
+		{"whisper", encode(whisperMsg{T: msgWhisper, Who: "bob", Text: "psst"}), `{"t":"whisper","who":"bob","text":"psst"}`},
+		{"whisper echo", encode(whisperMsg{T: msgWhisper, Who: "bob", Text: "psst", Out: true}), `{"t":"whisper","who":"bob","text":"psst","out":true}`},
+		{"auth ok", encode(authMsg{T: msgAuth, OK: true, Message: "hi"}), `{"t":"auth","ok":true,"message":"hi"}`},
+		{"auth refused", encode(authMsg{T: msgAuth, Code: codeNameTaken, Message: "taken"}), `{"t":"auth","ok":false,"code":"name_taken","message":"taken"}`},
+		{"error", encode(errorMsg{T: msgError, Code: codeRateLimited, Message: "slow"}), `{"t":"error","code":"rate_limited","message":"slow"}`},
+		{"room", encode(roomMsg{T: msgRoom, Name: "Hall", Exits: []string{"N", "S"}}), `{"t":"room","name":"Hall","exits":["N","S"]}`},
+		{"room without exits", encode(roomMsg{T: msgRoom, Name: "Closet", Exits: []string{}}), `{"t":"room","name":"Closet","exits":[]}`},
 	} {
 		if got := string(tc.frame); got != tc.want {
 			t.Errorf("%s: got %s, want %s", tc.name, got, tc.want)
+		}
+	}
+}
+
+// The typed events exist to keep chatter small. Pin the sizes so an envelope
+// or escaping change that doubles bytes again fails here, not in a load test.
+func TestHotPathFramesStayCompact(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		frame []byte
+		max   int
+	}{
+		{"heard SAY", encodeSay("bot00042", "mudbot hello"), 56},
+		{"arrival", encodeArrive("bot00042", ""), 36},
+		{"departure", encodeLeave("bot00042", "N"), 44},
+		{"whisper", encode(whisperMsg{T: msgWhisper, Who: "bot00007", Text: "mudbot:b:7:12", Out: true}), 76},
+	} {
+		if len(tc.frame) > tc.max {
+			t.Errorf("%s is %d bytes (%s), want at most %d", tc.name, len(tc.frame), tc.frame, tc.max)
+		}
+		if bytes.Contains(tc.frame, []byte(`\u001b`)) {
+			t.Errorf("%s carries an escaped ANSI code: %s", tc.name, tc.frame)
 		}
 	}
 }
