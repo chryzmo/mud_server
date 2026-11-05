@@ -12,6 +12,11 @@
 #   ACME_EMAIL       Let's Encrypt contact; only needed on the first deploy, to
 #                    create ~/mud/caddy.env on the host. Kept out of git.
 #   ALLOW_DIRTY=1    deploy even with uncommitted changes (tags the images -dirty)
+#   SKIP_TESTS=1     don't run the test suites (CI sets this: its test job already passed);
+#                    the frontend is still built
+#
+# Deploys take a lock on the host (~/mud/deploy.lock), so a deploy triggered from each
+# repo at the same time runs one after the other.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -24,12 +29,29 @@ images=(mud-db mud-server mud-caddy)
 
 remote() { ssh -o BatchMode=yes "$host" "$@"; }
 
+take_lock() {
+	remote 'mkdir -p ~/mud
+		for _ in $(seq 1 120); do
+			mkdir ~/mud/deploy.lock 2> /dev/null && exit 0
+			# A lock older than 20 minutes was left by a deploy that died; take it over.
+			if [ -n "$(find ~/mud/deploy.lock -maxdepth 0 -mmin +20)" ]; then
+				rmdir ~/mud/deploy.lock
+				continue
+			fi
+			sleep 5
+		done
+		echo "deploy: another deploy has held the lock for 10 minutes" >&2
+		exit 1'
+	trap 'remote "rmdir ~/mud/deploy.lock" 2> /dev/null || true' EXIT
+}
+
 case "${1:-deploy}" in
 	status)
 		remote 'systemctl --user --no-pager list-units "mud*" ; echo; journalctl --user -u mud-server -n 20 --no-pager -o cat'
 		exit 0
 		;;
 	rollback)
+		take_lock
 		remote 'set -e
 			for img in mud-db mud-server mud-caddy; do
 				if podman image exists "localhost/$img:previous"; then
@@ -59,15 +81,24 @@ for repo in . "$frontend"; do
 		fi
 	fi
 done
-scripts/test.sh > /dev/null
-"$frontend/scripts/test.sh" > /dev/null # also builds $frontend/dist
+if [ "${SKIP_TESTS:-}" = 1 ]; then
+	echo "   skipping tests (SKIP_TESTS=1)"
+	(cd "$frontend" && npm ci --silent --no-audit --no-fund && npx vite build --logLevel warn)
+else
+	scripts/test.sh > /dev/null
+	"$frontend/scripts/test.sh" > /dev/null # also builds $frontend/dist
+fi
 tag="$(git rev-parse --short HEAD)-$(git -C "$frontend" rev-parse --short HEAD)$suffix"
 
 echo "== Building images ($tag)"
-podman build -q -f deploy/Containerfile.server -t "localhost/mud-server:$tag" . > /dev/null
-podman build -q -f deploy/Containerfile.db -t "localhost/mud-db:$tag" . > /dev/null
-podman build -q -f deploy/Containerfile.caddy --build-context "frontend=$frontend/dist" \
+# --timestamp 0 makes builds reproducible: an unchanged image keeps its ID, so it isn't re-uploaded.
+build=(podman build -q --timestamp 0)
+"${build[@]}" -f deploy/Containerfile.server -t "localhost/mud-server:$tag" . > /dev/null
+"${build[@]}" -f deploy/Containerfile.db -t "localhost/mud-db:$tag" . > /dev/null
+"${build[@]}" -f deploy/Containerfile.caddy --build-context "frontend=$frontend/dist" \
 	-t "localhost/mud-caddy:$tag" . > /dev/null
+
+take_lock
 
 echo "== Shipping images to $host"
 for img in "${images[@]}"; do

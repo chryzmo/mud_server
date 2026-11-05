@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Turn off root and password SSH login. Run as root only after confirming the
-# deploy user can log in and use sudo:
+# admin user can log in and use sudo:
 #
-#   ssh deploy@HOST sudo -n true && ssh root@HOST 'bash -s' < deploy/harden-ssh.sh
+#   ssh admin@HOST sudo -n true && ssh root@HOST 'bash -s' < deploy/harden-ssh.sh
 #
 # The lowest-numbered drop-in wins in sshd, so 10- overrides cloud-init's 50-.
 set -euo pipefail
