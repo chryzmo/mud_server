@@ -13,6 +13,30 @@ project and any subsystem, and is gitignored, so it is local working state, not 
 - When work lands, tick the checklist, update the status line, and add a dated entry to the log.
 - For a new subsystem, write `plans/<subsystem>.md` and add it to `plans/README.md`.
 
+## Agent handoff (Pi and Claude Code)
+
+- This file is the shared source of project rules; `CLAUDE.md` points here. Keep rules here,
+  not in separate tool-specific copies.
+- At startup or when resuming, read in order: this file, `../mud_frontend/AGENTS.md`,
+  `plans/README.md`, `plans/magfest-2027.md`, the active subsystem plan, then
+  `plans/handoff.md` if present. If the handoff is missing, reconstruct state from the plans
+  and git, and ask about unclear authorization before changing anything.
+- Verify each affected repo's branch, HEAD and working-tree changes. Handoff notes are a
+  snapshot, not proof that git, tests, CI or production still match. Preserve other agents'
+  unfinished work; don't reset, stash, discard or overwrite it without permission.
+- Before switching agents, update `plans/handoff.md`: task and explicit authorization,
+  repo/branch/HEAD, unfinished changes, decisions, exact verification commands and results,
+  outstanding checks, PR/CI status, and concrete next actions. Identify what commit or working
+  tree was tested; don't describe tests as current after subsequent changes.
+- Keep the handoff as one current snapshot, not another log. Completed work and durable
+  decisions still go in the plans' status/checklists and dated logs. The handoff is gitignored
+  local state; explicitly transfer it if moving machines.
+- Proposed next actions are not permission to commit, push, open a PR, merge, deploy or SSH.
+  Record the user's actual authorization and ask when unclear. Never copy secrets into notes;
+  refer to their file paths instead.
+- Claude Code's hooks are tool-specific. In Pi, run the required checks explicitly; do not
+  assume another tool's hooks ran. Report anything not verified.
+
 ## Layout
 
 - `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
