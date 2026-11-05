@@ -68,25 +68,35 @@ func (r *Room) Broadcast(msg string, senderusername string) {
 }
 
 func (r *Room) LookDescription() string {
-	desc := "You are in '" + r.Name + "'\n" + r.Description + "\n"
+	// Append each section once rather than copying the growing player list
+	// for every occupant. The room's map iteration order remains unchanged.
+	var desc strings.Builder
+	desc.Grow(len(r.Name) + len(r.Description) + 32)
+	desc.WriteString("You are in '")
+	desc.WriteString(r.Name)
+	desc.WriteString("'\n")
+	desc.WriteString(r.Description)
+	desc.WriteByte('\n')
 
 	if len(r.BaddieMap) > 0 {
-		desc += "\nThe monsters here are:\n"
+		desc.WriteString("\nThe monsters here are:\n")
 		for _, baddie := range r.BaddieMap {
-			desc += mudutils.ColorString(baddie.Name, mudutils.COLOR_RED) + "\n"
+			desc.WriteString(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED))
+			desc.WriteByte('\n')
 		}
 	}
 
 	if len(r.UserMap) > 0 {
-		desc += "\nThe players here are:\n"
+		desc.WriteString("\nThe players here are:\n")
 		for k := range r.UserMap {
-			desc += mudutils.ColorString(k, mudutils.COLOR_BLUE) + "\n"
+			desc.WriteString(mudutils.ColorString(k, mudutils.COLOR_BLUE))
+			desc.WriteByte('\n')
 		}
 	}
 
 	if !r.Inventory.isEmpty() {
-		desc += "\nYou see:\n"
-		desc += r.Inventory.ListAsString(false)
+		desc.WriteString("\nYou see:\n")
+		desc.WriteString(r.Inventory.ListAsString(false))
 	}
 
 	if len(r.ExitMap) > 0 {
@@ -95,11 +105,13 @@ func (r *Room) LookDescription() string {
 			exits = append(exits, dir)
 		}
 		sort.Strings(exits)
-		desc += "\nExits: [" + strings.Join(exits, "] [") + "]\n"
+		desc.WriteString("\nExits: [")
+		desc.WriteString(strings.Join(exits, "] ["))
+		desc.WriteString("]\n")
 	}
 
-	desc += "\n"
-	return desc
+	desc.WriteByte('\n')
+	return desc.String()
 }
 
 // Players returns a snapshot of the players in the room, safe to iterate while
