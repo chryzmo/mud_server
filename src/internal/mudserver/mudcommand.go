@@ -39,10 +39,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 
+			heard := encodeText(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE) + " says: \"" + msg + "\"")
 			for _, target_mp := range player.Location.Players() {
 				if target_mp.Username != player.Username {
-					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE) + " says: \"" + msg + "\""
-					target_mp.SendMessage(message)
+					target_mp.Session.Send(heard)
 				}
 			}
 
@@ -54,7 +54,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	c_look := MudCommand{
 		description: "Describe your current room, its exits, monsters, and other players.",
 		action: func(player *MudPlayer, arguments string) int {
-			player.SendMessage(player.Location.LookDescription())
+			player.SendLook()
 			return muddata.MUD_OK
 		},
 	}
@@ -70,7 +70,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			} else {
 				player.dirty = true
 				// Send description of new room
-				player.SendMessage(player.Location.LookDescription())
+				player.SendLook()
 			}
 
 			return muddata.MUD_OK
@@ -196,9 +196,9 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 		description: "List everything you are carrying.",
 		action: func(player *MudPlayer, arguments string) int {
 			if player.Inventory.isEmpty() {
-				player.SendMessage("Your inventory is empty.")
+				player.SendInventory("Your inventory is empty.")
 			} else {
-				player.SendMessage("Your inventory contains:\n\n" + player.Inventory.ListAsString(true))
+				player.SendInventory("Your inventory contains:\n\n" + player.Inventory.ListAsString(true))
 			}
 
 			return muddata.MUD_OK

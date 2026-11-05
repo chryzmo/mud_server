@@ -127,7 +127,7 @@ func (s *Session) ReadMessage() ([]byte, error) {
 func (s *Session) allowCommand(now time.Time) bool {
 	allowed, notify := s.limiter.allow(now)
 	if notify {
-		s.Send([]byte("SERVER:  Slow down. Too many commands.\n"))
+		s.Send(encodeEnvelope(msgError, errorPayload{Code: codeRateLimited, Message: "Slow down. Too many commands."}))
 	}
 	return allowed
 }

@@ -2,6 +2,7 @@ package mudbot
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,15 @@ import (
 func testConfig(target string) Config {
 	return Config{URL: target, Count: 3, Duration: 2500 * time.Millisecond, Interval: 250 * time.Millisecond,
 		Timeout: time.Second, JoinTimeout: 3 * time.Second, LoginWorkers: 2, Prefix: "testbot", Password: "fixture"}
+}
+
+func peerFrame(t string, d any) []byte {
+	b, _ := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+	return b
+}
+
+func peerText(text string) []byte {
+	return peerFrame("text", map[string]any{"text": text, "kind": "plain"})
 }
 
 // Fake protocol peer: no game state, database or sleeps. It can reject logins,
@@ -32,8 +42,14 @@ func protocolPeer(t *testing.T, mode string) string {
 		if err != nil {
 			return
 		}
-		parts := strings.Fields(string(message))
-		if len(parts) != 3 {
+		var login struct {
+			T string `json:"t"`
+			D struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			} `json:"d"`
+		}
+		if json.Unmarshal(message, &login) != nil || (login.T != "login" && login.T != "register") {
 			return
 		}
 		if mode == "stall-login" {
@@ -41,18 +57,18 @@ func protocolPeer(t *testing.T, mode string) string {
 			return
 		}
 		if mode == "reject" {
-			conn.WriteMessage(websocket.TextMessage, []byte("Incorrect password."))
+			conn.WriteMessage(websocket.TextMessage, peerFrame("auth", map[string]any{"ok": false, "code": "bad_password", "message": "Incorrect password."}))
 			return
 		}
-		greeting := "Welcome back, " + parts[1] + "!"
-		if parts[0] == "/REGISTER" {
-			greeting = "Account created! Welcome, " + parts[1] + "."
+		greeting := "Welcome back, " + login.D.Username + "!"
+		if login.T == "register" {
+			greeting = "Account created! Welcome, " + login.D.Username + "."
 		}
-		if conn.WriteMessage(websocket.TextMessage, []byte(greeting)) != nil {
+		if conn.WriteMessage(websocket.TextMessage, peerFrame("auth", map[string]any{"ok": true, "message": greeting})) != nil {
 			return
 		}
 		room := "You are in 'Arena'\n\x1b[1;31mTest Orc\x1b[0m\n"
-		if conn.WriteMessage(websocket.TextMessage, []byte(room)) != nil {
+		if conn.WriteMessage(websocket.TextMessage, peerText(room)) != nil {
 			return
 		}
 		for {
@@ -63,19 +79,27 @@ func protocolPeer(t *testing.T, mode string) string {
 			if mode == "disconnect" {
 				return
 			}
-			text := string(message)
+			var cmd struct {
+				D struct {
+					Line string `json:"line"`
+				} `json:"d"`
+			}
+			if json.Unmarshal(message, &cmd) != nil {
+				return
+			}
+			text := cmd.D.Line
 			if mode == "server-error" {
-				if conn.WriteMessage(websocket.TextMessage, []byte("SERVER:  Something went wrong. Please try again.")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerFrame("error", map[string]any{"code": "internal", "message": "Something went wrong. Please try again."})) != nil {
 					return
 				}
 			}
 			if mode == "rate-limit" {
-				if conn.WriteMessage(websocket.TextMessage, []byte("SERVER:  Slow down. Too many commands.")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerFrame("error", map[string]any{"code": "rate_limited", "message": "Slow down. Too many commands."})) != nil {
 					return
 				}
 			}
 			if strings.HasPrefix(text, "ATTACK ") {
-				if conn.WriteMessage(websocket.TextMessage, []byte("You hit Test Orc for 5 points of damage!")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerText("You hit Test Orc for 5 points of damage!")) != nil {
 					return
 				}
 			}
@@ -83,18 +107,18 @@ func protocolPeer(t *testing.T, mode string) string {
 				fields := strings.SplitN(text, " ", 3)
 				// A received whisper containing the same marker must not satisfy
 				// the outgoing fence. Only the outgoing echo is a sample.
-				if conn.WriteMessage(websocket.TextMessage, []byte("someone whispers, \""+fields[2]+"\"")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerText("someone whispers, \""+fields[2]+"\"")) != nil {
 					return
 				}
 				if mode == "wrong-echo" {
 					continue
 				}
-				if conn.WriteMessage(websocket.TextMessage, []byte("\x1b[1;35mYou whisper to "+fields[1]+", \""+fields[2]+"\"\x1b[0m")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerText("\x1b[1;35mYou whisper to "+fields[1]+", \""+fields[2]+"\"\x1b[0m")) != nil {
 					return
 				}
 			}
 			if strings.HasPrefix(text, "MOVE ") {
-				if conn.WriteMessage(websocket.TextMessage, []byte(room)) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerText(room)) != nil {
 					return
 				}
 			}

@@ -60,9 +60,10 @@ func (r *Room) tick(now time.Time) {
 
 // Broadcast sends msg to everyone in the room except senderusername.
 func (r *Room) Broadcast(msg string, senderusername string) {
+	frame := encodeText(msg)
 	for _, player := range r.UserMap {
 		if player.Username != senderusername {
-			player.SendMessage(msg)
+			player.Session.Send(frame)
 		}
 	}
 }

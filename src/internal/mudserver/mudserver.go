@@ -1,17 +1,19 @@
 package mudserver
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
 	"mud_server/src/internal/mudutils"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/gorilla/websocket"
 )
@@ -219,7 +221,7 @@ func (ms *MudServer) Shutdown(ctx context.Context) {
 func (ms *MudServer) shutdownOnLoop() {
 	var final saveBatch
 	for _, player := range ms.players {
-		player.SendMessage("SERVER:  The server is restarting.  Reconnect in a moment.\n")
+		player.SendError(codeRestarting, "The server is restarting.  Reconnect in a moment.")
 		final.players = append(final.players, player.snapshot())
 	}
 	for _, l := range ms.leaving {
@@ -260,7 +262,7 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 
 	fmt.Printf("Client connection - number of connected clients: %d\n", count)
 
-	mc.SendMessage("Welcome to the MUD!\nType /REGISTER <username> <password> to create an account.\nType /LOGIN <username> <password> to log in.\n")
+	mc.SendMessage("Welcome to the MUD!\nRegister or log in to play.\n")
 
 	return mc
 }
@@ -295,7 +297,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) bool {
 		admitted = true
 		ms.players[player.Username] = player
 		player.Location.AddPlayer(player)
-		player.SendMessage(greeting)
+		player.SendAuth(true, "", greeting)
 		player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
@@ -351,8 +353,6 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 	defer recoverPanic("connection reader", nil)
 
 	for {
-		var msg MudMessage
-
 		messagebytes, err := player.Session.ReadMessage()
 		if err != nil {
 			fmt.Println(err)
@@ -365,58 +365,79 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			continue
 		}
 
-		// If message is blank, disregard it
-		if len(messagebytes) == 0 {
+		var env envelope
+		if err := json.Unmarshal(messagebytes, &env); err != nil || env.T == "" {
+			player.SendError(codeBadFrame, "Messages must be JSON envelopes: {\"v\":1,\"t\":...}.")
 			continue
 		}
-
-		// Build MudMessage
-		messagefields := bytes.Fields(messagebytes)
-		if len(messagefields) == 0 {
-			continue
+		if env.V != protocolVersion {
+			player.SendError(codeBadVersion, fmt.Sprintf("Unsupported protocol version %d; this server speaks %d.", env.V, protocolVersion))
+			return
 		}
-		msg.Command = strings.ToUpper(string(messagefields[0]))
-		msg.CommandParameter = string(bytes.Join(messagefields[1:], []byte(" ")))
-		msg.SenderPlayer = player
 
-		switch {
-		case admitted:
+		switch env.T {
+		case msgCmd:
+			var payload cmdPayload
+			if json.Unmarshal(env.D, &payload) != nil {
+				player.SendError(codeBadRequest, "A cmd needs {\"line\":\"...\"}.")
+				continue
+			}
+			if !admitted {
+				player.SendAuth(false, codeNotLoggedIn, "Please log in or register first.")
+				continue
+			}
+			messagefields := strings.Fields(payload.Line)
+			if len(messagefields) == 0 {
+				continue
+			}
+			var msg MudMessage
+			msg.Command = strings.ToUpper(messagefields[0])
+			msg.CommandParameter = strings.Join(messagefields[1:], " ")
+			msg.SenderPlayer = player
 			if !ms.enqueue(func() { ms.handleCommand(player, msg) }) {
 				return
 			}
-		case msg.Command == "/REGISTER":
-			admitted = ms.register(player, msg.CommandParameter)
-		case msg.Command == "/LOGIN":
-			admitted = ms.login(player, msg.CommandParameter)
+		case msgRegister, msgLogin:
+			var creds credentialsPayload
+			if json.Unmarshal(env.D, &creds) != nil || creds.Username == "" || creds.Password == "" {
+				player.SendAuth(false, codeBadRequest, "A "+env.T+" needs a username and a password.")
+				continue
+			}
+			if admitted {
+				player.SendError(codeAlreadyLoggedIn, "You are already logged in.")
+				continue
+			}
+			if strings.IndexFunc(creds.Username, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
+				player.SendAuth(false, codeInvalidUsername, "Usernames can't contain spaces or control characters.")
+				continue
+			}
+			if env.T == msgRegister {
+				admitted = ms.register(player, creds.Username, creds.Password)
+			} else {
+				admitted = ms.login(player, creds.Username, creds.Password)
+			}
 		default:
-			player.SendMessage("Please /LOGIN or /REGISTER first.\n")
+			player.SendError(codeBadRequest, "Unknown message type "+strconv.Quote(env.T)+".")
 		}
 	}
 }
 
 // register runs on the connection's reader goroutine; the player isn't in the
 // world yet, so the reader owns it until admit succeeds.
-func (ms *MudServer) register(player *MudPlayer, params string) bool {
-	parts := strings.SplitN(params, " ", 2)
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		player.SendMessage("Usage: /REGISTER <username> <password>\n")
-		return false
-	}
-	username, password := parts[0], parts[1]
-
+func (ms *MudServer) register(player *MudPlayer, username, password string) bool {
 	if online, _ := ms.isOnline(username); online {
-		player.SendMessage("That username is already online.\n")
+		player.SendAuth(false, codeNameOnline, "That username is already online.")
 		return false
 	}
 	if player.CountUsernameFromDB(&ms.DB, username) > 0 {
-		player.SendMessage("That username is already taken.\n")
+		player.SendAuth(false, codeNameTaken, "That username is already taken.")
 		return false
 	}
 
 	player.Username = username
 	if err := player.SetPassword(password); err != nil {
 		fmt.Println("SetPassword error: " + err.Error())
-		player.SendMessage("Registration failed. Please try again.\n")
+		player.SendAuth(false, codeFailed, "Registration failed. Please try again.")
 		player.Username = ""
 		return false
 	}
@@ -424,16 +445,16 @@ func (ms *MudServer) register(player *MudPlayer, params string) bool {
 		player.Username = ""
 		if errors.Is(err, errUsernameTaken) {
 			// Someone registered the same name between the check and the insert.
-			player.SendMessage("That username is already taken.\n")
+			player.SendAuth(false, codeNameTaken, "That username is already taken.")
 		} else {
 			fmt.Println("Register insert error: " + err.Error())
-			player.SendMessage("Registration failed. Please try again.\n")
+			player.SendAuth(false, codeFailed, "Registration failed. Please try again.")
 		}
 		return false
 	}
 
-	if !ms.admit(player, "Account created! Welcome, "+username+".\n") {
-		player.SendMessage("That username is already online.\n")
+	if !ms.admit(player, "Account created! Welcome, "+username+".") {
+		player.SendAuth(false, codeNameOnline, "That username is already online.")
 		player.Username = ""
 		return false
 	}
@@ -441,17 +462,10 @@ func (ms *MudServer) register(player *MudPlayer, params string) bool {
 }
 
 // login runs on the connection's reader goroutine, like register.
-func (ms *MudServer) login(player *MudPlayer, params string) bool {
-	parts := strings.SplitN(params, " ", 2)
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		player.SendMessage("Usage: /LOGIN <username> <password>\n")
-		return false
-	}
-	username, password := parts[0], parts[1]
-
+func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 	online, saved := ms.isOnline(username)
 	if online {
-		player.SendMessage("That user is already logged in.\n")
+		player.SendAuth(false, codeNameOnline, "That user is already logged in.")
 		return false
 	}
 	if saved != nil {
@@ -463,25 +477,25 @@ func (ms *MudServer) login(player *MudPlayer, params string) bool {
 		}
 	}
 	if player.CountUsernameFromDB(&ms.DB, username) == 0 {
-		player.SendMessage("Unknown username. Use /REGISTER to create an account.\n")
+		player.SendAuth(false, codeUnknownUser, "Unknown username. Register to create an account.")
 		return false
 	}
 
 	if err := player.LoadFromDB(&ms.DB, ms.World, player, username); err != nil {
 		fmt.Println("LoadFromDB error: " + err.Error())
-		player.SendMessage("Login failed. Please try again.\n")
+		player.SendAuth(false, codeFailed, "Login failed. Please try again.")
 		return false
 	}
 
 	if !player.CheckPassword(password) {
 		player.Username = ""
-		player.SendMessage("Incorrect password.\n")
+		player.SendAuth(false, codeBadPassword, "Incorrect password.")
 		return false
 	}
 
-	if !ms.admit(player, "Welcome back, "+username+"!\n") {
+	if !ms.admit(player, "Welcome back, "+username+"!") {
 		player.Username = ""
-		player.SendMessage("That user is already logged in.\n")
+		player.SendAuth(false, codeNameOnline, "That user is already logged in.")
 		return false
 	}
 	return true
@@ -499,7 +513,7 @@ func (ms *MudServer) handleCommand(player *MudPlayer, msg MudMessage) {
 
 	command, err := ms.getCommand(command_name)
 	if err == muddata.ERR_COMMAND_UNKNOWN {
-		player.SendMessage("SERVER:  Unknown command.\n")
+		player.SendError(codeUnknownCommand, "Unknown command.")
 	} else {
 		// Run command
 		command.action(player, arguments)

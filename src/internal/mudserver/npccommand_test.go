@@ -47,7 +47,7 @@ func TestNPCTargetSelectionDoesNotFloodCrowdedRoom(t *testing.T) {
 				t.Errorf("%s received %d selection messages, want one", p.Username, got)
 				return
 			}
-			if got := string(<-p.Session.out); got != want {
+			if got := queuedText(<-p.Session.out); got != want {
 				t.Errorf("selection message = %q, want %q", got, want)
 				return
 			}

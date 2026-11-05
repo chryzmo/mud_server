@@ -26,7 +26,7 @@ func TestWhitespaceOnlyMessageIsIgnored(t *testing.T) {
 	expect(t, other, "Welcome to the MUD!")
 	send(t, other, "  ")
 	send(t, other, "LOOK")
-	expect(t, other, "Please /LOGIN or /REGISTER first.")
+	expect(t, other, "Please log in or register first.")
 }
 
 // Two clients registering the same name at once: the unique index on

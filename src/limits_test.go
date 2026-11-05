@@ -11,6 +11,12 @@ import (
 	mudserver "mud_server/src/internal/mudserver"
 )
 
+// paddedCmd is an unknown-command envelope of exactly size bytes.
+func paddedCmd(size int) string {
+	prefix, suffix := `{"v":1,"t":"cmd","d":{"line":"DANCE `, `"}}`
+	return prefix + strings.Repeat("x", size-len(prefix)-len(suffix)) + suffix
+}
+
 func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -34,12 +40,14 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 			}
 
 			// Exactly 4 KB is allowed, including before login.
-			message := "DANCE " + strings.Repeat("x", 4096-len("DANCE "))
-			send(t, conn, message)
+			message := paddedCmd(4096)
+			if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+				t.Fatal(err)
+			}
 			if tc.loggedIn {
 				expect(t, conn, "Unknown command.")
 			} else {
-				expect(t, conn, "Please /LOGIN or /REGISTER first.")
+				expect(t, conn, "Please log in or register first.")
 			}
 			message += "x"
 			if tc.fragmented {
@@ -127,7 +135,7 @@ func TestCommandFloodIsLimitedBeforeAndAfterLogin(t *testing.T) {
 						if notices == 1 {
 							deadline.Reset(200 * time.Millisecond)
 						}
-					case strings.Contains(message, "Usage: /LOGIN"), strings.Contains(message, "Unknown command."):
+					case strings.Contains(message, "needs a username and a password"), strings.Contains(message, "Unknown command."):
 						replies++
 					}
 				case <-deadline.C:

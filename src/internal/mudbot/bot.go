@@ -3,6 +3,7 @@ package mudbot
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +16,43 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+// frame builds a protocol envelope: {"v":1,"t":t,"d":d}.
+func frame(t string, d any) []byte {
+	b, err := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+// inFrame is the part of a server envelope the bot looks at; Text is set only
+// for game text.
+type inFrame struct {
+	T    string
+	OK   bool
+	Code string
+	Text string
+}
+
+func parseFrame(message []byte) inFrame {
+	var env struct {
+		T string `json:"t"`
+		D struct {
+			OK   bool   `json:"ok"`
+			Code string `json:"code"`
+			Text string `json:"text"`
+		} `json:"d"`
+	}
+	if json.Unmarshal(message, &env) != nil {
+		return inFrame{}
+	}
+	f := inFrame{T: env.T, OK: env.D.OK, Code: env.D.Code}
+	if env.T == "text" {
+		f.Text = env.D.Text
+	}
+	return f
+}
 
 type Config struct {
 	URL          string
@@ -288,11 +326,11 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 	conn.SetReadLimit(4 << 20)
 	conn.SetReadDeadline(deadline)
 	conn.SetWriteDeadline(deadline)
-	verb, welcome := "/LOGIN", "Welcome back, "
+	verb := "login"
 	if c.Register {
-		verb, welcome = "/REGISTER", "Account created! Welcome, "
+		verb = "register"
 	}
-	if err := conn.WriteMessage(websocket.TextMessage, []byte(verb+" "+Name(c.Prefix, index)+" "+c.Password)); err != nil {
+	if err := conn.WriteMessage(websocket.TextMessage, frame(verb, map[string]string{"username": Name(c.Prefix, index), "password": c.Password})); err != nil {
 		return nil, err
 	}
 	for {
@@ -300,12 +338,15 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 		if err != nil {
 			return nil, err
 		}
-		text := string(message)
-		if strings.HasPrefix(text, welcome+Name(c.Prefix, index)) {
+		f := parseFrame(message)
+		if f.T == "auth" {
+			if !f.OK {
+				return nil, errors.New("authentication rejected")
+			}
 			break
 		}
-		if !strings.HasPrefix(text, "Welcome to the MUD!") {
-			return nil, errors.New("authentication rejected")
+		if f.T != "text" {
+			return nil, errors.New("unexpected message before authentication: " + f.T)
 		}
 	}
 	if dialCtx.Err() != nil {
@@ -333,16 +374,17 @@ func (b *client) read() {
 			}
 			return
 		}
-		text := string(message)
+		f := parseFrame(message)
+		text := f.Text // only game text is matched below; other types carry no text
 		b.messages++
 		b.bytes += int64(len(message))
 		if strings.HasPrefix(text, "You hit ") {
 			b.hits++
 		}
-		if strings.Contains(text, "SERVER:  Something went wrong.") {
+		if f.T == "error" && f.Code == "internal" {
 			b.serverErrors++
 		}
-		if strings.Contains(text, "SERVER:  Slow down.") || strings.Contains(text, "You are talking too fast.") {
+		if f.T == "error" && f.Code == "rate_limited" {
 			b.rateLimited++
 		}
 		b.Lock()
@@ -410,12 +452,12 @@ func (b *client) play(ctx context.Context) {
 		}
 		b.metrics.Unlock()
 		b.conn.SetWriteDeadline(time.Now().Add(b.config.Timeout))
-		if err := b.conn.WriteMessage(websocket.TextMessage, []byte(command)); err != nil {
+		if err := b.conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": command})); err != nil {
 			b.conn.Close()
 			<-b.done
 			return
 		}
-		if err := b.conn.WriteMessage(websocket.TextMessage, []byte("WHISPER "+target+" "+marker)); err != nil {
+		if err := b.conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": "WHISPER " + target + " " + marker})); err != nil {
 			b.conn.Close()
 			<-b.done
 			return

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -142,9 +144,66 @@ func dial(t *testing.T, wsURL string) *websocket.Conn {
 	return conn
 }
 
+// wireLine turns a line a player would type into a protocol envelope:
+// /REGISTER and /LOGIN become register and login messages, everything else a cmd.
+func wireLine(line string) []byte {
+	verb, rest, _ := strings.Cut(line, " ")
+	if verb == "/REGISTER" || verb == "/LOGIN" {
+		username, password, _ := strings.Cut(rest, " ")
+		return wireFrame(strings.ToLower(verb[1:]), map[string]string{"username": username, "password": password})
+	}
+	return wireFrame("cmd", map[string]string{"line": line})
+}
+
+func wireFrame(t string, d any) []byte {
+	b, _ := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+	return b
+}
+
+// flatten renders a server envelope as the text a player would have seen
+// before the JSON protocol, so assertions can look for substrings: game text
+// and inventory are their text, auth and error their message, stats the
+// old STATUPDATE line and room a ROOM line. Anything unparseable is returned
+// as is.
+func flatten(raw []byte) string {
+	var env struct {
+		T string `json:"t"`
+		D struct {
+			Text    string   `json:"text"`
+			Message string   `json:"message"`
+			Name    string   `json:"name"`
+			Exits   []string `json:"exits"`
+			HP      int      `json:"hp"`
+			MaxHP   int      `json:"maxhp"`
+			MP      int      `json:"mp"`
+			MaxMP   int      `json:"maxmp"`
+			Atk     int      `json:"atk"`
+			AtkB    int      `json:"atkbonus"`
+			Def     int      `json:"def"`
+			DefB    int      `json:"defbonus"`
+		} `json:"d"`
+	}
+	if json.Unmarshal(raw, &env) != nil || env.T == "" {
+		return string(raw)
+	}
+	switch env.T {
+	case "text", "inventory":
+		return env.D.Text
+	case "auth", "error":
+		return env.D.Message
+	case "stats":
+		d := env.D
+		return fmt.Sprintf("STATUPDATE:hp=%d,maxhp=%d,mp=%d,maxmp=%d,atk=%d,atkbonus=%d,def=%d,defbonus=%d",
+			d.HP, d.MaxHP, d.MP, d.MaxMP, d.Atk, d.AtkB, d.Def, d.DefB)
+	case "room":
+		return "ROOM:" + env.D.Name + " " + strings.Join(env.D.Exits, ",")
+	}
+	return string(raw)
+}
+
 func send(t *testing.T, conn *websocket.Conn, line string) {
 	t.Helper()
-	if err := conn.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
+	if err := conn.WriteMessage(websocket.TextMessage, wireLine(line)); err != nil {
 		t.Fatalf("send %q: %v", line, err)
 	}
 }
@@ -160,10 +219,11 @@ func expect(t *testing.T, conn *websocket.Conn, want string) string {
 		if err != nil {
 			t.Fatalf("waiting for %q: %v\nmessages seen:\n%s", want, err, strings.Join(seen, "\n---\n"))
 		}
-		if strings.Contains(string(msg), want) {
-			return string(msg)
+		text := flatten(msg)
+		if strings.Contains(text, want) {
+			return text
 		}
-		seen = append(seen, string(msg))
+		seen = append(seen, text)
 	}
 }
 
@@ -193,7 +253,7 @@ func TestCommandsRequireLogin(t *testing.T) {
 
 	expect(t, conn, "Welcome to the MUD!")
 	send(t, conn, "LOOK")
-	expect(t, conn, "Please /LOGIN or /REGISTER first.")
+	expect(t, conn, "Please log in or register first.")
 }
 
 func TestLoginRestoresSavedLocation(t *testing.T) {
