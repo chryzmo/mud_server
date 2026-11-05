@@ -22,6 +22,7 @@
     },
     "Crowd": {
         "SoftCap": 50,
+        "HardCap": 60,
         "MaxCopies": 200,
         "Areas": [
             { "Name": "start", "Rooms": [1, 2, 3] }

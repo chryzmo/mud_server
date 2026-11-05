@@ -24,7 +24,8 @@ type World struct {
 	// Area copies; see crowd.go. Loop only.
 	areas      map[int32]*Area // template room ID -> its area
 	nextRoomID int32           // next ID for a cloned room
-	softCap    int
+	softCap    int // placement fills a copy of a room up to this
+	hardCap    int // movement into a room is refused at this; 0 means no limit
 	maxCopies  int
 }
 

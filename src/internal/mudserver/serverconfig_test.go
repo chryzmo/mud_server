@@ -93,12 +93,12 @@ func TestProcessAliases(t *testing.T) {
 func TestCrowdConfigParses(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/c.json"
-	body := `{"Crowd":{"SoftCap":40,"MaxCopies":7,"Areas":[{"Name":"start","Rooms":[1,2,3]},{"Name":"hub","Rooms":[9]}]}}`
+	body := `{"Crowd":{"SoftCap":40,"HardCap":45,"MaxCopies":7,"Areas":[{"Name":"start","Rooms":[1,2,3]},{"Name":"hub","Rooms":[9]}]}}`
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	c := Configuration{}.LoadConfig(path)
-	if c.Crowd.SoftCap != 40 || c.Crowd.MaxCopies != 7 || len(c.Crowd.Areas) != 2 {
+	if c.Crowd.SoftCap != 40 || c.Crowd.HardCap != 45 || c.Crowd.MaxCopies != 7 || len(c.Crowd.Areas) != 2 {
 		t.Fatalf("Crowd = %+v", c.Crowd)
 	}
 	if a := c.Crowd.Areas[0]; a.Name != "start" || len(a.Rooms) != 3 || a.Rooms[2] != 3 {
@@ -111,7 +111,7 @@ func TestShippedConfigCopiesTheSeededStartingArea(t *testing.T) {
 	if len(c.Crowd.Areas) != 1 || c.Crowd.Areas[0].Name != "start" || len(c.Crowd.Areas[0].Rooms) != 3 {
 		t.Errorf("shipped Crowd.Areas = %+v, want the 3 seeded rooms as the start area", c.Crowd.Areas)
 	}
-	if c.Crowd.SoftCap != 50 || c.Crowd.MaxCopies != 200 {
-		t.Errorf("shipped caps = %d/%d, want 50/200", c.Crowd.SoftCap, c.Crowd.MaxCopies)
+	if c.Crowd.SoftCap != 50 || c.Crowd.HardCap != 60 || c.Crowd.MaxCopies != 200 {
+		t.Errorf("shipped caps = %d/%d/%d, want 50/60/200", c.Crowd.SoftCap, c.Crowd.HardCap, c.Crowd.MaxCopies)
 	}
 }

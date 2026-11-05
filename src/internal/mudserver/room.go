@@ -33,6 +33,8 @@ type Room struct {
 	TemplateID int32
 	clone      bool
 	pristine   *Inventory // the template's starting contents, copied into each clone
+	area       *Area      // the area this room belongs to, or nil
+	copy       int        // which copy of the area: 0 for the originals
 }
 
 // persistID is the database ID that names this room in saved data: the room's
