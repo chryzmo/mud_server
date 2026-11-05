@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Configuration struct {
@@ -13,6 +14,13 @@ type Configuration struct {
 		ListenPort	string `json:"ListenPort"`
 		WorldSaveDelayMinutes int32 `json:"WorldSaveDelayMinutes"`
 	} `json:"Server"`
+	// Per-connection tuning; zero means the default (see SessionSettings).
+	Connection struct {
+		OutboundQueueSize int `json:"OutboundQueueSize"`
+		WriteTimeoutMS    int `json:"WriteTimeoutMS"`
+		PingIntervalMS    int `json:"PingIntervalMS"`
+		PongTimeoutMS     int `json:"PongTimeoutMS"`
+	} `json:"Connection"`
 	Database struct {
 		DatabaseURL string `json:"DatabaseURL"`
 		StartupWaitSeconds int `json:"StartupWaitSeconds"` // how long to retry an unreachable database at startup (default 30)
@@ -65,6 +73,16 @@ func (c *Configuration) ApplyEnvOverrides() {
 	}
 	if v := os.Getenv("MUD_DATABASE_URL"); v != "" {
 		c.Database.DatabaseURL = v
+	}
+}
+
+func (c Configuration) SessionSettings() SessionSettings {
+	ms := func(n int) time.Duration { return time.Duration(n) * time.Millisecond }
+	return SessionSettings{
+		OutboundQueueSize: c.Connection.OutboundQueueSize,
+		WriteTimeout:      ms(c.Connection.WriteTimeoutMS),
+		PingInterval:      ms(c.Connection.PingIntervalMS),
+		PongTimeout:       ms(c.Connection.PongTimeoutMS),
 	}
 }
 

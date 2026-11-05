@@ -74,6 +74,13 @@ func startTestServer(t *testing.T) string {
 // server is shut down when the test ends.
 func startTestServerWith(t *testing.T, setupSQL ...string) (string, *mudserver.MudServer) {
 	t.Helper()
+	return startTestServerWithConfig(t, nil, setupSQL...)
+}
+
+// startTestServerWithConfig is startTestServerWith plus a hook to adjust the
+// server's Configuration (connection timeouts and so on) before it starts.
+func startTestServerWithConfig(t *testing.T, configure func(*mudserver.Configuration), setupSQL ...string) (string, *mudserver.MudServer) {
+	t.Helper()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	execSQL(t, url, setupSQL...)
@@ -87,6 +94,9 @@ func startTestServerWith(t *testing.T, setupSQL ...string) (string, *mudserver.M
 	c.Game.PlayerStartMaxMP = 10
 	c.Game.PlayerStartAttack = 5
 	c.Game.PlayerStartDefense = 10
+	if configure != nil {
+		configure(&c)
+	}
 
 	si, err := mudserver.NewMudServer(c)
 	if err != nil {
