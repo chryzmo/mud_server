@@ -64,8 +64,8 @@ func (mp *MudPlayer) snapshot() playerSnapshot {
 		MP:              mp.MP,
 		MaxHP:           mp.MaxHP,
 		MaxMP:           mp.MaxMP,
-		RoomID:          mp.Location.ID,
-		SpawnLocationID: mp.SpawnLocation.ID,
+		RoomID:          mp.Location.persistID(),
+		SpawnLocationID: mp.SpawnLocation.persistID(),
 	}
 }
 
@@ -164,7 +164,7 @@ func (ms *MudServer) flushDirty() {
 		}
 	}
 	for _, r := range ms.World.RoomMap {
-		if r.dirty {
+		if r.dirty && !r.clone { // copies have no row to save into
 			r.dirty = false
 			rooms = append(rooms, r)
 			b.rooms = append(b.rooms, r.snapshot())

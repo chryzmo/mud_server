@@ -10,18 +10,25 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// The World is owned by the game loop, like everything in it. RoomMap doesn't
-// change after startup, so connection readers may look rooms up in it (login
-// does, to place a loaded player) without going through the loop.
+// The World is owned by the game loop, like everything in it. RoomMap gains
+// cloned rooms as crowds arrive (crowd.go), so connection readers must not
+// read it: login only records where a player was saved, and the loop places
+// them.
 type World struct {
 	StartingRooms    map[string]*Room
 	RoomMap          map[int32]*Room
 	BaddieSpawnerMap map[string]*BaddieSpawner
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
+
+	// Area copies; see crowd.go. Loop only.
+	areas      map[int32]*Area // template room ID -> its area
+	nextRoomID int32           // next ID for a cloned room
+	softCap    int
+	maxCopies  int
 }
 
-func createWorld(db *muddatabase.MudDatabase) *World {
+func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig) *World {
 	w := &World{
 		RoomMap:          make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -42,6 +49,8 @@ func createWorld(db *muddatabase.MudDatabase) *World {
 		w.LinkRoomExits(room)
 		w.LoadAndLinkRoomBaddieSpawners(db, room)
 	}
+
+	w.configureAreas(crowd)
 
 	return w
 }

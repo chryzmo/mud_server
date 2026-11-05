@@ -19,5 +19,12 @@
         "PlayerStartMaxMP": 10,
         "PlayerStartAttack": 5,
         "PlayerStartDefense": 10
+    },
+    "Crowd": {
+        "SoftCap": 50,
+        "MaxCopies": 200,
+        "Areas": [
+            { "Name": "start", "Rooms": [1, 2, 3] }
+        ]
     }
 }

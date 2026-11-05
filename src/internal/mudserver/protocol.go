@@ -54,6 +54,7 @@ const (
 	codeUnknownCommand  = "unknown_command"
 	codeInternal        = "internal"
 	codeRestarting      = "restarting"
+	codeAtCapacity      = "at_capacity"
 )
 
 // inbound is every client-to-server message. Pointer fields tell "missing"

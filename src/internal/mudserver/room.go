@@ -27,6 +27,21 @@ type Room struct {
 	Inventory   *Inventory
 	ExitJSON    string
 	dirty       bool // contents changed since the last save; see persist.go
+
+	// Copies of a room (see crowd.go). A clone has no database row: it is never
+	// saved, and players' saved locations name its template instead.
+	TemplateID int32
+	clone      bool
+	pristine   *Inventory // the template's starting contents, copied into each clone
+}
+
+// persistID is the database ID that names this room in saved data: the room's
+// own for an original, its template's for a copy.
+func (r *Room) persistID() int32 {
+	if r.clone {
+		return r.TemplateID
+	}
+	return r.ID
 }
 
 type RoomDB struct {
