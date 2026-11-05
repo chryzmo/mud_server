@@ -6,11 +6,6 @@
 {$MUD_DOMAIN} {
 	encode zstd gzip
 
-	# The worldbuilder API has no authentication; never expose it.
-	handle /api/* {
-		respond 404
-	}
-
 	handle /ws {
 		reverse_proxy 127.0.0.1:8080
 	}

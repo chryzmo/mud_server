@@ -1,7 +1,7 @@
 # AGENTS.md — mud_server
 
-Go MUD server. Players connect over a websocket; the worldbuilder uses a small REST API.
-Sibling repos: `../mud_frontend` (player client) and `../mud_worldbuilder` (room editor).
+Go MUD server. Players connect over a websocket. Sibling repo: `../mud_frontend` (player client).
+`../mud_worldbuilder` (a room editor) is retired; world content will move into data files here.
 
 ## Current goal and plans
 
@@ -15,9 +15,8 @@ project and any subsystem, and is gitignored, so it is local working state, not 
 
 ## Layout
 
-- `src/main.go`: HTTP entry point; routes `/ws`, `/api/nodes`, `/api/edges`.
+- `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
 - `src/internal/mudserver/`: game logic: server, players, rooms, world, commands, items, equipment, NPCs, spawners.
-- `src/internal/mudapi/`: REST handlers for the worldbuilder.
 - `src/internal/database/`: pgx pool wrapper.
 - `src/internal/muddata/`: status and error codes. `src/internal/mudutils/`: ANSI color helpers.
 - `src/sql/`: schema and seed scripts, one per table.
@@ -93,5 +92,6 @@ player fields; the plan replaces this with a single game loop.
   `MudCommand` entries registered in `GenerateCommandList`, and DB writes use `pgx.NamedArgs`.
 - Files aren't uniformly `gofmt`ed. Format files you substantially edit, but put formatting-only
   changes in their own commit so diffs stay reviewable.
-- Never expose `/api/*` publicly; it has no authentication and allows any origin.
+- There is no REST API. Anything added beside `/ws` is public through Caddy unless the Caddyfile
+  blocks it, so admin or GM endpoints need authentication from the start.
 - Commit or push only when asked. Branch off `main` for changes; the history uses one PR per feature.

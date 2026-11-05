@@ -21,7 +21,7 @@ Run `scripts/install-git-hooks.sh` once per clone to enable the pre-commit hook 
 
 Production is a DigitalOcean Droplet (Fedora) running the game server, Postgres and Caddy as
 rootless Podman containers managed by systemd (Quadlet units in `deploy/quadlet/`). Caddy
-serves the frontend, proxies `/ws`, blocks `/api/*`, and handles TLS.
+serves the frontend, proxies `/ws`, and handles TLS.
 
 ```sh
 deploy/deploy.sh            # test, build images locally, ship them, restart what changed
