@@ -8,3 +8,6 @@ src/__debug_bin*.exe
 # OS
 .DS_Store
 Thumbs.db
+
+# Local planning docs
+plans/
