@@ -34,6 +34,8 @@ type SessionSettings struct {
 	ReadLimitBytes    int64         // per message, including fragments; default 4096
 	CommandsPerSecond int           // reader-side token refill rate; default 10
 	CommandBurst      int           // token bucket capacity; default 20
+	SayPerSecond      int           // per-player SAY refill rate; default 1
+	SayBurst          int           // per-player SAY bucket capacity; default 5
 	OutboundQueueSize int           // messages; default 256
 	WriteTimeout      time.Duration // per write; default 10s
 	PingInterval      time.Duration // default 30s; Cloudflare closes websockets idle for 100s
@@ -51,6 +53,12 @@ func (s SessionSettings) withDefaults() SessionSettings {
 	}
 	if s.CommandBurst <= 0 {
 		s.CommandBurst = 20
+	}
+	if s.SayPerSecond <= 0 {
+		s.SayPerSecond = 1
+	}
+	if s.SayBurst <= 0 {
+		s.SayBurst = 5
 	}
 	if s.OutboundQueueSize <= 0 {
 		s.OutboundQueueSize = 256

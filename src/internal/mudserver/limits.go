@@ -14,10 +14,21 @@ type commandLimiter struct {
 
 func newCommandLimiter(settings SessionSettings, now time.Time) commandLimiter {
 	settings = settings.withDefaults()
+	return newLimiter(settings.CommandsPerSecond, settings.CommandBurst, now)
+}
+
+// newSayLimiter limits one player's SAY, which costs a send to every occupant
+// of the room, far more than a command that only answers its sender.
+func newSayLimiter(settings SessionSettings, now time.Time) commandLimiter {
+	settings = settings.withDefaults()
+	return newLimiter(settings.SayPerSecond, settings.SayBurst, now)
+}
+
+func newLimiter(perSecond, burst int, now time.Time) commandLimiter {
 	return commandLimiter{
-		rate:     float64(settings.CommandsPerSecond),
-		capacity: float64(settings.CommandBurst),
-		tokens:   float64(settings.CommandBurst),
+		rate:     float64(perSecond),
+		capacity: float64(burst),
+		tokens:   float64(burst),
 		last:     now,
 	}
 }

@@ -19,6 +19,8 @@ type Configuration struct {
 		ReadLimitBytes    int64 `json:"ReadLimitBytes"`
 		CommandsPerSecond int `json:"CommandsPerSecond"`
 		CommandBurst      int `json:"CommandBurst"`
+		SayPerSecond      int `json:"SayPerSecond"`
+		SayBurst          int `json:"SayBurst"`
 		OutboundQueueSize int `json:"OutboundQueueSize"`
 		WriteTimeoutMS    int `json:"WriteTimeoutMS"`
 		PingIntervalMS    int `json:"PingIntervalMS"`
@@ -86,6 +88,8 @@ func (c Configuration) SessionSettings() SessionSettings {
 		ReadLimitBytes:    c.Connection.ReadLimitBytes,
 		CommandsPerSecond: c.Connection.CommandsPerSecond,
 		CommandBurst:      c.Connection.CommandBurst,
+		SayPerSecond:      c.Connection.SayPerSecond,
+		SayBurst:          c.Connection.SayBurst,
 		OutboundQueueSize: c.Connection.OutboundQueueSize,
 		WriteTimeout:      ms(c.Connection.WriteTimeoutMS),
 		PingInterval:      ms(c.Connection.PingIntervalMS),

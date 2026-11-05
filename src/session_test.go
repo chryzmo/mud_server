@@ -82,6 +82,8 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 		// queue, not the inbound limiter (covered separately).
 		c.Connection.CommandsPerSecond = 100000
 		c.Connection.CommandBurst = 10000
+		c.Connection.SayPerSecond = 100000
+		c.Connection.SayBurst = 10000
 	})
 
 	stalled := dialWithTinyReceiveBuffer(t, wsURL)

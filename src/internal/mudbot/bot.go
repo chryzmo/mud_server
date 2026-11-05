@@ -342,7 +342,7 @@ func (b *client) read() {
 		if strings.Contains(text, "SERVER:  Something went wrong.") {
 			b.serverErrors++
 		}
-		if strings.Contains(text, "SERVER:  Slow down.") {
+		if strings.Contains(text, "SERVER:  Slow down.") || strings.Contains(text, "You are talking too fast.") {
 			b.rateLimited++
 		}
 		b.Lock()
