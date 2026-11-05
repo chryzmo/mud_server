@@ -12,7 +12,7 @@ type Configuration struct {
 	Server struct {
 		ServerName	string `json:"ServerName"`
 		ListenPort	string `json:"ListenPort"`
-		WorldSaveDelayMinutes int32 `json:"WorldSaveDelayMinutes"`
+		SaveIntervalMS int `json:"SaveIntervalMS"` // batched saves of changed players and rooms (default 5000)
 	} `json:"Server"`
 	// Per-connection tuning; zero means the default (see SessionSettings).
 	Connection struct {
@@ -23,6 +23,7 @@ type Configuration struct {
 	} `json:"Connection"`
 	Database struct {
 		DatabaseURL string `json:"DatabaseURL"`
+		MaxConnections int `json:"MaxConnections"` // database pool size (default 10)
 		StartupWaitSeconds int `json:"StartupWaitSeconds"` // how long to retry an unreachable database at startup (default 30)
 		DatabaseHost string `json:"DatabaseHost"`
 		DatabasePort string `json:"DatabasePort"`

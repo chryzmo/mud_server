@@ -142,10 +142,19 @@ changed="$(remote "set -e
 		fi
 	done")"
 remote 'systemctl --user daemon-reload'
+db_restarted=""
 for img in "${images[@]}"; do
 	if [ -n "$changed" ] && grep -qx "$img" <<< "$changed"; then
+		# mud-server has Requires=mud-db, so restarting the database already
+		# restarted the server (on its new image, since the tags have switched).
+		# Restarting it again would disconnect everyone twice.
+		if [ "$img" = mud-server ] && [ -n "$db_restarted" ]; then
+			echo "   mud-server restarted along with mud-db"
+			continue
+		fi
 		echo "   restarting $img"
 		remote "systemctl --user restart $img"
+		[ "$img" = mud-db ] && db_restarted=1
 	else
 		remote "systemctl --user start $img"
 	fi

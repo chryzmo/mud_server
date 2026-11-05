@@ -121,9 +121,3 @@ func (w World) RetrieveListofRoomIDsFromDB(db *muddatabase.MudDatabase) []int32 
 
 	return idslice
 }
-
-func (w World) WriteWorldToDB(db *muddatabase.MudDatabase) {
-	for _, room := range w.RoomMap {
-		room.WriteToDB(db)
-	}
-}

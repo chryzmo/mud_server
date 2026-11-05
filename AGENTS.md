@@ -100,8 +100,14 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - Each connection is a `Session` (`session.go`): sends go into its bounded queue and one writer
   goroutine drains it, with a write timeout and keepalive pings. `SendMessage` never blocks; a client
   whose queue fills is disconnected. Never write to the websocket directly.
-- Saves currently run synchronously on the loop (`WriteToDB` after GET, kills, EQUIP/UNEQUIP, and on
-  disconnect). Step 4 of `plans/game-loop.md` moves them to a batched saver.
+- **Saving is batched and off the loop** (`persist.go`). Code that changes a player sets
+  `player.dirty = true`; code that changes a room's contents sets `room.dirty = true`. Every
+  `SaveIntervalMS` (5 s) the loop snapshots whatever is dirty and the saver goroutine writes it in
+  one transaction. Disconnects save at once, and a login under the same name waits for that save.
+  Never write game state to the database from a command; mark it dirty. A new kind of state change
+  needs its dirty mark and a test that it reaches the database (see `src/persist_test.go`).
+- Some commands still *read* the database on the loop: `EQUIP` looks up the equipment catalog and
+  NPC kills look up the gold item. Prefer not to add more; a catalog cache would remove these.
 - Output is plain text with ANSI colors. The client depends on those colors (red = NPC,
   blue = player, green = item, magenta = whisper) and on `STATUPDATE:` lines. Changing message text
   or colors can break `../mud_frontend`.

@@ -70,6 +70,7 @@ func (npc *BaddieNPC) attack (player *MudPlayer, now time.Time) {
 			pmsg = fmt.Sprint(npcstyledname, " hits you for ", npc.AttackPower, " damage!")
 			player.SendMessage(pmsg)
 			player.HP -= npc.AttackPower
+			player.dirty = true
 			player.SendStatUpdate()
 
 			// Check for player death

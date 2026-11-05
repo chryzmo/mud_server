@@ -13,11 +13,16 @@ type MudDatabase struct {
 	Connection	*pgxpool.Pool
 }
 
-func CreateDatabase(db_url string) (MudDatabase) {
+func CreateDatabase(db_url string, maxConns int) (MudDatabase) {
 	var muddb MudDatabase
 
 	ctx := context.Background()
-	db, err := pgxpool.New(ctx, db_url)
+	poolConfig, err := pgxpool.ParseConfig(db_url)
+	if err != nil {
+		panic(err)
+	}
+	poolConfig.MaxConns = int32(maxConns)
+	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
 
 	if err != nil {
 		panic(err)
