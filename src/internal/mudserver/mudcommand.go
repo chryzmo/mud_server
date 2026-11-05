@@ -32,7 +32,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 
-			for _, target_mp := range player.Location.UserMap {
+			for _, target_mp := range player.Location.Players() {
 				if target_mp.Username != player.Username {
 					message := mudutils.ColorString(player.Username, mudutils.COLOR_BLUE) + " says: \"" + msg + "\""
 					target_mp.SendMessage(message)
