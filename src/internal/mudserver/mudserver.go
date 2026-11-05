@@ -117,6 +117,8 @@ func (ms *MudServer) Shutdown(ctx context.Context) {
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
+	session := NewSession(ws_conn, ms.Configuration.SessionSettings())
+
 	stats := PlayerStartStats{
 		HP:      ms.Configuration.Game.PlayerStartHP,
 		MaxHP:   ms.Configuration.Game.PlayerStartMaxHP,
@@ -125,7 +127,7 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 		Attack:  ms.Configuration.Game.PlayerStartAttack,
 		Defense: ms.Configuration.Game.PlayerStartDefense,
 	}
-	mc := CreateMudPlayer(ws_conn, ms.World.RoomMap[1], stats)
+	mc := CreateMudPlayer(session, ms.World.RoomMap[1], stats)
 
 	// Add MudPlayer to Server connectionList
 	ms.playerMu.Lock()
@@ -176,7 +178,7 @@ func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
 		mp.Location.RemovePlayer(mp.Username)
 	}
 
-	mp.Conn.Close()
+	mp.Session.Close()
 	fmt.Printf("Client disconnect - number of connected clients: %d\n", count)
 }
 
@@ -229,7 +231,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 	for {
 		var msg MudMessage
 
-		_, messagebytes, err := player.Conn.ReadMessage()
+		messagebytes, err := player.Session.ReadMessage()
 
 		// Clean up the MudConn on error
 		if err != nil {

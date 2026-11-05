@@ -87,6 +87,9 @@ that step 3 removes; don't add tests to it for new races.
   itself, and queues everything else on `MudServer.Broadcast`.
 - `HandleMessages` (one goroutine) applies aliases and runs the command from `GenerateCommandList`.
 - Each room runs its own `ProcessBroadcast` and `RunTicker` goroutines; each spawner runs a ticker.
+- Each connection is a `Session` (`session.go`): sends go into its bounded queue and one writer
+  goroutine drains it, with a write timeout and keepalive pings. `SendMessage` never blocks; a client
+  whose queue fills is disconnected. Never write to the websocket directly.
 - Output is plain text with ANSI colors. The client depends on those colors (red = NPC,
   blue = player, green = item, magenta = whisper) and on `STATUPDATE:` lines. Changing message text
   or colors can break `../mud_frontend`.

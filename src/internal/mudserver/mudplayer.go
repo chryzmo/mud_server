@@ -8,17 +8,15 @@ import (
 	"mud_server/src/internal/mudutils"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type MudPlayer struct {
 	ID            int32
-	Conn          *websocket.Conn
+	Session       *Session
 	TimeConnected time.Time
 	State         int8
 	Location      *Room
@@ -33,7 +31,6 @@ type MudPlayer struct {
 	MaxHP         int
 	MaxMP         int
 	NPCTarget     *BaddieNPC
-	send_mutex    sync.Mutex
 	SpawnLocation *Room
 }
 
@@ -62,9 +59,9 @@ type PlayerStartStats struct {
 	Defense int
 }
 
-func CreateMudPlayer(ws_conn *websocket.Conn, room *Room, stats PlayerStartStats) *MudPlayer {
+func CreateMudPlayer(session *Session, room *Room, stats PlayerStartStats) *MudPlayer {
 	return &MudPlayer{
-		Conn:          ws_conn,
+		Session:       session,
 		TimeConnected: time.Now(),
 		Location:      room,
 		Inventory:     CreateInventory(),
@@ -115,15 +112,10 @@ func (mp *MudPlayer) CheckPassword(password string) bool {
 	return err == nil
 }
 
+// SendMessage queues a message for the player's client. It never blocks; it
+// fails only if the session is closed or the client has fallen too far behind.
 func (mp *MudPlayer) SendMessage(message string) error {
-	mp.send_mutex.Lock()
-	defer mp.send_mutex.Unlock()
-	err := mp.Conn.WriteMessage(websocket.TextMessage, []byte(message))
-
-	if err != nil {
-		fmt.Println(err)
-	}
-	return err
+	return mp.Session.Send([]byte(message))
 }
 
 // SendStatUpdate pushes a STATUPDATE line to the client.  The frontend
