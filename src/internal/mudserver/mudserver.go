@@ -164,6 +164,7 @@ func (ms *MudServer) run() {
 			runEvent("world tick", func() {
 				ms.World.tick(now)
 				ms.expireDormant(now)
+				ms.reclaimIdle(now)
 			})
 		case <-save.C:
 			runEvent("periodic save", ms.flushDirty)
@@ -330,6 +331,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.rememberCopy()
 		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
 		player.world = ms.World
+		player.lastActive = time.Now()
 		if player.canResume() {
 			player.replaySize = ms.replayFrames()
 		}
@@ -593,6 +595,7 @@ func (ms *MudServer) handleCommand(player *MudPlayer, msg MudMessage) {
 	if ms.players[player.Username] != player {
 		return // disconnected while the command was queued
 	}
+	player.lastActive = time.Now()
 
 	// Translate aliases
 	command_name, arguments := ms.processAliases(msg.Command, msg.CommandParameter)

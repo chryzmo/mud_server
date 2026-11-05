@@ -167,6 +167,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
   code cannot both win), and attaches like a resume with no frames remembered (`noFramesSeen`, so a gap and a
   fresh look). Five wrong codes lock the name for `RecoveryLockMS` (15 min); answers never reveal whether a name
   exists. Any new path that changes a guest's token must update `ms.byToken` and `player.tokenHash` on the loop.
+- Idle reclaim (`idle.go`): a guest with no command for `IdleTimeoutMS` (default 30 min, -1 never) gets an `idle`
+  error and is closed (reason `idle`), then goes through the normal dormant grace period. Activity is commands,
+  admission and resume, not keepalives; password accounts are never kicked. A client should treat `idle` as
+  "wait for a tap" and not reconnect by itself, or it holds the slot again.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes

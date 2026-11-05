@@ -117,6 +117,7 @@ func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64
 	}
 	player.Session = session
 	player.dormant = false
+	player.lastActive = time.Now() // coming back is activity
 	delete(ms.dormant, player)
 
 	frames, ok := player.framesAfter(received)
