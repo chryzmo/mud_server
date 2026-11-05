@@ -38,6 +38,9 @@ type MudPlayer struct {
 	savedRoomID   int32
 	savedSpawnID  int32
 	world         *World         // set at admission; used to place a respawn
+	guest         bool           // joined by name only (see guest.go)
+	tokenHash     string         // hash of the resume token; set for a new guest until it is inserted
+	recoveryHash  string         // hash of the recovery code; likewise
 	lastCopy      map[*Area]int  // the copy of each area the player was last in; loop-owned
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	SpawnLocation *Room
@@ -267,7 +270,7 @@ var errUsernameTaken = errors.New("username taken")
 // InsertIntoDB creates the player's row and sets mp.ID. If the name is already
 // taken (the unique index on username), it returns errUsernameTaken.
 func (mp *MudPlayer) InsertIntoDB(db *muddatabase.MudDatabase) error {
-	query := "INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@equipmentslots,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid) RETURNING id;"
+	query := "INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash,recoveryhash) VALUES (@username,@passwordhash,@inventoryidslice,@equipmentslots,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid,@guest,@resumetokenhash,@recoveryhash) RETURNING id;"
 	args := pgx.NamedArgs{
 		"username":         mp.Username,
 		"passwordhash":     mp.PasswordHash,
@@ -281,6 +284,9 @@ func (mp *MudPlayer) InsertIntoDB(db *muddatabase.MudDatabase) error {
 		"maxmp":            mp.MaxMP,
 		"roomid":           mp.savedRoomID,
 		"spawnlocationid":  mp.savedSpawnID,
+		"guest":            mp.guest,
+		"resumetokenhash":  mp.tokenHash,
+		"recoveryhash":     mp.recoveryHash,
 	}
 
 	err := db.Connection.QueryRow(db.Context, query, args).Scan(&mp.ID)
@@ -289,6 +295,16 @@ func (mp *MudPlayer) InsertIntoDB(db *muddatabase.MudDatabase) error {
 		return errUsernameTaken
 	}
 	return err
+}
+
+// DeleteFromDB removes the player's row, for a guest created but never admitted.
+func (mp *MudPlayer) DeleteFromDB(db *muddatabase.MudDatabase) {
+	if mp.ID == 0 {
+		return
+	}
+	if _, err := db.Connection.Exec(db.Context, "DELETE FROM player WHERE id=$1", mp.ID); err != nil {
+		fmt.Println("DeleteFromDB error: " + err.Error())
+	}
 }
 
 func (mp *MudPlayer) GetIDFromDB(db *muddatabase.MudDatabase) int32 {

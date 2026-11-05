@@ -152,6 +152,31 @@ func (w *World) placeNear(templateID int32, preferred int) (*Room, bool) {
 	return area.copies[best][start.ID], true
 }
 
+// canAdmit reports whether place would admit someone saved in templateID,
+// without changing anything. Loop only.
+func (w *World) canAdmit(templateID int32) bool {
+	start := w.templateRoom(templateID)
+	if start == nil {
+		return false
+	}
+	area := w.areas[start.ID]
+	if area == nil {
+		if w.atHardCap(start) && start.ID != defaultStartRoomID {
+			return w.canAdmit(defaultStartRoomID)
+		}
+		return true
+	}
+	if len(area.copies) < w.maxCopies {
+		return true
+	}
+	for _, copy := range area.copies {
+		if len(copy[start.ID].UserMap) < w.softCap {
+			return true
+		}
+	}
+	return false
+}
+
 // atHardCap reports whether movement into the room is refused.
 func (w *World) atHardCap(room *Room) bool {
 	return w.hardCap > 0 && len(room.UserMap) >= w.hardCap

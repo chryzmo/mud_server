@@ -21,6 +21,7 @@ const (
 	msgCmd      = "cmd"
 	msgRegister = "register"
 	msgLogin    = "login"
+	msgJoin     = "join"
 )
 
 // Server-to-client message types.
@@ -45,6 +46,7 @@ const (
 	codeNotLoggedIn     = "not_logged_in"
 	codeAlreadyLoggedIn = "already_logged_in"
 	codeInvalidUsername = "invalid_username"
+	codeInvalidName     = "invalid_name"
 	codeNameTaken       = "name_taken"
 	codeNameOnline      = "name_online"
 	codeUnknownUser     = "unknown_user"
@@ -64,6 +66,7 @@ type inbound struct {
 	Line     *string `json:"line"`
 	Username string  `json:"username"`
 	Password string  `json:"password"`
+	Name     string  `json:"name"` // join
 }
 
 // Outbound messages. Each struct is one frame; T is the type.
@@ -98,6 +101,9 @@ type (
 		OK      bool   `json:"ok"`
 		Code    string `json:"code,omitempty"`
 		Message string `json:"message"`
+		// Guests only, sent once at join: the resume token and the recovery code.
+		Token    string `json:"token,omitempty"`
+		Recovery string `json:"recovery,omitempty"`
 	}
 	errorMsg struct {
 		T       string `json:"t"`
@@ -164,6 +170,12 @@ func (mp *MudPlayer) SendWhisper(who, text string, out bool) error {
 // SendAuth answers a register or login attempt.
 func (mp *MudPlayer) SendAuth(ok bool, code, message string) error {
 	return mp.Session.Send(encode(authMsg{T: msgAuth, OK: ok, Code: code, Message: message}))
+}
+
+// SendWelcome tells a player they are in. A new guest's token and recovery code
+// travel here, once.
+func (mp *MudPlayer) SendWelcome(w welcome) error {
+	return mp.Session.Send(encode(authMsg{T: msgAuth, OK: true, Message: w.message, Token: w.token, Recovery: w.recovery}))
 }
 
 // SendError reports a protocol or server problem that isn't game text.
