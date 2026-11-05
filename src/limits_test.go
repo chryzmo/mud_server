@@ -30,7 +30,7 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 		{"fragmented binary", false, true, websocket.BinaryMessage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			wsURL := startTestServer(t)
+			wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
 			watcher := register(t, wsURL, "watcher")
 			conn := dial(t, wsURL)
 			expect(t, conn, "Welcome to the MUD!")
@@ -79,6 +79,7 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 					break
 				}
 			}
+			waitForClose(t, ms, "read_limit", 1)
 			// Another session still plays normally.
 			send(t, watcher, "MOVE N")
 			expect(t, watcher, "You are in 'Balcony'")

@@ -346,3 +346,20 @@ func register(t *testing.T, wsURL, name string) *websocket.Conn {
 	expect(t, conn, "You are in 'Start Room'")
 	return conn
 }
+
+// waitForClose waits until the server has counted at least want sessions closed
+// for reason, and returns all the counts.
+func waitForClose(t *testing.T, ms *mudserver.MudServer, reason string, want int64) map[string]int64 {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		counts := ms.SessionCloseCounts()
+		if counts[reason] >= want {
+			return counts
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("session closes = %v, want %s >= %d", counts, reason, want)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
