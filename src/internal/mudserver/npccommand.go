@@ -1,9 +1,12 @@
 package mudserver
 
-import "mud_server/src/internal/mudutils"
+import (
+	"mud_server/src/internal/mudutils"
+	"time"
+)
 
 type NPCCommand struct {
-	action func(room *Room, baddie *BaddieNPC) int32
+	action func(room *Room, baddie *BaddieNPC, now time.Time) int32
 }
 
 func GenerateNPCCommandList() map[int32]NPCCommand {
@@ -11,7 +14,7 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 
 	// 1 - Orc
 	c_orc := NPCCommand{
-		action: func(room *Room, baddie *BaddieNPC) int32 {
+		action: func(room *Room, baddie *BaddieNPC, now time.Time) int32 {
 			// If NPC does not have a target, select a target
 			if baddie.TargetPC != nil && baddie.Location.GetPlayer(baddie.TargetPC.Username) == nil {
 				// Target is no longer in the room
@@ -27,7 +30,7 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 			} else {
 				// If NPC has target, attack
 				if baddie.TargetPC.HP > 0 {
-					baddie.attack(baddie.TargetPC)
+					baddie.attack(baddie.TargetPC, now)
 				} else {
 					baddie.TargetPC = nil
 				}

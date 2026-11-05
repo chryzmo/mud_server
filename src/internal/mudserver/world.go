@@ -5,18 +5,23 @@ import (
 	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
+// The World is owned by the game loop, like everything in it. RoomMap doesn't
+// change after startup, so connection readers may look rooms up in it (login
+// does, to place a loaded player) without going through the loop.
 type World struct {
 	StartingRooms    map[string]*Room
 	RoomMap          map[int32]*Room
 	BaddieSpawnerMap map[string]*BaddieSpawner
+	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 }
 
-func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whisperchan chan MudMessage, done <-chan struct{}) *World {
+func createWorld(db *muddatabase.MudDatabase) *World {
 	w := &World{
 		RoomMap:          make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -25,8 +30,8 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whispercha
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking
 	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
 	for _, id := range roomIDList {
-		r := Room{GlobalWhisperChannel: whisperchan, done: done}
-		w.RoomMap[id] = r.FetchFromDB(db, roomTickDuration, id)
+		r := Room{}
+		w.RoomMap[id] = r.FetchFromDB(db, id)
 	}
 
 	// Load NPC TurnAction functions here
@@ -39,6 +44,17 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whispercha
 	}
 
 	return w
+}
+
+// tick advances the world by one step: every room's NPCs act, then every
+// spawner checks whether it's due.
+func (w *World) tick(now time.Time) {
+	for _, room := range w.RoomMap {
+		room.tick(now)
+	}
+	for _, spawner := range w.Spawners {
+		spawner.tick(now)
+	}
 }
 
 func (w World) LinkRoomExits(room *Room) {
@@ -59,7 +75,7 @@ func (w World) LinkRoomExits(room *Room) {
 	}
 }
 
-func (w World) LoadAndLinkRoomBaddieSpawners(db *muddatabase.MudDatabase, room *Room) {
+func (w *World) LoadAndLinkRoomBaddieSpawners(db *muddatabase.MudDatabase, room *Room) {
 	query := "SELECT id FROM baddiespawner WHERE roomid=$1"
 	var err error
 	tmpspawner := BaddieSpawner{}
@@ -79,8 +95,8 @@ func (w World) LoadAndLinkRoomBaddieSpawners(db *muddatabase.MudDatabase, room *
 		for _, id := range idslice {
 			spawner := tmpspawner.FetchGenericFromDB(db, id)
 			spawner.Location = room
-			go spawner.RunTicker()
 
+			w.Spawners = append(w.Spawners, spawner)
 			w.BaddieSpawnerMap[spawner.baddie.Race] = spawner
 		}
 	}

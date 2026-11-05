@@ -14,7 +14,7 @@ type BaddieSpawner struct {
 	TotalNumber int
 	tickDurationMS int64
 	baddie BaddieNPC
-	ticker      *time.Ticker
+	nextSpawnAt time.Time
 	Location *Room
 }
 
@@ -26,10 +26,8 @@ type BaddieSpawnerDB struct {
 	RoomID int32
 }
 
-func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
+func (spawner *BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 	count := 0
-	spawner.Location.baddieMu.RLock()
-	defer spawner.Location.baddieMu.RUnlock()
 	for _, b := range spawner.Location.BaddieMap {
 		if b.Race == baddierace {
 			count++
@@ -39,17 +37,18 @@ func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 	return count
 }
 
-func (spawner BaddieSpawner) RunTicker () {
-	spawner.ticker = time.NewTicker(time.Millisecond * time.Duration(spawner.tickDurationMS))
-	defer spawner.ticker.Stop()
-
-	for {
-		select {
-		case <-spawner.ticker.C:
-		case <-spawner.Location.done:
-			return
-		}
-
+// tick spawns an NPC if the spawner's interval has passed and the room is
+// below its count. Called by the game loop on each world tick.
+func (spawner *BaddieSpawner) tick (now time.Time) {
+	if spawner.nextSpawnAt.IsZero() {
+		// The first spawn comes one interval after startup, as with the old ticker.
+		spawner.nextSpawnAt = now.Add(time.Millisecond * time.Duration(spawner.tickDurationMS))
+	}
+	if now.Before(spawner.nextSpawnAt) {
+		return
+	}
+	spawner.nextSpawnAt = now.Add(time.Millisecond * time.Duration(spawner.tickDurationMS))
+	{
 		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
 			// Spawn another baddie!
 			newbaddie := &BaddieNPC{
@@ -63,7 +62,8 @@ func (spawner BaddieSpawner) RunTicker () {
 				MP: spawner.baddie.MP,
 				TurnAction: spawner.baddie.TurnAction,
 				combatTickerDurationInMS: spawner.baddie.combatTickerDurationInMS,
-				combatTicker: time.NewTicker(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
+				// As with the old per-NPC ticker, the first swing comes one interval after spawning.
+				nextAttackAt: now.Add(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
 				LootGoldMin: spawner.baddie.LootGoldMin,
 				LootGoldMax: spawner.baddie.LootGoldMax,
 			}
@@ -72,9 +72,7 @@ func (spawner BaddieSpawner) RunTicker () {
 				newbaddie.Name = newbaddie.GenerateName()
 			}
 
-			spawner.Location.baddieMu.Lock()
 			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
-			spawner.Location.baddieMu.Unlock()
 			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
 		}
 	}

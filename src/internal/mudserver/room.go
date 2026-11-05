@@ -9,29 +9,23 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
+// A Room is owned by the game loop: only the loop reads or changes it, so it
+// needs no locks. NPCs act when the loop calls tick on each world tick.
 type Room struct {
-	ID                   int32
-	DB                   *muddatabase.MudDatabase
-	Name                 string
-	Description          string
-	ExitMap              map[string]*Room
-	RoomBroadcastChannel chan RoomMessage
-	UserMap              map[string]*MudPlayer
-	BaddieMap            map[string]*BaddieNPC
-	Inventory            *Inventory
-	ExitJSON             string
-	ticker               *time.Ticker
-	tickDurationInMS     int32
-	GlobalWhisperChannel chan MudMessage
-	done                 <-chan struct{} // the server's shutdown signal
-	userMu               sync.RWMutex
-	baddieMu             sync.RWMutex
+	ID          int32
+	DB          *muddatabase.MudDatabase
+	Name        string
+	Description string
+	ExitMap     map[string]*Room
+	UserMap     map[string]*MudPlayer
+	BaddieMap   map[string]*BaddieNPC
+	Inventory   *Inventory
+	ExitJSON    string
 }
 
 type RoomDB struct {
@@ -51,102 +45,43 @@ type RoomExits struct {
 	D int32 `json:"D"`
 }
 
-func CreateRoom(name string, description string, tickdur int32, whisperchan chan MudMessage) *Room {
-	r := &Room{
-		Name:                 name,
-		Description:          description,
-		RoomBroadcastChannel: make(chan RoomMessage, 5),
-		UserMap:              make(map[string]*MudPlayer),
-		ExitMap:              make(map[string]*Room),
-		Inventory:            CreateInventory(),
-		BaddieMap:            make(map[string]*BaddieNPC),
-		tickDurationInMS:     tickdur,
-		GlobalWhisperChannel: whisperchan,
+// tick runs one turn for every NPC in the room.
+func (r *Room) tick(now time.Time) {
+	// Snapshot first: a turn can kill an NPC or a player, changing the maps.
+	npcs := make([]*BaddieNPC, 0, len(r.BaddieMap))
+	for _, npc := range r.BaddieMap {
+		npcs = append(npcs, npc)
 	}
-
-	go r.ProcessBroadcast()
-	go r.RunTicker()
-
-	return r
-}
-
-func (room *Room) RunTicker() {
-	room.ticker = time.NewTicker(time.Millisecond * time.Duration(room.tickDurationInMS))
-	defer room.ticker.Stop()
-
-	for {
-		select {
-		case <-room.ticker.C:
-		case <-room.done:
-			return
-		}
-
-		// Snapshot BaddieMap so TurnAction (which may call KillNPC) can safely
-		// acquire the write lock without deadlocking the ticker.
-		room.baddieMu.RLock()
-		npcs := make([]*BaddieNPC, 0, len(room.BaddieMap))
-		for _, npc := range room.BaddieMap {
-			npcs = append(npcs, npc)
-		}
-		room.baddieMu.RUnlock()
-
-		for _, npc := range npcs {
-			npc.TurnAction(room, npc)
-		}
+	for _, npc := range npcs {
+		npc.TurnAction(r, npc, now)
 	}
 }
 
-func (r *Room) ProcessBroadcast() {
-	for {
-		var msg RoomMessage
-		select {
-		case msg = <-r.RoomBroadcastChannel:
-		case <-r.done:
-			return
-		}
-
-		r.userMu.RLock()
-		for _, player := range r.UserMap {
-			if player.Username != msg.SenderUsername {
-				player.SendMessage(msg.CommandParameter)
-			}
-		}
-		r.userMu.RUnlock()
-	}
-}
-
+// Broadcast sends msg to everyone in the room except senderusername.
 func (r *Room) Broadcast(msg string, senderusername string) {
-	roommsg := RoomMessage{
-		Command:          "BROADCAST",
-		CommandParameter: msg,
-		SenderUsername:   senderusername,
-	}
-	select {
-	case r.RoomBroadcastChannel <- roommsg:
-	case <-r.done:
+	for _, player := range r.UserMap {
+		if player.Username != senderusername {
+			player.SendMessage(msg)
+		}
 	}
 }
 
 func (r *Room) LookDescription() string {
 	desc := "You are in '" + r.Name + "'\n" + r.Description + "\n"
 
-	r.baddieMu.RLock()
 	if len(r.BaddieMap) > 0 {
 		desc += "\nThe monsters here are:\n"
 		for _, baddie := range r.BaddieMap {
 			desc += mudutils.ColorString(baddie.Name, mudutils.COLOR_RED) + "\n"
 		}
 	}
-	r.baddieMu.RUnlock()
 
-	r.userMu.RLock()
 	if len(r.UserMap) > 0 {
 		desc += "\nThe players here are:\n"
 		for k := range r.UserMap {
 			desc += mudutils.ColorString(k, mudutils.COLOR_BLUE) + "\n"
 		}
 	}
-	r.userMu.RUnlock()
 
 	if !r.Inventory.isEmpty() {
 		desc += "\nYou see:\n"
@@ -166,12 +101,9 @@ func (r *Room) LookDescription() string {
 	return desc
 }
 
-// Players returns a snapshot of the players in the room. Iterate over this,
-// never over UserMap directly: disconnects remove players from other
-// goroutines, and an unlocked map iteration during a write crashes the server.
+// Players returns a snapshot of the players in the room, safe to iterate while
+// a turn moves, kills or respawns players.
 func (r *Room) Players() []*MudPlayer {
-	r.userMu.RLock()
-	defer r.userMu.RUnlock()
 	players := make([]*MudPlayer, 0, len(r.UserMap))
 	for _, p := range r.UserMap {
 		players = append(players, p)
@@ -181,15 +113,11 @@ func (r *Room) Players() []*MudPlayer {
 
 // GetPlayer returns the named player if they're in the room, or nil.
 func (r *Room) GetPlayer(username string) *MudPlayer {
-	r.userMu.RLock()
-	defer r.userMu.RUnlock()
 	return r.UserMap[username]
 }
 
 func (r *Room) RemovePlayer(username string) {
-	r.userMu.Lock()
 	delete(r.UserMap, username)
-	r.userMu.Unlock()
 }
 
 // KillNPC removes the named NPC, distributes loot to the attacker, and
@@ -197,15 +125,10 @@ func (r *Room) RemovePlayer(username string) {
 func (r *Room) KillNPC(npcname string, attackername string) {
 	npcKey := strings.ToUpper(npcname)
 
-	// Read loot info before acquiring the write lock.
-	r.baddieMu.RLock()
 	deadNPC := r.BaddieMap[npcKey]
-	r.baddieMu.RUnlock()
 
 	if deadNPC != nil && deadNPC.LootGoldMax > 0 {
-		r.userMu.RLock()
 		attacker := r.UserMap[attackername]
-		r.userMu.RUnlock()
 
 		if attacker != nil {
 			i := Item{}
@@ -216,9 +139,7 @@ func (r *Room) KillNPC(npcname string, attackername string) {
 		}
 	}
 
-	r.baddieMu.Lock()
 	delete(r.BaddieMap, npcKey)
-	r.baddieMu.Unlock()
 
 	r.Broadcast(attackername+" kills "+npcname+"!", attackername)
 }
@@ -231,12 +152,10 @@ func (r *Room) KillPC(player *MudPlayer, attackername string) {
 }
 
 func (r *Room) AddPlayer(mp *MudPlayer) {
-	r.userMu.Lock()
 	r.UserMap[mp.Username] = mp
-	r.userMu.Unlock()
 }
 
-func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid interface{}) *Room {
+func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Room {
 	query := ""
 	var err error
 	room := Room{}
@@ -264,19 +183,15 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid in
 
 	if err == nil {
 		room = Room{
-			ID:                   ret.ID,
-			DB:                   db,
-			Name:                 ret.Name,
-			Description:          ret.Description,
-			Inventory:            CreateInventory(),
-			RoomBroadcastChannel: make(chan RoomMessage, 5),
-			UserMap:              make(map[string]*MudPlayer),
-			ExitMap:              make(map[string]*Room),
-			BaddieMap:            make(map[string]*BaddieNPC),
-			ExitJSON:             ret.ExitJSON,
-			tickDurationInMS:     tickdur,
-			GlobalWhisperChannel: r.GlobalWhisperChannel,
-			done:                 r.done,
+			ID:          ret.ID,
+			DB:          db,
+			Name:        ret.Name,
+			Description: ret.Description,
+			Inventory:   CreateInventory(),
+			UserMap:     make(map[string]*MudPlayer),
+			ExitMap:     make(map[string]*Room),
+			BaddieMap:   make(map[string]*BaddieNPC),
+			ExitJSON:    ret.ExitJSON,
 		}
 
 		for iid := range ret.InventoryIDSlice {
@@ -286,8 +201,6 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid in
 			room.Inventory.AddItemByQuantity(i.FetchFromDB(db, item_id), ret.InventoryIDSlice[iid])
 		}
 
-		go room.ProcessBroadcast()
-		go room.RunTicker()
 	}
 
 	return &room

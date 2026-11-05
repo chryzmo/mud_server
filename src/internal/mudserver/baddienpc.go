@@ -25,8 +25,8 @@ type BaddieNPC struct {
 	HP int
 	MP int
 	TargetPC *MudPlayer
-	TurnAction func(room *Room, baddie *BaddieNPC) int32
-	combatTicker *time.Ticker
+	TurnAction func(room *Room, baddie *BaddieNPC, now time.Time) int32
+	nextAttackAt time.Time // the NPC can swing again once the world tick reaches this
 	combatTickerDurationInMS int32
 	LootGoldMin int32
 	LootGoldMax int32
@@ -46,9 +46,14 @@ type baddieNPC_GenericDB struct {
 	LootGoldMax int32
 }
 
-func (npc *BaddieNPC) attack (player *MudPlayer) {
-	select {
-	case <-npc.combatTicker.C:
+// attack swings at the player if the NPC's combat timer has run out; otherwise
+// it does nothing this tick.
+func (npc *BaddieNPC) attack (player *MudPlayer, now time.Time) {
+	if now.Before(npc.nextAttackAt) {
+		return
+	}
+	npc.nextAttackAt = now.Add(time.Millisecond * time.Duration(npc.combatTickerDurationInMS))
+	{
 		// Do attack logic
 		npcstyledname := (mudutils.ColorString(npc.Name,mudutils.COLOR_RED))
 		attackRoll := rand.IntN(100) + npc.AttackAccuracy
@@ -78,11 +83,7 @@ func (npc *BaddieNPC) attack (player *MudPlayer) {
 			npc.Location.Broadcast(npcstyledname+" misses "+player.Username+".", player.Username)
 			player.SendMessage(npcstyledname + " misses you.")
 		}
-	default:
-		// Do nothing as combat ticker is running
-		
 	}
-
 }
 
 // npcNamePool maps race names to a pool of thematic names.

@@ -58,9 +58,7 @@ script there.
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
-comes back. Don't weaken `-race`; a race report is a real bug. The only sanctioned exception is
-`skipUntilGameLoop` in `src/gameplay_test.go`, for the known races listed in `plans/game-loop.md`
-that step 3 removes; don't add tests to it for new races.
+comes back. Don't weaken `-race` or skip tests under it; a race report is a real bug.
 
 CI runs on 2-CPU GitHub runners. For anything timing-sensitive (floods, timeouts, concurrency),
 also run `GOMAXPROCS=2 taskset -c 0,1 scripts/test.sh` before opening a PR; a test that only
@@ -87,19 +85,26 @@ passes on a many-core machine will fail on `main` and block the deploy.
 
 ## How the code works today
 
-- `ProcessInput` (one goroutine per connection) reads frames, handles `/LOGIN` and `/REGISTER`
-  itself, and queues everything else on `MudServer.Broadcast`.
-- `HandleMessages` (one goroutine) applies aliases and runs the command from `GenerateCommandList`.
-- Each room runs its own `ProcessBroadcast` and `RunTicker` goroutines; each spawner runs a ticker.
+- **One game loop owns all game state** (`MudServer.run` in `mudserver.go`): online players,
+  rooms, items, NPCs, spawners. It runs queued events one at a time, a world tick
+  (`RoomTickDurationInMS`, 250 ms) that drives NPC turns and spawners, the periodic save, and
+  shutdown. Game code needs no locks because nothing else touches game state.
+- **Never touch game state from another goroutine.** From outside the loop, use `enqueue` (fire and
+  forget) or `onLoop` (run and wait). The only exception is `World.RoomMap`, which doesn't change
+  after startup.
+- `ProcessInput` (one goroutine per connection) handles `/LOGIN` and `/REGISTER` itself (database
+  lookups and bcrypt stay off the loop), then `admit` places the player on the loop. After that it
+  queues each command with `enqueue`, and the player's disconnect when the connection ends.
+- Timed behavior is a timestamp checked on the tick (`nextAttackAt`, `nextSpawnAt`), not a goroutine
+  or `time.Ticker`.
 - Each connection is a `Session` (`session.go`): sends go into its bounded queue and one writer
   goroutine drains it, with a write timeout and keepalive pings. `SendMessage` never blocks; a client
   whose queue fills is disconnected. Never write to the websocket directly.
+- Saves currently run synchronously on the loop (`WriteToDB` after GET, kills, EQUIP/UNEQUIP, and on
+  disconnect). Step 4 of `plans/game-loop.md` moves them to a batched saver.
 - Output is plain text with ANSI colors. The client depends on those colors (red = NPC,
   blue = player, green = item, magenta = whisper) and on `STATUPDATE:` lines. Changing message text
   or colors can break `../mud_frontend`.
-
-Shared state is not consistently synchronized. Don't add new cross-goroutine access to maps or
-player fields; the plan replaces this with a single game loop.
 
 ## Conventions
 
