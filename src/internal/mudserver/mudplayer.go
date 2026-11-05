@@ -87,7 +87,7 @@ func (mp *MudPlayer) allowSay(now time.Time) bool {
 	}
 	allowed, notify := mp.sayLimiter.allow(now)
 	if notify {
-		mp.SendMessage("You are talking too fast.")
+		mp.SendError(codeRateLimited, "You are talking too fast.")
 	}
 	return allowed
 }
@@ -126,27 +126,6 @@ func (mp *MudPlayer) SetPassword(password string) error {
 func (mp *MudPlayer) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(mp.PasswordHash), []byte(password))
 	return err == nil
-}
-
-// SendMessage queues a message for the player's client. It never blocks; it
-// fails only if the session is closed or the client has fallen too far behind.
-func (mp *MudPlayer) SendMessage(message string) error {
-	return mp.Session.Send([]byte(message))
-}
-
-// SendStatUpdate pushes a STATUPDATE line to the client.  The frontend
-// intercepts lines with this prefix and updates the stats bar without
-// displaying them in the chat log.
-func (mp *MudPlayer) SendStatUpdate() {
-	atkBonus := mp.Equipment.TotalBonusAttackPower()
-	defBonus := mp.Equipment.TotalBonusDefense()
-	line := fmt.Sprintf("STATUPDATE:hp=%d,maxhp=%d,mp=%d,maxmp=%d,atk=%d,atkbonus=%d,def=%d,defbonus=%d\n",
-		mp.HP, mp.EffectiveMaxHP(),
-		mp.MP, mp.EffectiveMaxMP(),
-		mp.EffectiveAttackPower(), atkBonus,
-		mp.EffectiveDefense(), defBonus,
-	)
-	mp.SendMessage(line)
 }
 
 func (mp *MudPlayer) MoveRoom(dir string) int {
@@ -335,5 +314,5 @@ func (mp *MudPlayer) Respawn() {
 	}
 	mp.Location.AddPlayer(mp)
 	mp.Location.Broadcast(mp.Username+" has appeared in the room.", mp.Username)
-	mp.SendMessage(mp.Location.LookDescription())
+	mp.SendLook()
 }

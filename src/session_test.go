@@ -47,7 +47,7 @@ func reader(conn *websocket.Conn) <-chan string {
 			if err != nil {
 				return
 			}
-			ch <- string(msg)
+			ch <- flatten(msg)
 		}
 	}()
 	return ch

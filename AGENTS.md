@@ -138,7 +138,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - **Never touch game state from another goroutine.** From outside the loop, use `enqueue` (fire and
   forget) or `onLoop` (run and wait). The only exception is `World.RoomMap`, which doesn't change
   after startup.
-- `ProcessInput` (one goroutine per connection) handles `/LOGIN` and `/REGISTER` itself (database
+- Every websocket frame, both ways, is a JSON envelope `{"v":1,"t":type,"d":payload}` (`protocol.go`;
+  design in `plans/json-protocol.md`). Send through `SendMessage`/`SendAuth`/`SendError`/`SendLook`/etc.,
+  never raw bytes; fan-out encodes once (`encodeText`) and queues the same slice to everyone.
+- `ProcessInput` (one goroutine per connection) handles `login` and `register` messages itself (database
   lookups and bcrypt stay off the loop), then `admit` places the player on the loop. After that it
   queues each command with `enqueue`, and the player's disconnect when the connection ends.
 - Timed behavior is a timestamp checked on the tick (`nextAttackAt`, `nextSpawnAt`), not a goroutine

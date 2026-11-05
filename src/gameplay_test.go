@@ -28,8 +28,8 @@ func expectWithin(conn *websocket.Conn, want string, wait time.Duration) (string
 		if err != nil {
 			return "", false
 		}
-		if strings.Contains(string(msg), want) {
-			return string(msg), true
+		if text := flatten(msg); strings.Contains(text, want) {
+			return text, true
 		}
 	}
 }
@@ -150,7 +150,7 @@ func waitForNPC(t *testing.T, conn *websocket.Conn) string {
 		if err != nil {
 			t.Fatalf("waiting for an NPC: %v", err)
 		}
-		if m := npcNamePattern.FindStringSubmatch(string(msg)); m != nil {
+		if m := npcNamePattern.FindStringSubmatch(flatten(msg)); m != nil {
 			return m[1] + m[2]
 		}
 	}

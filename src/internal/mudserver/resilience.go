@@ -13,7 +13,7 @@ func recoverPanic(scope string, player *MudPlayer) {
 	if value := recover(); value != nil {
 		log.Printf("panic in %s: %v\n%s", scope, value, debug.Stack())
 		if player != nil {
-			player.SendMessage("SERVER:  Something went wrong. Please try again.\n")
+			player.SendError(codeInternal, "Something went wrong. Please try again.")
 		}
 	}
 }
