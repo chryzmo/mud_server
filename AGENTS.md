@@ -62,6 +62,10 @@ comes back. Don't weaken `-race`; a race report is a real bug. The only sanction
 `skipUntilGameLoop` in `src/gameplay_test.go`, for the known races listed in `plans/game-loop.md`
 that step 3 removes; don't add tests to it for new races.
 
+CI runs on 2-CPU GitHub runners. For anything timing-sensitive (floods, timeouts, concurrency),
+also run `GOMAXPROCS=2 taskset -c 0,1 scripts/test.sh` before opening a PR; a test that only
+passes on a many-core machine will fail on `main` and block the deploy.
+
 ## Deploying
 
 - **Deploy only when the user asks.** `deploy/deploy.sh` changes the live game; never run it,
