@@ -5,7 +5,6 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	muddata "mud_server/src/internal/muddata"
-	"mud_server/src/internal/mudutils"
 	"strconv"
 	"strings"
 	"time"
@@ -157,12 +156,12 @@ func (mp *MudPlayer) MoveRoom(dir string) int {
 	} else {
 		// Clean up location info in old room, set new room
 		mp.Location.RemovePlayer(mp.Username)
-		mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has left to the "+dir+".", mp.Username)
+		mp.Location.BroadcastFrame(encodeLeave(mp.Username, dir), mp.Username)
 
 		// Set new location for Player
 		newroom := mp.Location.ExitMap[dir]
 		mp.Location = newroom
-		mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has entered the room from the "+dir+".", mp.Username)
+		mp.Location.BroadcastFrame(encodeArrive(mp.Username, dir), mp.Username)
 		mp.Location.AddPlayer(mp)
 	}
 
@@ -313,6 +312,6 @@ func (mp *MudPlayer) Respawn() {
 		mp.Location = mp.SpawnLocation
 	}
 	mp.Location.AddPlayer(mp)
-	mp.Location.Broadcast(mp.Username+" has appeared in the room.", mp.Username)
+	mp.Location.BroadcastFrame(encodeArrive(mp.Username, ""), mp.Username)
 	mp.SendLook()
 }

@@ -11,31 +11,31 @@ import (
 	mudserver "mud_server/src/internal/mudserver"
 )
 
-// readEnvelope reads the next frame and decodes it, failing on anything that
-// isn't a v1 envelope.
-func readEnvelope(t *testing.T, conn *websocket.Conn) (typ string, data map[string]any) {
+// readMessage reads the next frame and decodes it, failing on anything that
+// isn't a JSON object with a type.
+func readMessage(t *testing.T, conn *websocket.Conn) (typ string, data map[string]any) {
 	t.Helper()
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	_, raw, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	var env struct {
-		V int            `json:"v"`
-		T string         `json:"t"`
-		D map[string]any `json:"d"`
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("not a JSON object: %q (%v)", raw, err)
 	}
-	if err := json.Unmarshal(raw, &env); err != nil || env.V != 1 || env.T == "" {
-		t.Fatalf("not a v1 envelope: %q (%v)", raw, err)
+	typ, _ = m["t"].(string)
+	if typ == "" {
+		t.Fatalf("no type: %q", raw)
 	}
-	return env.T, env.D
+	return typ, m
 }
 
-// expectEnvelope reads frames until one has the given type and returns its payload.
-func expectEnvelope(t *testing.T, conn *websocket.Conn, typ string) map[string]any {
+// expectMessage reads frames until one has the given type and returns it.
+func expectMessage(t *testing.T, conn *websocket.Conn, typ string) map[string]any {
 	t.Helper()
 	for {
-		got, data := readEnvelope(t, conn)
+		got, data := readMessage(t, conn)
 		if got == typ {
 			return data
 		}
@@ -52,31 +52,35 @@ func writeRaw(t *testing.T, conn *websocket.Conn, frame string) {
 func TestMalformedFramesGetBadFrameAndConnectionSurvives(t *testing.T) {
 	wsURL := startTestServer(t)
 	for _, frame := range []string{
-		"MOVE N",           // legacy plain text
-		"{not json",        // unparseable
-		`{"v":1}`,          // no type
-		`[1,2,3]`,          // not an object
-		`{"v":1,"t":"cmd"`, // truncated
+		"MOVE N",            // legacy plain text
+		"{not json",         // unparseable
+		`{"line":"LOOK"}`,   // no type
+		`[1,2,3]`,           // not an object
+		`{"t":"cmd","line"`, // truncated
+		`{"t":""}`,          // empty type
 	} {
 		conn := dial(t, wsURL)
 		expect(t, conn, "Welcome to the MUD!")
 		writeRaw(t, conn, frame)
-		data := expectEnvelope(t, conn, "error")
+		data := expectMessage(t, conn, "error")
 		if data["code"] != "bad_frame" {
 			t.Errorf("frame %q: code = %v, want bad_frame", frame, data["code"])
 		}
 		// Still usable.
 		send(t, conn, "/REGISTER survivor"+strings.Repeat("x", len(frame)%5)+" secret")
-		expectEnvelope(t, conn, "auth")
+		expectMessage(t, conn, "auth")
 	}
 }
 
-func TestUnsupportedVersionIsRejectedAndClosed(t *testing.T) {
+// The protocol version rides in the websocket subprotocol, once per connection.
+func TestClientWithoutSubprotocolIsRefusedAndClosed(t *testing.T) {
 	wsURL := startTestServer(t)
-	conn := dial(t, wsURL)
-	expect(t, conn, "Welcome to the MUD!")
-	writeRaw(t, conn, `{"v":2,"t":"cmd","d":{"line":"LOOK"}}`)
-	if data := expectEnvelope(t, conn, "error"); data["code"] != "bad_version" {
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil) // offers no subprotocol
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	if data := expectMessage(t, conn, "error"); data["code"] != "bad_version" {
 		t.Errorf("code = %v, want bad_version", data["code"])
 	}
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
@@ -87,22 +91,31 @@ func TestUnsupportedVersionIsRejectedAndClosed(t *testing.T) {
 	}
 }
 
+func TestSubprotocolIsNegotiated(t *testing.T) {
+	wsURL := startTestServer(t)
+	conn := dial(t, wsURL)
+	if got := conn.Subprotocol(); got != mudserver.Subprotocol {
+		t.Errorf("negotiated subprotocol %q, want %q", got, mudserver.Subprotocol)
+	}
+}
+
 func TestUnknownTypeAndBadPayloads(t *testing.T) {
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
 
 	for _, tc := range []struct{ frame, typ, code string }{
-		{`{"v":1,"t":"dance"}`, "error", "bad_request"},
-		{`{"v":1,"t":"cmd","d":"LOOK"}`, "error", "bad_request"},
-		{`{"v":1,"t":"login","d":{"username":"x"}}`, "auth", "bad_request"},
-		{`{"v":1,"t":"register","d":{"username":"","password":"p"}}`, "auth", "bad_request"},
-		{`{"v":1,"t":"register","d":{"username":"two words","password":"p"}}`, "auth", "invalid_username"},
-		{`{"v":1,"t":"register","d":{"username":"tab\there","password":"p"}}`, "auth", "invalid_username"},
-		{`{"v":1,"t":"cmd","d":{"line":"LOOK"}}`, "auth", "not_logged_in"},
+		{`{"t":"dance"}`, "error", "bad_request"},
+		{`{"t":"cmd"}`, "error", "bad_request"},
+		{`{"t":"cmd","line":5}`, "error", "bad_frame"},
+		{`{"t":"login","username":"x"}`, "auth", "bad_request"},
+		{`{"t":"register","username":"","password":"p"}`, "auth", "bad_request"},
+		{`{"t":"register","username":"two words","password":"p"}`, "auth", "invalid_username"},
+		{`{"t":"register","username":"tab\there","password":"p"}`, "auth", "invalid_username"},
+		{`{"t":"cmd","line":"LOOK"}`, "auth", "not_logged_in"},
 	} {
 		writeRaw(t, conn, tc.frame)
-		data := expectEnvelope(t, conn, tc.typ)
+		data := expectMessage(t, conn, tc.typ)
 		if data["code"] != tc.code {
 			t.Errorf("%s: code = %v, want %s", tc.frame, data["code"], tc.code)
 		}
@@ -117,37 +130,83 @@ func TestAuthStatsAndRoomMessages(t *testing.T) {
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
 
-	writeRaw(t, conn, `{"v":1,"t":"register","d":{"username":"typed","password":"secret pass"}}`)
-	auth := expectEnvelope(t, conn, "auth")
+	writeRaw(t, conn, `{"t":"register","username":"typed","password":"secret pass"}`)
+	auth := expectMessage(t, conn, "auth")
 	if auth["ok"] != true || !strings.Contains(auth["message"].(string), "Account created! Welcome, typed.") {
 		t.Errorf("register auth = %v", auth)
 	}
-	text := expectEnvelope(t, conn, "text")
-	if !strings.Contains(text["text"].(string), "You are in 'Start Room'") || text["kind"] != "plain" {
+	text := expectMessage(t, conn, "text")
+	if !strings.Contains(text["text"].(string), "You are in 'Start Room'") {
 		t.Errorf("look text = %v", text)
 	}
-	room := expectEnvelope(t, conn, "room")
+	room := expectMessage(t, conn, "room")
 	if room["name"] != "Start Room" {
 		t.Errorf("room name = %v", room["name"])
 	}
 	if exits, _ := room["exits"].([]any); len(exits) == 0 {
 		t.Errorf("room exits = %v, want at least one", room["exits"])
 	}
-	stats := expectEnvelope(t, conn, "stats")
+	stats := expectMessage(t, conn, "stats")
 	if stats["hp"] != float64(20) || stats["maxhp"] != float64(20) {
 		t.Errorf("stats = %v", stats)
 	}
 
-	// A password with a space survives, and a second login is refused.
-	writeRaw(t, conn, `{"v":1,"t":"login","d":{"username":"typed","password":"secret pass"}}`)
-	if data := expectEnvelope(t, conn, "error"); data["code"] != "already_logged_in" {
+	// A second login on the same connection is refused.
+	writeRaw(t, conn, `{"t":"login","username":"typed","password":"secret pass"}`)
+	if data := expectMessage(t, conn, "error"); data["code"] != "already_logged_in" {
 		t.Errorf("second login = %v", data)
 	}
 	other := dial(t, wsURL)
 	expect(t, other, "Welcome to the MUD!")
-	writeRaw(t, other, `{"v":1,"t":"login","d":{"username":"typed","password":"wrong"}}`)
-	if data := expectEnvelope(t, other, "auth"); data["code"] != "name_online" {
+	writeRaw(t, other, `{"t":"login","username":"typed","password":"wrong"}`)
+	if data := expectMessage(t, other, "auth"); data["code"] != "name_online" {
 		t.Errorf("login while online = %v", data)
+	}
+}
+
+// Fan-out and chatter are typed events, not coloured text: the client owns the
+// wording and colour.
+func TestRoomEventsAreTypedAndCompact(t *testing.T) {
+	wsURL := startTestServer(t)
+	alice := register(t, wsURL, "alice")
+	bob := register(t, wsURL, "bob")
+
+	data := expectMessage(t, alice, "arrive")
+	if data["who"] != "bob" || data["from"] != nil {
+		t.Errorf("arrive = %v, want who=bob and no from", data)
+	}
+
+	send(t, bob, "SAY hi <&> there")
+	_, raw, err := alice.ReadMessage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"t":"say","who":"bob","text":"hi <&> there"}`; string(raw) != want {
+		t.Errorf("heard SAY = %s, want %s", raw, want)
+	}
+
+	send(t, bob, "WHISPER alice psst")
+	whisper := expectMessage(t, alice, "whisper")
+	if whisper["who"] != "bob" || whisper["text"] != "psst" || whisper["out"] != nil {
+		t.Errorf("whisper received = %v", whisper)
+	}
+	echo := expectMessage(t, bob, "whisper")
+	if echo["who"] != "alice" || echo["text"] != "psst" || echo["out"] != true {
+		t.Errorf("whisper echo = %v", echo)
+	}
+
+	send(t, bob, "MOVE N")
+	if data := expectMessage(t, alice, "leave"); data["who"] != "bob" || data["to"] != "N" {
+		t.Errorf("leave = %v, want who=bob to=N", data)
+	}
+	send(t, bob, "MOVE S")
+	if data := expectMessage(t, alice, "arrive"); data["who"] != "bob" || data["from"] == nil || data["from"] == "" {
+		t.Errorf("arrive after move = %v, want who=bob and a from direction", data)
+	}
+
+	bob.Close()
+	if data := expectMessage(t, alice, "leave"); data["who"] != "bob" || data["to"] != nil {
+		t.Errorf("disconnect leave = %v, want who=bob and no to", data)
 	}
 }
 
@@ -155,11 +214,11 @@ func TestInventoryAndErrorTypes(t *testing.T) {
 	wsURL := startTestServer(t)
 	conn := register(t, wsURL, "pack")
 	send(t, conn, "INVENTORY")
-	if data := expectEnvelope(t, conn, "inventory"); !strings.Contains(data["text"].(string), "Your inventory is empty.") {
+	if data := expectMessage(t, conn, "inventory"); !strings.Contains(data["text"].(string), "Your inventory is empty.") {
 		t.Errorf("inventory = %v", data)
 	}
 	send(t, conn, "DANCE")
-	if data := expectEnvelope(t, conn, "error"); data["code"] != "unknown_command" {
+	if data := expectMessage(t, conn, "error"); data["code"] != "unknown_command" {
 		t.Errorf("unknown command = %v", data)
 	}
 }
@@ -175,13 +234,13 @@ func TestLoginAfterRegisterRestoresAndWrongPasswordCodes(t *testing.T) {
 
 	bad := dial(t, wsURL)
 	expect(t, bad, "Welcome to the MUD!")
-	writeRaw(t, bad, `{"v":1,"t":"login","d":{"username":"nobody","password":"x"}}`)
-	if data := expectEnvelope(t, bad, "auth"); data["code"] != "unknown_user" {
+	writeRaw(t, bad, `{"t":"login","username":"nobody","password":"x"}`)
+	if data := expectMessage(t, bad, "auth"); data["code"] != "unknown_user" {
 		t.Errorf("unknown user = %v", data)
 	}
-	writeRaw(t, bad, `{"v":1,"t":"login","d":{"username":"again","password":"nope"}}`)
+	writeRaw(t, bad, `{"t":"login","username":"again","password":"nope"}`)
 	for {
-		data := expectEnvelope(t, bad, "auth")
+		data := expectMessage(t, bad, "auth")
 		if data["code"] == "bad_password" {
 			break
 		}
@@ -189,7 +248,7 @@ func TestLoginAfterRegisterRestoresAndWrongPasswordCodes(t *testing.T) {
 			t.Fatalf("login with wrong password = %v", data)
 		}
 		time.Sleep(50 * time.Millisecond)
-		writeRaw(t, bad, `{"v":1,"t":"login","d":{"username":"again","password":"nope"}}`)
+		writeRaw(t, bad, `{"t":"login","username":"again","password":"nope"}`)
 	}
 }
 
@@ -217,7 +276,7 @@ func TestGarbageFramesAreRateLimited(t *testing.T) {
 			switch {
 			case strings.Contains(m, "Slow down."):
 				notices++
-			case strings.Contains(m, "must be JSON envelopes"):
+			case strings.Contains(m, "must be JSON objects"):
 				badFrames++
 			}
 		case <-deadline.C:

@@ -17,17 +17,25 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// frame builds a protocol envelope: {"v":1,"t":t,"d":d}.
-func frame(t string, d any) []byte {
-	b, err := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+// subprotocol is the websocket subprotocol that carries the protocol version.
+const subprotocol = "mud.v1"
+
+// frame builds a flat client message: {"t":t, ...fields}.
+func frame(t string, fields map[string]string) []byte {
+	m := map[string]any{"t": t}
+	for k, v := range fields {
+		m[k] = v
+	}
+	b, err := json.Marshal(m)
 	if err != nil {
 		panic(err)
 	}
 	return b
 }
 
-// inFrame is the part of a server envelope the bot looks at; Text is set only
-// for game text.
+// inFrame is the part of a server message the bot looks at. Text is the game
+// text it matches against: set for text messages, and for the sender's own
+// whisper echo, rebuilt in the wording the fence matches.
 type inFrame struct {
 	T    string
 	OK   bool
@@ -36,20 +44,23 @@ type inFrame struct {
 }
 
 func parseFrame(message []byte) inFrame {
-	var env struct {
-		T string `json:"t"`
-		D struct {
-			OK   bool   `json:"ok"`
-			Code string `json:"code"`
-			Text string `json:"text"`
-		} `json:"d"`
+	var msg struct {
+		T    string `json:"t"`
+		OK   bool   `json:"ok"`
+		Code string `json:"code"`
+		Text string `json:"text"`
+		Who  string `json:"who"`
+		Out  bool   `json:"out"`
 	}
-	if json.Unmarshal(message, &env) != nil {
+	if json.Unmarshal(message, &msg) != nil {
 		return inFrame{}
 	}
-	f := inFrame{T: env.T, OK: env.D.OK, Code: env.D.Code}
-	if env.T == "text" {
-		f.Text = env.D.Text
+	f := inFrame{T: msg.T, OK: msg.OK, Code: msg.Code}
+	switch {
+	case msg.T == "text":
+		f.Text = msg.Text
+	case msg.T == "whisper" && msg.Out:
+		f.Text = "You whisper to " + msg.Who + ", \"" + msg.Text + "\""
 	}
 	return f
 }
@@ -310,7 +321,9 @@ type client struct {
 func connect(ctx context.Context, c Config, index int, m *metrics, active *atomic.Int64) (*client, error) {
 	dialCtx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
-	conn, _, err := websocket.DefaultDialer.DialContext(dialCtx, c.URL, nil)
+	dialer := *websocket.DefaultDialer
+	dialer.Subprotocols = []string{subprotocol}
+	conn, _, err := dialer.DialContext(dialCtx, c.URL, nil)
 	if err != nil {
 		return nil, err
 	}

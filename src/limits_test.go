@@ -11,9 +11,9 @@ import (
 	mudserver "mud_server/src/internal/mudserver"
 )
 
-// paddedCmd is an unknown-command envelope of exactly size bytes.
+// paddedCmd is an unknown-command message of exactly size bytes.
 func paddedCmd(size int) string {
-	prefix, suffix := `{"v":1,"t":"cmd","d":{"line":"DANCE `, `"}}`
+	prefix, suffix := `{"t":"cmd","line":"DANCE `, `"}`
 	return prefix + strings.Repeat("x", size-len(prefix)-len(suffix)) + suffix
 }
 

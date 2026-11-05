@@ -18,20 +18,24 @@ func testConfig(target string) Config {
 		Timeout: time.Second, JoinTimeout: 3 * time.Second, LoginWorkers: 2, Prefix: "testbot", Password: "fixture"}
 }
 
-func peerFrame(t string, d any) []byte {
-	b, _ := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+func peerFrame(t string, fields map[string]any) []byte {
+	m := map[string]any{"t": t}
+	for k, v := range fields {
+		m[k] = v
+	}
+	b, _ := json.Marshal(m)
 	return b
 }
 
 func peerText(text string) []byte {
-	return peerFrame("text", map[string]any{"text": text, "kind": "plain"})
+	return peerFrame("text", map[string]any{"text": text})
 }
 
 // Fake protocol peer: no game state, database or sleeps. It can reject logins,
 // withhold fences, or disconnect on the first action to exercise failure reports.
 func protocolPeer(t *testing.T, mode string) string {
 	t.Helper()
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{Subprotocols: []string{subprotocol}}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -43,11 +47,9 @@ func protocolPeer(t *testing.T, mode string) string {
 			return
 		}
 		var login struct {
-			T string `json:"t"`
-			D struct {
-				Username string `json:"username"`
-				Password string `json:"password"`
-			} `json:"d"`
+			T        string `json:"t"`
+			Username string `json:"username"`
+			Password string `json:"password"`
 		}
 		if json.Unmarshal(message, &login) != nil || (login.T != "login" && login.T != "register") {
 			return
@@ -60,9 +62,9 @@ func protocolPeer(t *testing.T, mode string) string {
 			conn.WriteMessage(websocket.TextMessage, peerFrame("auth", map[string]any{"ok": false, "code": "bad_password", "message": "Incorrect password."}))
 			return
 		}
-		greeting := "Welcome back, " + login.D.Username + "!"
+		greeting := "Welcome back, " + login.Username + "!"
 		if login.T == "register" {
-			greeting = "Account created! Welcome, " + login.D.Username + "."
+			greeting = "Account created! Welcome, " + login.Username + "."
 		}
 		if conn.WriteMessage(websocket.TextMessage, peerFrame("auth", map[string]any{"ok": true, "message": greeting})) != nil {
 			return
@@ -80,14 +82,12 @@ func protocolPeer(t *testing.T, mode string) string {
 				return
 			}
 			var cmd struct {
-				D struct {
-					Line string `json:"line"`
-				} `json:"d"`
+				Line string `json:"line"`
 			}
 			if json.Unmarshal(message, &cmd) != nil {
 				return
 			}
-			text := cmd.D.Line
+			text := cmd.Line
 			if mode == "server-error" {
 				if conn.WriteMessage(websocket.TextMessage, peerFrame("error", map[string]any{"code": "internal", "message": "Something went wrong. Please try again."})) != nil {
 					return
@@ -107,13 +107,13 @@ func protocolPeer(t *testing.T, mode string) string {
 				fields := strings.SplitN(text, " ", 3)
 				// A received whisper containing the same marker must not satisfy
 				// the outgoing fence. Only the outgoing echo is a sample.
-				if conn.WriteMessage(websocket.TextMessage, peerText("someone whispers, \""+fields[2]+"\"")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerFrame("whisper", map[string]any{"who": "someone", "text": fields[2]})) != nil {
 					return
 				}
 				if mode == "wrong-echo" {
 					continue
 				}
-				if conn.WriteMessage(websocket.TextMessage, peerText("\x1b[1;35mYou whisper to "+fields[1]+", \""+fields[2]+"\"\x1b[0m")) != nil {
+				if conn.WriteMessage(websocket.TextMessage, peerFrame("whisper", map[string]any{"who": fields[1], "text": fields[2], "out": true})) != nil {
 					return
 				}
 			}

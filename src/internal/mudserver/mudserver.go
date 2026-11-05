@@ -7,7 +7,6 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
-	"mud_server/src/internal/mudutils"
 	"os"
 	"strconv"
 	"strings"
@@ -298,7 +297,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) bool {
 		ms.players[player.Username] = player
 		player.Location.AddPlayer(player)
 		player.SendAuth(true, "", greeting)
-		player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has appeared in the room.", player.Username)
+		player.Location.BroadcastFrame(encodeArrive(player.Username, ""), player.Username)
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
 		player.SendStatUpdate()
@@ -319,7 +318,7 @@ func (ms *MudServer) disconnect(player *MudPlayer) {
 	ms.savingNames[player.Username] = l.saved
 	ms.flushDirty() // save them now, not at the next interval
 
-	player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has poofed away.", player.Username)
+	player.Location.BroadcastFrame(encodeLeave(player.Username, ""), player.Username)
 	player.Location.RemovePlayer(player.Username)
 	player.Session.Close()
 }
@@ -365,20 +364,15 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			continue
 		}
 
-		var env envelope
-		if err := json.Unmarshal(messagebytes, &env); err != nil || env.T == "" {
-			player.SendError(codeBadFrame, "Messages must be JSON envelopes: {\"v\":1,\"t\":...}.")
+		var in inbound
+		if err := json.Unmarshal(messagebytes, &in); err != nil || in.T == "" {
+			player.SendError(codeBadFrame, "Messages must be JSON objects with a type: {\"t\":\"cmd\",\"line\":\"LOOK\"}.")
 			continue
 		}
-		if env.V != protocolVersion {
-			player.SendError(codeBadVersion, fmt.Sprintf("Unsupported protocol version %d; this server speaks %d.", env.V, protocolVersion))
-			return
-		}
 
-		switch env.T {
+		switch in.T {
 		case msgCmd:
-			var payload cmdPayload
-			if json.Unmarshal(env.D, &payload) != nil {
+			if in.Line == nil {
 				player.SendError(codeBadRequest, "A cmd needs {\"line\":\"...\"}.")
 				continue
 			}
@@ -386,7 +380,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				player.SendAuth(false, codeNotLoggedIn, "Please log in or register first.")
 				continue
 			}
-			messagefields := strings.Fields(payload.Line)
+			messagefields := strings.Fields(*in.Line)
 			if len(messagefields) == 0 {
 				continue
 			}
@@ -398,26 +392,25 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				return
 			}
 		case msgRegister, msgLogin:
-			var creds credentialsPayload
-			if json.Unmarshal(env.D, &creds) != nil || creds.Username == "" || creds.Password == "" {
-				player.SendAuth(false, codeBadRequest, "A "+env.T+" needs a username and a password.")
+			if in.Username == "" || in.Password == "" {
+				player.SendAuth(false, codeBadRequest, "A "+in.T+" needs a username and a password.")
 				continue
 			}
 			if admitted {
 				player.SendError(codeAlreadyLoggedIn, "You are already logged in.")
 				continue
 			}
-			if strings.IndexFunc(creds.Username, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
+			if strings.IndexFunc(in.Username, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
 				player.SendAuth(false, codeInvalidUsername, "Usernames can't contain spaces or control characters.")
 				continue
 			}
-			if env.T == msgRegister {
-				admitted = ms.register(player, creds.Username, creds.Password)
+			if in.T == msgRegister {
+				admitted = ms.register(player, in.Username, in.Password)
 			} else {
-				admitted = ms.login(player, creds.Username, creds.Password)
+				admitted = ms.login(player, in.Username, in.Password)
 			}
 		default:
-			player.SendError(codeBadRequest, "Unknown message type "+strconv.Quote(env.T)+".")
+			player.SendError(codeBadRequest, "Unknown message type "+strconv.Quote(in.T)+".")
 		}
 	}
 }

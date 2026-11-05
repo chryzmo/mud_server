@@ -136,7 +136,7 @@ func execSQL(t *testing.T, url string, statements ...string) {
 
 func dial(t *testing.T, wsURL string) *websocket.Conn {
 	t.Helper()
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("dial %s: %v", wsURL, err)
 	}
@@ -144,7 +144,7 @@ func dial(t *testing.T, wsURL string) *websocket.Conn {
 	return conn
 }
 
-// wireLine turns a line a player would type into a protocol envelope:
+// wireLine turns a line a player would type into a client message:
 // /REGISTER and /LOGIN become register and login messages, everything else a cmd.
 func wireLine(line string) []byte {
 	verb, rest, _ := strings.Cut(line, " ")
@@ -155,48 +155,75 @@ func wireLine(line string) []byte {
 	return wireFrame("cmd", map[string]string{"line": line})
 }
 
-func wireFrame(t string, d any) []byte {
-	b, _ := json.Marshal(map[string]any{"v": 1, "t": t, "d": d})
+func wireFrame(t string, fields map[string]string) []byte {
+	m := map[string]any{"t": t}
+	for k, v := range fields {
+		m[k] = v
+	}
+	b, _ := json.Marshal(m)
 	return b
 }
 
-// flatten renders a server envelope as the text a player would have seen
+// dialer offers the protocol subprotocol, as every client must.
+var dialer = websocket.Dialer{Subprotocols: []string{mudserver.Subprotocol}}
+
+// flatten renders a server message as the text a player would have seen
 // before the JSON protocol, so assertions can look for substrings: game text
-// and inventory are their text, auth and error their message, stats the
-// old STATUPDATE line and room a ROOM line. Anything unparseable is returned
-// as is.
+// and inventory are their text, auth and error their message, say/arrive/
+// leave/whisper the wording the client shows (with the same colours), stats
+// the old STATUPDATE line and room a ROOM line. Anything unparseable is
+// returned as is.
 func flatten(raw []byte) string {
-	var env struct {
-		T string `json:"t"`
-		D struct {
-			Text    string   `json:"text"`
-			Message string   `json:"message"`
-			Name    string   `json:"name"`
-			Exits   []string `json:"exits"`
-			HP      int      `json:"hp"`
-			MaxHP   int      `json:"maxhp"`
-			MP      int      `json:"mp"`
-			MaxMP   int      `json:"maxmp"`
-			Atk     int      `json:"atk"`
-			AtkB    int      `json:"atkbonus"`
-			Def     int      `json:"def"`
-			DefB    int      `json:"defbonus"`
-		} `json:"d"`
+	var m struct {
+		T       string   `json:"t"`
+		Text    string   `json:"text"`
+		Message string   `json:"message"`
+		Who     string   `json:"who"`
+		From    string   `json:"from"`
+		To      string   `json:"to"`
+		Out     bool     `json:"out"`
+		Name    string   `json:"name"`
+		Exits   []string `json:"exits"`
+		HP      int      `json:"hp"`
+		MaxHP   int      `json:"maxhp"`
+		MP      int      `json:"mp"`
+		MaxMP   int      `json:"maxmp"`
+		Atk     int      `json:"atk"`
+		AtkB    int      `json:"atkbonus"`
+		Def     int      `json:"def"`
+		DefB    int      `json:"defbonus"`
 	}
-	if json.Unmarshal(raw, &env) != nil || env.T == "" {
+	if json.Unmarshal(raw, &m) != nil || m.T == "" {
 		return string(raw)
 	}
-	switch env.T {
+	blue := func(s string) string { return "\x1b[1;34m" + s + "\x1b[0m" }
+	switch m.T {
 	case "text", "inventory":
-		return env.D.Text
+		return m.Text
 	case "auth", "error":
-		return env.D.Message
+		return m.Message
+	case "say":
+		return blue(m.Who) + ` says: "` + m.Text + `"`
+	case "arrive":
+		if m.From == "" {
+			return blue(m.Who) + " has appeared in the room."
+		}
+		return blue(m.Who) + " has entered the room from the " + m.From + "."
+	case "leave":
+		if m.To == "" {
+			return blue(m.Who) + " has poofed away."
+		}
+		return blue(m.Who) + " has left to the " + m.To + "."
+	case "whisper":
+		if m.Out {
+			return `You whisper to ` + m.Who + `, "` + m.Text + `"`
+		}
+		return m.Who + ` whispers, "` + m.Text + `"`
 	case "stats":
-		d := env.D
 		return fmt.Sprintf("STATUPDATE:hp=%d,maxhp=%d,mp=%d,maxmp=%d,atk=%d,atkbonus=%d,def=%d,defbonus=%d",
-			d.HP, d.MaxHP, d.MP, d.MaxMP, d.Atk, d.AtkB, d.Def, d.DefB)
+			m.HP, m.MaxHP, m.MP, m.MaxMP, m.Atk, m.AtkB, m.Def, m.DefB)
 	case "room":
-		return "ROOM:" + env.D.Name + " " + strings.Join(env.D.Exits, ",")
+		return "ROOM:" + m.Name + " " + strings.Join(m.Exits, ",")
 	}
 	return string(raw)
 }
