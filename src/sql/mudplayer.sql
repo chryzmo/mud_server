@@ -15,12 +15,19 @@ CREATE TABLE IF NOT EXISTS player
     maxMP integer,
     roomid integer,
     spawnlocationid integer,
+    guest boolean NOT NULL DEFAULT false,
+    resumetokenhash text NOT NULL DEFAULT '',
+    recoveryhash text NOT NULL DEFAULT '',
+    lastseen timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT "PLAYER_pkey" PRIMARY KEY (id),
     -- Same name as the index the server creates on older databases at startup.
     CONSTRAINT player_username_key UNIQUE (username),
     CONSTRAINT fk_roomid FOREIGN KEY(roomid) REFERENCES room(id),
     CONSTRAINT fk_spawnlocationid FOREIGN KEY(spawnlocationid) REFERENCES room(id)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username));
+CREATE INDEX IF NOT EXISTS player_resumetoken_idx ON player (resumetokenhash) WHERE resumetokenhash <> '';
 
 INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES
     ('c','','{}','{}',5,10,20,20,10,10,1,1);

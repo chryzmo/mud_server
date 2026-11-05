@@ -49,6 +49,7 @@ type MudServer struct {
 	sessions   map[*Session]struct{}
 	sessionsMu sync.Mutex
 	closes     *closeStats // why sessions ended; see closestats.go
+	names      *nameRules  // what guests may call themselves; see names.go
 
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
@@ -114,6 +115,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		savingNames:   make(map[string]chan struct{}),
 		sessions:      make(map[*Session]struct{}),
 		closes:        newCloseStats(),
+		names:         defaultNameRules(),
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
 	}
@@ -299,7 +301,7 @@ func (ms *MudServer) isOnline(username string) (online bool, saved <-chan struct
 // World.place). It returns "" when they are in, codeAtCapacity if every copy
 // is full and no more can open, and codeNameOnline if the name is already
 // online (someone else logged in first) or the server is shutting down.
-func (ms *MudServer) admit(player *MudPlayer, greeting string) string {
+func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 	refusal := codeNameOnline
 	ms.onLoop(func() {
 		if _, online := ms.players[player.Username]; online {
@@ -317,7 +319,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) string {
 		player.world = ms.World
 		ms.players[player.Username] = player
 		player.Location.AddPlayer(player)
-		player.SendAuth(true, "", greeting)
+		player.SendWelcome(hello)
 		player.Location.BroadcastFrame(encodeArrive(player.Username, ""), player.Username)
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
@@ -412,6 +414,16 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			if !ms.enqueue(func() { ms.handleCommand(player, msg) }) {
 				return
 			}
+		case msgJoin:
+			if in.Name == "" {
+				player.SendAuth(false, codeBadRequest, "A join needs a name.")
+				continue
+			}
+			if admitted {
+				player.SendError(codeAlreadyLoggedIn, "You are already in the game.")
+				continue
+			}
+			admitted = ms.join(player, in.Name)
 		case msgRegister, msgLogin:
 			if in.Username == "" || in.Password == "" {
 				player.SendAuth(false, codeBadRequest, "A "+in.T+" needs a username and a password.")
@@ -467,7 +479,7 @@ func (ms *MudServer) register(player *MudPlayer, username, password string) bool
 		return false
 	}
 
-	if refusal := ms.admit(player, "Account created! Welcome, "+username+"."); refusal != "" {
+	if refusal := ms.admit(player, welcome{message: "Account created! Welcome, " + username + "."}); refusal != "" {
 		if refusal == codeAtCapacity {
 			player.SendAuth(false, refusal, "Your account was created, but the event is at capacity right now. Log in again in a moment.")
 		} else {
@@ -511,7 +523,7 @@ func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 		return false
 	}
 
-	if refusal := ms.admit(player, "Welcome back, "+username+"!"); refusal != "" {
+	if refusal := ms.admit(player, welcome{message: "Welcome back, " + username + "!"}); refusal != "" {
 		player.Username = ""
 		if refusal == codeAtCapacity {
 			player.SendAuth(false, refusal, "The event is at capacity right now. Please try again in a moment.")

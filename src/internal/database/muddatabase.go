@@ -58,6 +58,16 @@ func (db MudDatabase) EnsureSchema() error {
 		// Settles two players registering the same name at once. Fresh databases
 		// get it from src/sql/mudplayer.sql under the same name.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_key ON player (username)",
+		// Guest sessions (plans/guest-sessions.md). The token and recovery code are
+		// stored only as hashes; '' means the player has none (password accounts).
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS guest boolean NOT NULL DEFAULT false",
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS resumetokenhash text NOT NULL DEFAULT ''",
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS recoveryhash text NOT NULL DEFAULT ''",
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS lastseen timestamptz NOT NULL DEFAULT now()",
+		"CREATE INDEX IF NOT EXISTS player_resumetoken_idx ON player (resumetokenhash) WHERE resumetokenhash <> ''",
+		// Names are unique ignoring case. Last, because it fails if an older
+		// database already holds two names that differ only in case.
+		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",
 	}
 	for _, stmt := range statements {
 		if _, err := db.Connection.Exec(db.Context, stmt); err != nil {

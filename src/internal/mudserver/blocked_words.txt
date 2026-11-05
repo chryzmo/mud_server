@@ -1,0 +1,67 @@
+# Words that make a guest name unacceptable. One entry per line; blank lines and
+# lines starting with # are ignored. Matching is case-insensitive, lets any
+# letter be repeated ("shiiit" matches "shit"; a doubled letter in the entry
+# still needs two, so "fagg" does not match "Fagin"), ignores _ and -, and reads
+# digits as the letters they resemble (0=o 1=i 3=e 4=a 5=s 7=t).
+#
+#   plain entry     blocks any name that CONTAINS it ("fuck" blocks "xxFuckxx").
+#                   Keep these to words that rarely occur inside innocent words.
+#   =entry          blocks a name only when a whole part of it equals the entry,
+#                   where parts are split at _ and - ("=dick" blocks "Big_Dick"
+#                   but not "Dickens"). Use this for short or ambiguous words.
+#
+# This is a short starter list, not a complete one. Edit freely; it is compiled
+# into the server, so a change takes effect with the next build. GM tools (mute,
+# kick, rename) are the backstop for whatever it misses.
+
+# Contained anywhere
+fuck
+shit
+bitch
+cunt
+whore
+slut
+nigg
+fagg
+retard
+tranny
+chink
+wetback
+bastard
+cocksuck
+dickhead
+asshole
+jackass
+motherf
+
+# Whole part only
+=ass
+=arse
+=cock
+=dick
+=piss
+=tit
+=tits
+=cum
+=jizz
+=spic
+=kike
+=gook
+=coon
+=dyke
+=fag
+=rape
+=rapist
+=nazi
+=hitler
+=kkk
+=porn
+=sex
+=anus
+=penis
+=vagina
+=pussy
+=twat
+=wank
+=wanker
+=slutty

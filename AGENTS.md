@@ -150,6 +150,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - `ProcessInput` (one goroutine per connection) handles `login` and `register` messages itself (database
   lookups and bcrypt stay off the loop), then `admit` places the player on the loop. After that it
   queues each command with `enqueue`, and the player's disconnect when the connection ends.
+- Guests (`guest.go`, `names.go`, plans/guest-sessions.md): `join {name}` creates a `player` row with `guest=true`,
+  returns a resume token and a recovery code once, and stores only their SHA-256 hashes. Names are 3-16 of
+  `[A-Za-z0-9_-]`, unique ignoring case (unique index on `lower(username)`), checked against a reserved list and
+  `blocked_words.txt` (compiled in; format in the file). Schema changes for older databases go in `EnsureSchema`.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes
