@@ -78,6 +78,10 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 	// Default queue size; a short write timeout so the stalled writer gives up quickly.
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.WriteTimeoutMS = 500
+		// This test deliberately floods broadcasts to exercise the outbound
+		// queue, not the inbound limiter (covered separately).
+		c.Connection.CommandsPerSecond = 100000
+		c.Connection.CommandBurst = 10000
 	})
 
 	stalled := dialWithTinyReceiveBuffer(t, wsURL)

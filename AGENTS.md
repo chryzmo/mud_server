@@ -112,7 +112,9 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - **One game loop owns all game state** (`MudServer.run` in `mudserver.go`): online players,
   rooms, items, NPCs, spawners. It runs queued events one at a time, a world tick
   (`RoomTickDurationInMS`, 250 ms) that drives NPC turns and spawners, the periodic save, and
-  shutdown. Game code needs no locks because nothing else touches game state.
+  shutdown. Game code needs no locks because nothing else touches game state. Queued events,
+  ticks and periodic saves recover independently from panics; a panicking command notifies its
+  player and the loop continues. Recovery cannot roll back partially changed state.
 - **Never touch game state from another goroutine.** From outside the loop, use `enqueue` (fire and
   forget) or `onLoop` (run and wait). The only exception is `World.RoomMap`, which doesn't change
   after startup.
@@ -123,7 +125,11 @@ passes on a many-core machine will fail on `main` and block the deploy.
   or `time.Ticker`.
 - Each connection is a `Session` (`session.go`): sends go into its bounded queue and one writer
   goroutine drains it, with a write timeout and keepalive pings. `SendMessage` never blocks; a client
-  whose queue fills is disconnected. Never write to the websocket directly.
+  whose queue fills is disconnected. Never write to the websocket directly. Incoming messages
+  are limited to 4096 bytes (including fragments), with a per-session token bucket of 10 commands/s,
+  burst 20. Excess input is dropped before parsing or authentication; slow-down notices are limited
+  to once per second. These limits are configurable under `Connection` (`ReadLimitBytes`,
+  `CommandsPerSecond`, `CommandBurst`); pre-login input and blank messages count too.
 - **Saving is batched and off the loop** (`persist.go`). Code that changes a player sets
   `player.dirty = true`; code that changes a room's contents sets `room.dirty = true`. Every
   `SaveIntervalMS` (5 s) the loop snapshots whatever is dirty and the saver goroutine writes it in
