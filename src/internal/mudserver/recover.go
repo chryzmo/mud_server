@@ -144,12 +144,14 @@ func (ms *MudServer) recoverGuest(shell *MudPlayer, session *Session, name, code
 		return nil
 	}
 	if remaining, locked := ms.recoveries.locked(username); locked {
+		ms.logIP(session, "Recovery refused (name locked): %s", username)
 		session.Send(encode(authMsg{T: msgAuth, Code: codeRecoveryLocked, RetryMS: int(remaining.Milliseconds()),
 			Message: fmt.Sprintf("Too many wrong codes for that name. Try again in %d minutes.", int(remaining.Minutes())+1)}))
 		return nil
 	}
 	if subtle.ConstantTimeCompare([]byte(hashSecret(normaliseRecovery(code))), []byte(storedHash)) != 1 {
 		ms.recoveries.fail(username)
+		ms.logIP(session, "Recovery failed (wrong code): %s", username)
 		session.sendAuth(false, codeBadRecovery, recoverFailed)
 		return nil
 	}
@@ -171,6 +173,7 @@ func (ms *MudServer) recoverGuest(shell *MudPlayer, session *Session, name, code
 		return nil
 	}
 	ms.recoveries.succeed(username)
+	ms.logIP(session, "Recovery succeeded: %s", username)
 	fresh := welcome{token: token, recovery: recovery}
 
 	// Online or dormant: the new credentials replace the old, and this connection

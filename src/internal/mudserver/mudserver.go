@@ -7,6 +7,7 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -58,6 +59,8 @@ type MudServer struct {
 
 	recoveries *recoveryGuard // wrong recovery codes per name; used by readers, has its own lock
 	joinLimit  *joinLimiter   // one bucket for every join/resume/recover/login/register; has its own lock
+	ipLimit    *ipLimiter     // optional per-address ceiling on the same requests; nil = off
+	proxies    *proxyTrust    // which peers may report a client address; see clientip.go
 
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
@@ -90,6 +93,10 @@ NewMudServer builds a server from an already-loaded Configuration and starts
 its game loop. Tests use this directly to point at the test database.
 */
 func NewMudServer(c Configuration) (*MudServer, error) {
+	proxies, err := newProxyTrust(c.Server.TrustedProxies, c.Server.ClientIPHeader)
+	if err != nil {
+		return nil, fmt.Errorf("Server.TrustedProxies: %w", err)
+	}
 	maxConns := c.Database.MaxConnections
 	if maxConns <= 0 {
 		// The saver uses one; the rest serve logins, which run on connection
@@ -131,6 +138,8 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	}
 	server.recoveries = newRecoveryGuard(server.recoveryLock())
 	server.joinLimit = newJoinLimiter(c.Connection.JoinPerSecond, c.Connection.JoinBurst)
+	server.ipLimit = newIPLimiter(c.Connection.MaxJoinsPerMinutePerIP)
+	server.proxies = proxies
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
@@ -269,8 +278,9 @@ func (ms *MudServer) shutdownOnLoop() {
 // shutdown or server.
 func (ms *MudServer) SessionCloseCounts() map[string]int64 { return ms.closes.Counts() }
 
-func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
+func (ms *MudServer) AddConnection(ws_conn *websocket.Conn, clientIP netip.Addr) *MudPlayer {
 	session := NewSession(ws_conn, ms.Configuration.SessionSettings(), ms.closes)
+	session.clientIP = clientIP
 
 	stats := PlayerStartStats{
 		HP:      ms.Configuration.Game.PlayerStartHP,

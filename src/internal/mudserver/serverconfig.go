@@ -3,6 +3,7 @@ package mudserver
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -13,6 +14,12 @@ type Configuration struct {
 		ServerName	string `json:"ServerName"`
 		ListenPort	string `json:"ListenPort"`
 		SaveIntervalMS int `json:"SaveIntervalMS"` // batched saves of changed players and rooms (default 5000)
+		// Peers allowed to tell us a client's address in ClientIPHeader (CIDRs or addresses).
+		// Absent: the loopback addresses Caddy uses inside the pod. An empty list trusts nobody.
+		TrustedProxies []string `json:"TrustedProxies"`
+		ClientIPHeader string `json:"ClientIPHeader"` // default X-Client-IP
+		LogClientIPs *bool `json:"LogClientIPs"` // log client addresses on join/login/recover (default true)
+		LogWriter io.Writer `json:"-"` // where those lines go; nil is standard output (tests inject their own)
 	} `json:"Server"`
 	// Per-connection tuning; zero means the default (see SessionSettings).
 	Connection struct {
@@ -30,6 +37,7 @@ type Configuration struct {
 		RecoveryLockMS    int `json:"RecoveryLockMS"` // a name refuses recovery this long after 5 wrong codes (default 900000)
 		JoinPerSecond     int `json:"JoinPerSecond"`  // join/resume/recover/login/register tokens per second, all connections together (default 1000; -1 no limit)
 		JoinBurst         int `json:"JoinBurst"`      // bucket size (default 5000)
+		MaxJoinsPerMinutePerIP int `json:"MaxJoinsPerMinutePerIP"` // 0 = off. A flood breaker for staff, not a fairness rule: many players share an address at a venue
 		IdleTimeoutMS     int `json:"IdleTimeoutMS"`  // a guest with no command for this long is disconnected (default 1800000; -1 never)
 	} `json:"Connection"`
 	Database struct {

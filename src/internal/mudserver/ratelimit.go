@@ -95,7 +95,12 @@ func (l *joinLimiter) allow() (ok bool, retryAfter time.Duration) {
 // join, resume, recover, login or register. If the limit is spent it tells the
 // client when to come back and returns false.
 func (ms *MudServer) allowJoin(session *Session) bool {
-	ok, retry := ms.joinLimit.allow()
+	// The per-address ceiling comes first, so a flooding address cannot spend
+	// everyone's shared tokens.
+	ok, retry := ms.ipLimit.allow(session.clientIP)
+	if ok {
+		ok, retry = ms.joinLimit.allow()
+	}
 	if !ok {
 		session.Send(encode(errorMsg{T: msgError, Code: codeRateLimited, RetryMS: int(retry.Milliseconds()) + 1,
 			Message: "Too many people are joining right now. Please wait a moment."}))

@@ -1,13 +1,29 @@
 # MUD_DOMAIN and ACME_EMAIL come from ~/mud/caddy.env on the host (not in git).
+# Cloudflare's IP ranges (generated; see deploy/update-cloudflare-ips.sh).
+import cloudflare-ips.caddy
+
 {
 	email {$ACME_EMAIL}
+
+	servers {
+		# Believe CF-Connecting-IP only from a connection that really comes from
+		# Cloudflare. From anyone else (someone hitting the origin directly) it is
+		# ignored, so a client cannot choose its own address.
+		import cloudflare_ips
+		client_ip_headers CF-Connecting-IP
+	}
 }
 
 {$MUD_DOMAIN} {
 	encode zstd gzip
 
 	handle /ws {
-		reverse_proxy 127.0.0.1:8080
+		reverse_proxy 127.0.0.1:8080 {
+			# The real client address, for the game server's logs and abuse tools. The
+			# game server believes this header only from this proxy (loopback in the
+			# pod), and header_up replaces anything a client sent under the same name.
+			header_up X-Client-IP {client_ip}
+		}
 	}
 
 	handle {
