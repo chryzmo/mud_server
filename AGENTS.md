@@ -162,6 +162,11 @@ passes on a many-core machine will fail on `main` and block the deploy.
   only through `sendFrame` (or `SendMessage` and friends), and replies to the reader's own session only through
   `Session.sendAuth/sendError`. Reader goroutines keep their own `session` and never read `player.Session`
   after admission: a resume can hand the player to a newer connection, and only the loop may change it.
+- Recovery (`recover.go`): `recover {name, code}` takes a character back with the recovery code shown at join. It
+  verifies the hash, rotates token and code in one compare-and-swap `UPDATE` (so two recoveries with the same
+  code cannot both win), and attaches like a resume with no frames remembered (`noFramesSeen`, so a gap and a
+  fresh look). Five wrong codes lock the name for `RecoveryLockMS` (15 min); answers never reveal whether a name
+  exists. Any new path that changes a guest's token must update `ms.byToken` and `player.tokenHash` on the loop.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes

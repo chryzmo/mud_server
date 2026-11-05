@@ -56,6 +56,8 @@ type MudServer struct {
 	byToken map[string]*MudPlayer
 	dormant map[*MudPlayer]time.Time
 
+	recoveries *recoveryGuard // wrong recovery codes per name; used by readers, has its own lock
+
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
 	closeOnce sync.Once
@@ -126,6 +128,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
 	}
+	server.recoveries = newRecoveryGuard(server.recoveryLock())
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
@@ -462,6 +465,15 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			}
 			if resumed := ms.resume(player, session, in.Token, in.Received); resumed != nil {
 				player = resumed
+				admitted = true
+			}
+		case msgRecover:
+			if admitted {
+				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
+				continue
+			}
+			if recovered := ms.recoverGuest(player, session, in.Name, in.Code); recovered != nil {
+				player = recovered
 				admitted = true
 			}
 		case msgRegister, msgLogin:

@@ -111,7 +111,7 @@ func (ms *MudServer) expireDormant(now time.Time) {
 
 // attach gives an existing player (dormant, or still holding an older
 // connection) a new session, and sends it what it missed. Loop only.
-func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64) {
+func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64, fresh welcome) {
 	if old := player.Session; old != nil && old != session {
 		old.CloseWith(closeReplaced)
 	}
@@ -120,7 +120,8 @@ func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64
 	delete(ms.dormant, player)
 
 	frames, ok := player.framesAfter(received)
-	hello := authMsg{T: msgAuth, OK: true, Message: "Welcome back, " + player.Username + "!", Resumed: true, Gap: !ok}
+	hello := authMsg{T: msgAuth, OK: true, Message: "Welcome back, " + player.Username + "!", Resumed: true, Gap: !ok,
+		Token: fresh.token, Recovery: fresh.recovery} // set only after a recovery
 	if ok {
 		hello.Replayed, hello.Base = len(frames), received
 	} else {
@@ -150,7 +151,7 @@ func (ms *MudServer) resume(shell *MudPlayer, session *Session, token string, re
 	ms.onLoop(func() {
 		if p := ms.byToken[hash]; p != nil && ms.players[p.Username] == p {
 			existing = p
-			ms.attach(p, session, received)
+			ms.attach(p, session, received, welcome{})
 		}
 	})
 	if existing != nil {
