@@ -31,7 +31,13 @@ type MudPlayer struct {
 	MaxHP         int
 	MaxMP         int
 	NPCTarget     *BaddieNPC
-	dirty         bool           // changed since the last save; see persist.go
+	dirty         bool // changed since the last save; see persist.go
+	// Where the player was saved, by template room ID. Login records these on the
+	// reader goroutine; the game loop turns them into Location and SpawnLocation
+	// when the player is admitted (see World.place).
+	savedRoomID   int32
+	savedSpawnID  int32
+	world         *World         // set at admission; used to place a respawn
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	SpawnLocation *Room
 }
@@ -61,11 +67,14 @@ type PlayerStartStats struct {
 	Defense int
 }
 
-func CreateMudPlayer(session *Session, room *Room, stats PlayerStartStats) *MudPlayer {
+// CreateMudPlayer starts a new player who has not yet been placed in a room:
+// admission does that, on the game loop.
+func CreateMudPlayer(session *Session, stats PlayerStartStats) *MudPlayer {
 	return &MudPlayer{
 		Session:       session,
 		TimeConnected: time.Now(),
-		Location:      room,
+		savedRoomID:   defaultStartRoomID,
+		savedSpawnID:  defaultStartRoomID,
 		Inventory:     CreateInventory(),
 		Equipment:     NewEquipmentSlots(),
 		AttackPower:   stats.Attack,
@@ -74,7 +83,6 @@ func CreateMudPlayer(session *Session, room *Room, stats PlayerStartStats) *MudP
 		MaxHP:         stats.MaxHP,
 		MP:            stats.MP,
 		MaxMP:         stats.MaxMP,
-		SpawnLocation: room,
 	}
 }
 
@@ -168,7 +176,7 @@ func (mp *MudPlayer) MoveRoom(dir string) int {
 	return retcode
 }
 
-func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, world *World, player *MudPlayer, playerid interface{}) error {
+func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, playerid interface{}) error {
 	query := ""
 	var err error
 
@@ -197,10 +205,7 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, world *World, playe
 		player.ID = ret.ID
 		player.Username = ret.Username
 		player.PasswordHash = ret.PasswordHash
-		player.Location = world.RoomMap[ret.RoomID]
-		if player.Location == nil {
-			player.Location = world.RoomMap[1]
-		}
+		player.savedRoomID = ret.RoomID
 		player.Inventory = CreateInventory()
 		player.Equipment = NewEquipmentSlots()
 		player.Equipment.LoadFromIDMap(db, ret.EquipmentSlots)
@@ -210,10 +215,7 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, world *World, playe
 		player.MaxHP = ret.MaxHP
 		player.MP = ret.MP
 		player.MaxMP = ret.MaxMP
-		player.SpawnLocation = world.RoomMap[ret.SpawnLocationID]
-		if player.SpawnLocation == nil {
-			player.SpawnLocation = world.RoomMap[1]
-		}
+		player.savedSpawnID = ret.SpawnLocationID
 
 		// Build inventory
 		for iid := range ret.InventoryIDSlice {
@@ -272,8 +274,8 @@ func (mp *MudPlayer) InsertIntoDB(db *muddatabase.MudDatabase) error {
 		"maxhp":            mp.MaxHP,
 		"mp":               mp.MP,
 		"maxmp":            mp.MaxMP,
-		"roomid":           mp.Location.ID,
-		"spawnlocationid":  mp.SpawnLocation.ID,
+		"roomid":           mp.savedRoomID,
+		"spawnlocationid":  mp.savedSpawnID,
 	}
 
 	err := db.Connection.QueryRow(db.Context, query, args).Scan(&mp.ID)
@@ -310,6 +312,13 @@ func (mp *MudPlayer) Respawn() {
 	mp.dirty = true
 	if mp.SpawnLocation != nil {
 		mp.Location = mp.SpawnLocation
+		if mp.world != nil {
+			// A respawn lands in a copy with room, like an arrival; if every copy is
+			// full the player still returns to their spawn room.
+			if room, ok := mp.world.place(mp.SpawnLocation.persistID()); ok {
+				mp.Location = room
+			}
+		}
 	}
 	mp.Location.AddPlayer(mp)
 	mp.Location.BroadcastFrame(encodeArrive(mp.Username, ""), mp.Username)

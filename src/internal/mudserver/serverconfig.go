@@ -45,6 +45,8 @@ type Configuration struct {
 		PlayerStartAttack    int   `json:"PlayerStartAttack"`
 		PlayerStartDefense   int   `json:"PlayerStartDefense"`
 	} `json:"Game"`
+	// Area copies for crowds; none by default. See crowd.go.
+	Crowd CrowdConfig `json:"Crowd"`
 }
 
 func (c Configuration) LoadConfig (config_file string) (Configuration) {

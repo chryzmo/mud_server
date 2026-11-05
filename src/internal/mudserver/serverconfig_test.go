@@ -1,6 +1,9 @@
 package mudserver
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestDatabaseConnectionURLFromFields(t *testing.T) {
 	c := Configuration{}
@@ -84,5 +87,31 @@ func TestProcessAliases(t *testing.T) {
 		if cmd != tc.wantCmd || args != tc.wantA {
 			t.Errorf("processAliases(%q, %q) = (%q, %q), want (%q, %q)", tc.in, tc.inArgs, cmd, args, tc.wantCmd, tc.wantA)
 		}
+	}
+}
+
+func TestCrowdConfigParses(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/c.json"
+	body := `{"Crowd":{"SoftCap":40,"MaxCopies":7,"Areas":[{"Name":"start","Rooms":[1,2,3]},{"Name":"hub","Rooms":[9]}]}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c := Configuration{}.LoadConfig(path)
+	if c.Crowd.SoftCap != 40 || c.Crowd.MaxCopies != 7 || len(c.Crowd.Areas) != 2 {
+		t.Fatalf("Crowd = %+v", c.Crowd)
+	}
+	if a := c.Crowd.Areas[0]; a.Name != "start" || len(a.Rooms) != 3 || a.Rooms[2] != 3 {
+		t.Errorf("first area = %+v", a)
+	}
+}
+
+func TestShippedConfigCopiesTheSeededStartingArea(t *testing.T) {
+	c := Configuration{}.LoadConfig("../../../config/server_config.json")
+	if len(c.Crowd.Areas) != 1 || c.Crowd.Areas[0].Name != "start" || len(c.Crowd.Areas[0].Rooms) != 3 {
+		t.Errorf("shipped Crowd.Areas = %+v, want the 3 seeded rooms as the start area", c.Crowd.Areas)
+	}
+	if c.Crowd.SoftCap != 50 || c.Crowd.MaxCopies != 200 {
+		t.Errorf("shipped caps = %d/%d, want 50/200", c.Crowd.SoftCap, c.Crowd.MaxCopies)
 	}
 }

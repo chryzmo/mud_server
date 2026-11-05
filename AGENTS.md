@@ -136,8 +136,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
   ticks and periodic saves recover independently from panics; a panicking command notifies its
   player and the loop continues. Recovery cannot roll back partially changed state.
 - **Never touch game state from another goroutine.** From outside the loop, use `enqueue` (fire and
-  forget) or `onLoop` (run and wait). The only exception is `World.RoomMap`, which doesn't change
-  after startup.
+  forget) or `onLoop` (run and wait). There are no exceptions: `World.RoomMap`
+  gains cloned rooms as crowds arrive (`crowd.go`), so login records only where a player was saved
+  (`savedRoomID`) and `admit` places them on the loop (`World.place`). Area copies are never saved;
+  persisted room IDs always name the template (`Room.persistID`).
 - Every websocket frame, both ways, is a flat JSON object with a type, `{"t":"say","who":"bob","text":"hi"}`
   (`protocol.go`; design in `plans/json-protocol.md`). The version is the websocket subprotocol `mud.v1`,
   checked once per connection. Send through `SendMessage`/`SendAuth`/`SendError`/`SendLook`/etc., never

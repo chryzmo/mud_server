@@ -106,7 +106,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	server := &MudServer{
 		players:       make(map[string]*MudPlayer),
 		events:        make(chan func(), 4096),
-		World:         createWorld(&db),
+		World:         createWorld(&db, c.Crowd),
 		Configuration: c,
 		DB:            db,
 		saves:         make(chan saveBatch, 1),
@@ -230,7 +230,9 @@ func (ms *MudServer) shutdownOnLoop() {
 		final.players = append(final.players, l.snapshot)
 	}
 	for _, room := range ms.World.RoomMap {
-		final.rooms = append(final.rooms, room.snapshot())
+		if !room.clone {
+			final.rooms = append(final.rooms, room.snapshot())
+		}
 	}
 
 	// A batch may still be with the saver; the channel has room for this one
@@ -260,7 +262,7 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 		Attack:  ms.Configuration.Game.PlayerStartAttack,
 		Defense: ms.Configuration.Game.PlayerStartDefense,
 	}
-	mc := CreateMudPlayer(session, ms.World.RoomMap[1], stats)
+	mc := CreateMudPlayer(session, stats)
 
 	ms.sessionsMu.Lock()
 	ms.sessions[session] = struct{}{}
@@ -293,15 +295,25 @@ func (ms *MudServer) isOnline(username string) (online bool, saved <-chan struct
 }
 
 // admit places a player who has just registered or logged in into the world,
-// on the game loop. It returns false if the name is already online (someone
-// else logged in first) or the server is shutting down.
-func (ms *MudServer) admit(player *MudPlayer, greeting string) bool {
-	admitted := false
+// on the game loop, in the copy of their saved room that has space (see
+// World.place). It returns "" when they are in, codeAtCapacity if every copy
+// is full and no more can open, and codeNameOnline if the name is already
+// online (someone else logged in first) or the server is shutting down.
+func (ms *MudServer) admit(player *MudPlayer, greeting string) string {
+	refusal := codeNameOnline
 	ms.onLoop(func() {
 		if _, online := ms.players[player.Username]; online {
 			return
 		}
-		admitted = true
+		room, ok := ms.World.place(player.savedRoomID)
+		if !ok {
+			refusal = codeAtCapacity
+			return
+		}
+		refusal = ""
+		player.Location = room
+		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
+		player.world = ms.World
 		ms.players[player.Username] = player
 		player.Location.AddPlayer(player)
 		player.SendAuth(true, "", greeting)
@@ -310,7 +322,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) bool {
 		c.action(player, "")
 		player.SendStatUpdate()
 	})
-	return admitted
+	return refusal
 }
 
 // disconnect removes a player from the world and queues their save. Loop only.
@@ -454,8 +466,12 @@ func (ms *MudServer) register(player *MudPlayer, username, password string) bool
 		return false
 	}
 
-	if !ms.admit(player, "Account created! Welcome, "+username+".") {
-		player.SendAuth(false, codeNameOnline, "That username is already online.")
+	if refusal := ms.admit(player, "Account created! Welcome, "+username+"."); refusal != "" {
+		if refusal == codeAtCapacity {
+			player.SendAuth(false, refusal, "Your account was created, but the event is at capacity right now. Log in again in a moment.")
+		} else {
+			player.SendAuth(false, refusal, "That username is already online.")
+		}
 		player.Username = ""
 		return false
 	}
@@ -482,7 +498,7 @@ func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 		return false
 	}
 
-	if err := player.LoadFromDB(&ms.DB, ms.World, player, username); err != nil {
+	if err := player.LoadFromDB(&ms.DB, player, username); err != nil {
 		fmt.Println("LoadFromDB error: " + err.Error())
 		player.SendAuth(false, codeFailed, "Login failed. Please try again.")
 		return false
@@ -494,9 +510,13 @@ func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 		return false
 	}
 
-	if !ms.admit(player, "Welcome back, "+username+"!") {
+	if refusal := ms.admit(player, "Welcome back, "+username+"!"); refusal != "" {
 		player.Username = ""
-		player.SendAuth(false, codeNameOnline, "That user is already logged in.")
+		if refusal == codeAtCapacity {
+			player.SendAuth(false, refusal, "The event is at capacity right now. Please try again in a moment.")
+		} else {
+			player.SendAuth(false, refusal, "That user is already logged in.")
+		}
 		return false
 	}
 	return true
