@@ -177,6 +177,15 @@ passes on a many-core machine will fail on `main` and block the deploy.
   venue WiFi and carrier NAT put many players behind one address. Refusals are `error rate_limited` with a
   `retry_ms` hint that includes jitter; clients should wait that long, not back off exponentially. Defaults
   (`JoinPerSecond` 1000, `JoinBurst` 5000, -1 off) come from the storm measurements; see the file comment.
+- Client IPs (`clientip.go`, `deploy/Caddyfile`): Cloudflare sets `CF-Connecting-IP`; Caddy honours it only for
+  connections from Cloudflare's published ranges (`deploy/cloudflare-ips.caddy`, regenerate with
+  `deploy/update-cloudflare-ips.sh` before an event) and passes the result to the game server as `X-Client-IP`;
+  the game server believes that header only from `Server.TrustedProxies` (default: loopback, where Caddy runs).
+  `deploy/test-client-ip.sh` proves it with the real pinned Caddy image. The address is for logs and
+  abuse forensics (`LogClientIPs`) and an optional ceiling (`MaxJoinsPerMinutePerIP`, off by default, never a
+  fairness rule: venue WiFi and carrier NAT put many players behind one address). If Caddy ever stops
+  trusting Cloudflare (stale ranges), every client looks like a Cloudflare address: do not turn the ceiling on
+  without checking a live join's logged address first.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes

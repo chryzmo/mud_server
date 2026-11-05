@@ -2,6 +2,7 @@ package mudserver
 
 import (
 	"errors"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type Session struct {
 	limiter   commandLimiter // reader-owned, including before login
 	stats     *closeStats    // where the close reason is counted; may be nil
 	reason    string         // why it closed; valid once closed is closed
+	clientIP  netip.Addr     // who is really connecting (see clientip.go); zero if unknown
 }
 
 // SessionSettings tunes connection limits, the outbound queue and keepalives.

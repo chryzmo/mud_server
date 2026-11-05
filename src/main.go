@@ -72,7 +72,7 @@ func handleConnections(si *mudserver.MudServer,w http.ResponseWriter, r *http.Re
 	}
 
 	// Once connection is upgraded, create a MudConn
-	mc := si.AddConnection(conn)
+	mc := si.AddConnection(conn, si.ClientIP(r))
 
 	// Create goroutine to handle Input processing until MudConn closes
 	go si.ProcessInput(mc)

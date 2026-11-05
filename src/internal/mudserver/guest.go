@@ -131,5 +131,6 @@ func (ms *MudServer) join(player *MudPlayer, name string) bool {
 		}
 		return false
 	}
+	ms.logIP(player.Session, "Guest joined: %s", name)
 	return true
 }
