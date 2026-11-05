@@ -63,6 +63,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			if player.MoveRoom(direction) == muddata.ERR_ROOM_DNE {
 				player.SendMessage("You cannot move there.\n")
 			} else {
+				player.dirty = true
 				// Send description of new room
 				player.SendMessage(player.Location.LookDescription())
 			}
@@ -114,8 +115,9 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 
 				if !i.Persistent {
 					player.Location.Inventory.RemoveItem(i)
+					player.Location.dirty = true
 				}
-				player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
+				player.dirty = true // saved in the next batch (persist.go)
 			}
 
 			return muddata.MUD_OK
@@ -146,7 +148,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
 						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
 						player.NPCTarget = nil
-						player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
+						player.dirty = true // saved in the next batch (persist.go)
 					}
 				}
 
@@ -176,6 +178,8 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				player.Location.Inventory.AddItem(p_item)
 
 				player.Inventory.RemoveItem(i)
+				player.dirty = true
+				player.Location.dirty = true
 			}
 
 			return muddata.MUD_OK
@@ -295,7 +299,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			player.Inventory.RemoveItem(invItem)
 			player.SendMessage("You equip " + equipItem.Name + ". " + equipItem.BonusSummary() + "\n")
 			player.SendStatUpdate()
-			player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
+			player.dirty = true // saved in the next batch (persist.go)
 			return muddata.MUD_OK
 		},
 	}
@@ -327,7 +331,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			*slotPtr = nil
 			player.SendMessage("You unequip " + old.Name + " and stow it in your inventory.\n")
 			player.SendStatUpdate()
-			player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
+			player.dirty = true // saved in the next batch (persist.go)
 			return muddata.MUD_OK
 		},
 	}

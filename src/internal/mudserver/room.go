@@ -26,6 +26,7 @@ type Room struct {
 	BaddieMap   map[string]*BaddieNPC
 	Inventory   *Inventory
 	ExitJSON    string
+	dirty       bool // contents changed since the last save; see persist.go
 }
 
 type RoomDB struct {
@@ -204,18 +205,4 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 	}
 
 	return &room
-}
-
-func (r *Room) WriteToDB(db *muddatabase.MudDatabase) {
-	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson, inventoryidslice=@inventoryidslice WHERE id=@roomid;"
-
-	args := pgx.NamedArgs{
-		"name":             r.Name,
-		"description":      r.Description,
-		"exitjson":         r.ExitJSON,
-		"inventoryidslice": r.Inventory.IDMap(),
-		"roomid":           r.ID,
-	}
-
-	db.ExecWithArgs(query, args)
 }

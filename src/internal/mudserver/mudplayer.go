@@ -32,6 +32,7 @@ type MudPlayer struct {
 	MaxHP         int
 	MaxMP         int
 	NPCTarget     *BaddieNPC
+	dirty         bool // changed since the last save; see persist.go
 	SpawnLocation *Room
 }
 
@@ -262,60 +263,6 @@ func (mp *MudPlayer) CountUsernameFromDB(db *muddatabase.MudDatabase, playerid i
 	return usercount
 }
 
-func (mp *MudPlayer) WriteToDB(db *muddatabase.MudDatabase) {
-	query := ""
-
-	if mp.ID == 0 {
-		// User does not exist, do INSERT
-		query = "INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@equipmentslots,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid);"
-
-		args := pgx.NamedArgs{
-			"username":         mp.Username,
-			"passwordhash":     mp.PasswordHash,
-			"inventoryidslice": mp.Inventory.IDMap(),
-			"equipmentslots":   mp.Equipment.ToIDMap(),
-			"attackpower":      mp.AttackPower,
-			"defense":          mp.Defense,
-			"hp":               mp.HP,
-			"maxhp":            mp.MaxHP,
-			"mp":               mp.MP,
-			"maxmp":            mp.MaxMP,
-			"roomid":           mp.Location.ID,
-			"spawnlocationid":  mp.SpawnLocation.ID,
-		}
-
-		err := db.ExecWithArgs(query, args)
-		if err != nil {
-			fmt.Println("MudPlayer.WriteToDB INSERT error: " + err.Error())
-		}
-
-	} else {
-		// User exists, do UPDATE
-		query = "UPDATE player SET username=@username, passwordhash=@passwordhash, inventoryidslice=@inventoryidslice, equipmentslots=@equipmentslots, attackpower=@attackpower, defense=@defense, hp=@hp, maxhp=@maxhp, mp=@mp, maxmp=@maxmp, roomid=@roomid, spawnlocationid=@spawnlocationid WHERE id=@playerid;"
-
-		args := pgx.NamedArgs{
-			"username":         mp.Username,
-			"passwordhash":     mp.PasswordHash,
-			"inventoryidslice": mp.Inventory.IDMap(),
-			"equipmentslots":   mp.Equipment.ToIDMap(),
-			"attackpower":      mp.AttackPower,
-			"defense":          mp.Defense,
-			"hp":               mp.HP,
-			"maxhp":            mp.MaxHP,
-			"mp":               mp.MP,
-			"maxmp":            mp.MaxMP,
-			"roomid":           mp.Location.ID,
-			"playerid":         mp.ID,
-			"spawnlocationid":  mp.SpawnLocation.ID,
-		}
-
-		err := db.ExecWithArgs(query, args)
-		if err != nil {
-			fmt.Println("MudPlayer.WriteToDB UPDATE error: " + err.Error())
-		}
-	}
-}
-
 var errUsernameTaken = errors.New("username taken")
 
 // InsertIntoDB creates the player's row and sets mp.ID. If the name is already
@@ -368,6 +315,7 @@ func (mp *MudPlayer) Respawn() {
 	mp.Location.RemovePlayer(mp.Username)
 	mp.HP = mp.MaxHP
 	mp.MP = mp.MaxMP
+	mp.dirty = true
 	if mp.SpawnLocation != nil {
 		mp.Location = mp.SpawnLocation
 	}

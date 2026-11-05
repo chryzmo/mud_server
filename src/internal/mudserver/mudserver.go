@@ -25,7 +25,8 @@ locks, and a slow client can only slow its own reader.
 
 Login is the exception that stays off the loop: the database lookup and
 bcrypt check run on the connection's reader, and only admission (checking
-the name isn't online, placing the player) runs on the loop.
+the name isn't online, placing the player) runs on the loop. Saving is off
+the loop too; see persist.go.
 */
 type MudServer struct {
 	players       map[string]*MudPlayer // online players by name; loop-owned
@@ -34,6 +35,14 @@ type MudServer struct {
 	Commands      map[string]*MudCommand
 	Configuration Configuration
 	DB            muddatabase.MudDatabase
+
+	// Batched saving (persist.go); all loop-owned except the channels.
+	saves       chan saveBatch
+	saverDone   chan struct{}
+	saving      bool                     // a batch is with the saver
+	flushAgain  bool                     // a flush was skipped while saving
+	leaving     []leavingPlayer          // disconnected, not yet in a batch
+	savingNames map[string]chan struct{} // disconnected, save not yet written
 
 	// Every open connection, logged in or not, so Shutdown can close them all.
 	sessions   map[*Session]struct{}
@@ -70,7 +79,13 @@ NewMudServer builds a server from an already-loaded Configuration and starts
 its game loop. Tests use this directly to point at the test database.
 */
 func NewMudServer(c Configuration) (*MudServer, error) {
-	db := muddatabase.CreateDatabase(c.DatabaseConnectionURL())
+	maxConns := c.Database.MaxConnections
+	if maxConns <= 0 {
+		// The saver uses one; the rest serve logins, which run on connection
+		// readers and so can arrive all at once after a restart.
+		maxConns = 10
+	}
+	db := muddatabase.CreateDatabase(c.DatabaseConnectionURL(), maxConns)
 
 	// Fail fast rather than start with an empty world: loading rooms from an
 	// unreachable database silently yields none.
@@ -92,12 +107,16 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		World:         createWorld(&db),
 		Configuration: c,
 		DB:            db,
+		saves:         make(chan saveBatch, 1),
+		saverDone:     make(chan struct{}),
+		savingNames:   make(map[string]chan struct{}),
 		sessions:      make(map[*Session]struct{}),
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
 	}
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 
+	go server.saver(server.saves, server.saverDone)
 	go server.run()
 
 	return server, nil
@@ -114,9 +133,9 @@ func (ms *MudServer) run() {
 	tick := time.NewTicker(tickEvery)
 	defer tick.Stop()
 
-	saveEvery := time.Duration(ms.Configuration.Server.WorldSaveDelayMinutes) * time.Minute
+	saveEvery := time.Duration(ms.Configuration.Server.SaveIntervalMS) * time.Millisecond
 	if saveEvery <= 0 {
-		saveEvery = 60 * time.Minute
+		saveEvery = 5 * time.Second
 	}
 	save := time.NewTicker(saveEvery)
 	defer save.Stop()
@@ -128,7 +147,7 @@ func (ms *MudServer) run() {
 		case now := <-tick.C:
 			ms.World.tick(now)
 		case <-save.C:
-			ms.saveAll()
+			ms.flushDirty()
 		case <-ms.done:
 			ms.shutdownOnLoop()
 			return
@@ -195,23 +214,30 @@ func (ms *MudServer) Shutdown(ctx context.Context) {
 	})
 }
 
-// shutdownOnLoop is the game loop's last act.
+// shutdownOnLoop is the game loop's last act: warn everyone, write one final
+// batch with every player and room, wait for the saver, then disconnect.
 func (ms *MudServer) shutdownOnLoop() {
+	var final saveBatch
 	for _, player := range ms.players {
 		player.SendMessage("SERVER:  The server is restarting.  Reconnect in a moment.\n")
-		player.WriteToDB(&ms.DB)
+		final.players = append(final.players, player.snapshot())
+	}
+	for _, l := range ms.leaving {
+		final.players = append(final.players, l.snapshot)
+	}
+	for _, room := range ms.World.RoomMap {
+		final.rooms = append(final.rooms, room.snapshot())
+	}
+
+	// A batch may still be with the saver; the channel has room for this one
+	// behind it, and the saver writes both before it finishes.
+	ms.saves <- final
+	close(ms.saves)
+	<-ms.saverDone
+
+	for _, player := range ms.players {
 		player.Session.Close()
 	}
-	ms.World.WriteWorldToDB(&ms.DB)
-}
-
-// saveAll is the periodic save of every player and room.
-func (ms *MudServer) saveAll() {
-	for _, player := range ms.players {
-		player.SendMessage("SERVER:  World saving to DB.")
-		player.WriteToDB(&ms.DB)
-	}
-	ms.World.WriteWorldToDB(&ms.DB)
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
@@ -244,11 +270,17 @@ func (ms *MudServer) findPlayer(username string) *MudPlayer {
 	return ms.players[username]
 }
 
-// isOnline asks the game loop whether a player with that name is online.
-func (ms *MudServer) isOnline(username string) bool {
-	online := false
-	ms.onLoop(func() { _, online = ms.players[username] })
-	return online
+// isOnline asks the game loop whether a player with that name is online. If
+// they've just disconnected and their save isn't written yet, saved is a
+// channel that closes once it is.
+func (ms *MudServer) isOnline(username string) (online bool, saved <-chan struct{}) {
+	ms.onLoop(func() {
+		_, online = ms.players[username]
+		if ch, ok := ms.savingNames[username]; ok {
+			saved = ch
+		}
+	})
+	return online, saved
 }
 
 // admit places a player who has just registered or logged in into the world,
@@ -272,7 +304,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) bool {
 	return admitted
 }
 
-// disconnect removes a player from the world and saves them. Loop only.
+// disconnect removes a player from the world and queues their save. Loop only.
 func (ms *MudServer) disconnect(player *MudPlayer) {
 	if ms.players[player.Username] != player {
 		player.Session.Close()
@@ -280,7 +312,11 @@ func (ms *MudServer) disconnect(player *MudPlayer) {
 	}
 	delete(ms.players, player.Username)
 
-	player.WriteToDB(&ms.DB)
+	l := leavingPlayer{snapshot: player.snapshot(), saved: make(chan struct{})}
+	ms.leaving = append(ms.leaving, l)
+	ms.savingNames[player.Username] = l.saved
+	ms.flushDirty() // save them now, not at the next interval
+
 	player.Location.Broadcast(mudutils.ColorString(player.Username, mudutils.COLOR_BLUE)+" has poofed away.", player.Username)
 	player.Location.RemovePlayer(player.Username)
 	player.Session.Close()
@@ -361,7 +397,7 @@ func (ms *MudServer) register(player *MudPlayer, params string) bool {
 	}
 	username, password := parts[0], parts[1]
 
-	if ms.isOnline(username) {
+	if online, _ := ms.isOnline(username); online {
 		player.SendMessage("That username is already online.\n")
 		return false
 	}
@@ -406,9 +442,18 @@ func (ms *MudServer) login(player *MudPlayer, params string) bool {
 	}
 	username, password := parts[0], parts[1]
 
-	if ms.isOnline(username) {
+	online, saved := ms.isOnline(username)
+	if online {
 		player.SendMessage("That user is already logged in.\n")
 		return false
+	}
+	if saved != nil {
+		// They just left; wait for that save so we load their latest state.
+		select {
+		case <-saved:
+		case <-ms.done:
+			return false
+		}
 	}
 	if player.CountUsernameFromDB(&ms.DB, username) == 0 {
 		player.SendMessage("Unknown username. Use /REGISTER to create an account.\n")
