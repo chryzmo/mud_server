@@ -88,6 +88,20 @@ CI runs on 2-CPU GitHub runners. For anything timing-sensitive (floods, timeouts
 also run `GOMAXPROCS=2 taskset -c 0,1 scripts/test.sh` before opening a PR; a test that only
 passes on a many-core machine will fail on `main` and block the deploy.
 
+## AI assistance attribution
+
+- End AI-assisted commit messages and PR descriptions with exactly one trailer:
+  `AI-Assisted-By: <agent>`. Use `ChatGPT` for ChatGPT in Pi or `Claude Code` for Claude Code;
+  use an equivalent agent/product name for other tools, never a model name.
+- Do not use AI `Co-Authored-By` trailers or otherwise imply AI authorship. Preserve the user's
+  normal git author identity. Do not include model names or Pi/Claude session information
+  (IDs, URLs, paths, or generated-with/session-link footers) in commits or PR descriptions.
+- This replaces earlier requests for environment-provided attribution/session lines. Do not
+  rewrite existing commits or published history without explicit permission.
+- User-wide copies live in `~/.pi/agent/AGENTS.md` and `~/.claude/CLAUDE.md`; this repo copy
+  carries the rule to other machines. Claude Code's user settings also set its commit/PR
+  attribution to `AI-Assisted-By: Claude Code` rather than the default co-author footer.
+
 ## Deploying
 
 - **Deploy only when the user asks.** `deploy/deploy.sh` changes the live game; never run it,
