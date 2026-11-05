@@ -41,6 +41,13 @@ type inFrame struct {
 	OK   bool
 	Code string
 	Text string
+
+	// auth replies to join and resume
+	Token, Recovery string
+	Resumed, Gap    bool
+	Replayed        int
+	Base            uint64
+	RetryMS         int // error rate_limited
 }
 
 func parseFrame(message []byte) inFrame {
@@ -51,11 +58,20 @@ func parseFrame(message []byte) inFrame {
 		Text string `json:"text"`
 		Who  string `json:"who"`
 		Out  bool   `json:"out"`
+
+		Token    string `json:"token"`
+		Recovery string `json:"recovery"`
+		Resumed  bool   `json:"resumed"`
+		Gap      bool   `json:"gap"`
+		Replayed int    `json:"replayed"`
+		Base     uint64 `json:"base"`
+		RetryMS  int    `json:"retry_ms"`
 	}
 	if json.Unmarshal(message, &msg) != nil {
 		return inFrame{}
 	}
-	f := inFrame{T: msg.T, OK: msg.OK, Code: msg.Code}
+	f := inFrame{T: msg.T, OK: msg.OK, Code: msg.Code, Token: msg.Token, Recovery: msg.Recovery,
+		Resumed: msg.Resumed, Gap: msg.Gap, Replayed: msg.Replayed, Base: msg.Base, RetryMS: msg.RetryMS}
 	switch {
 	case msg.T == "text":
 		f.Text = msg.Text
