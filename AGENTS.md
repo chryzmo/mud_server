@@ -40,6 +40,8 @@ project and any subsystem, and is gitignored, so it is local working state, not 
 ## Layout
 
 - `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
+- `src/cmd/mudbot/`: opt-in websocket load client; `src/internal/mudbot/` holds its runner
+  and test-account seeder. See README.md for local usage and measurement limitations.
 - `src/internal/mudserver/`: game logic: server, players, rooms, world, commands, items, equipment, NPCs, spawners.
 - `src/internal/database/`: pgx pool wrapper.
 - `src/internal/muddata/`: status and error codes. `src/internal/mudutils/`: ANSI color helpers.
@@ -82,7 +84,11 @@ script there.
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
-comes back. Don't weaken `-race` or skip tests under it; a race report is a real bug.
+comes back. The suite includes 200 bots playing for 10 s, with fixture-only bcrypt cost 4
+and a durable NPC; it exercises real login and gameplay, not production-cost login storms.
+The manual load fixture uses only a dedicated local `mud_load` database; never point the
+seeder at the development or production DB, or load-test production without authorization.
+Don't weaken `-race` or skip tests under it; a race report is a real bug.
 
 CI runs on 2-CPU GitHub runners. For anything timing-sensitive (floods, timeouts, concurrency),
 also run `GOMAXPROCS=2 taskset -c 0,1 scripts/test.sh` before opening a PR; a test that only

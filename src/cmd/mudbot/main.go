@@ -1,0 +1,79 @@
+// mudbot is a manual, opt-in websocket load generator. It never runs against a
+// remote host unless -allow-remote is explicitly supplied.
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"mud_server/src/internal/mudbot"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) > 0 && args[0] == "seed" {
+		return seed(ctx, args[1:], stdout, stderr)
+	}
+	flags := flag.NewFlagSet("mudbot", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	var c mudbot.Config
+	flags.StringVar(&c.URL, "url", "ws://127.0.0.1:8080/ws", "target websocket URL")
+	flags.IntVar(&c.Count, "count", 200, "number of concurrent bots")
+	flags.DurationVar(&c.Duration, "duration", 30*time.Second, "gameplay duration after all admissions finish")
+	flags.DurationVar(&c.Interval, "interval", time.Second, "per-bot pause between actions (each also sends a whisper fence)")
+	flags.DurationVar(&c.Timeout, "timeout", 5*time.Second, "per dial/login/action timeout (maximum 1m)")
+	flags.DurationVar(&c.JoinTimeout, "join-timeout", 2*time.Minute, "total admission time budget")
+	flags.IntVar(&c.LoginWorkers, "login-workers", 8, "concurrent logins")
+	flags.StringVar(&c.Prefix, "prefix", "loadbot", "account prefix; names append a five-digit zero-based index")
+	flags.BoolVar(&c.Register, "register", false, "register instead of login; creates persistent accounts and incurs normal bcrypt cost")
+	flags.BoolVar(&c.AllowRemote, "allow-remote", false, "explicitly allow a non-loopback target; requires operator authorization")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("unexpected positional arguments")
+	}
+	c.Password = os.Getenv("MUD_BOT_PASSWORD")
+	report, err := mudbot.Run(ctx, c)
+	if encodeErr := json.NewEncoder(stdout).Encode(report); encodeErr != nil {
+		return encodeErr
+	}
+	return err
+}
+
+func seed(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("mudbot seed", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	count := flags.Int("count", 200, "number of fixture accounts")
+	prefix := flags.String("prefix", "loadbot", "account prefix")
+	directory := flags.String("sql-dir", "src/sql", "schema/seed directory (run from repository root)")
+	reset := flags.Bool("reset", false, "required: replace schema in the dedicated local mud_load database")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 || !*reset {
+		return fmt.Errorf("seed requires -reset and no positional arguments; only local mud_load is allowed")
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if err := mudbot.ResetLocal(ctx, os.Getenv("MUD_BOT_DATABASE_URL"), *directory, *count, *prefix, os.Getenv("MUD_BOT_PASSWORD")); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(stdout, "Seeded %d fixture accounts in local mud_load (bcrypt cost 4; not a production login benchmark).\n", *count)
+	return err
+}
