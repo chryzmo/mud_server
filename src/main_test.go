@@ -102,7 +102,6 @@ func startTestServerWithConfig(t *testing.T, configure func(*mudserver.Configura
 	if err != nil {
 		t.Fatalf("NewMudServer: %v", err)
 	}
-	go si.HandleMessages()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) { handleConnections(si, w, r) })

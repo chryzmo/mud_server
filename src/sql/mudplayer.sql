@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS player
     roomid integer,
     spawnlocationid integer,
     CONSTRAINT "PLAYER_pkey" PRIMARY KEY (id),
+    -- Same name as the index the server creates on older databases at startup.
+    CONSTRAINT player_username_key UNIQUE (username),
     CONSTRAINT fk_roomid FOREIGN KEY(roomid) REFERENCES room(id),
     CONSTRAINT fk_spawnlocationid FOREIGN KEY(spawnlocationid) REFERENCES room(id)
 );

@@ -15,7 +15,9 @@ type MudCommand struct {
 	action      func(player *MudPlayer, arguments string) int
 }
 
-func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
+// GenerateCommandList builds the command table. findPlayer looks up an online
+// player by name; commands run on the game loop, which owns that list.
+func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username string) *MudPlayer) map[string]*MudCommand {
 	cList := make(map[string]*MudCommand)
 
 	// SAY
@@ -81,19 +83,13 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 			if target == player.Username {
 				player.SendMessage("Talking to yourself, eh?")
 			} else {
-				mudMessage := MudMessage{
-					Command:          "WHISPER",
-					CommandTarget:    target,
-					CommandParameter: message,
-					SenderPlayer:     player,
-				}
-
-				select {
-				case player.Location.GlobalWhisperChannel <- mudMessage:
-				case <-player.Location.done:
-					return muddata.MUD_OK
-				}
 				player.SendMessage(mudutils.ColorString("You whisper to "+target+", \""+message+"\"", mudutils.COLOR_MAGENTA))
+
+				if targetPlayer := findPlayer(target); targetPlayer == nil {
+					player.SendMessage("Player '" + target + "' is not online.\n")
+				} else {
+					targetPlayer.SendMessage(mudutils.ColorString(player.Username+" whispers, \""+message+"\"", mudutils.COLOR_MAGENTA))
+				}
 			}
 
 			return muddata.MUD_OK
@@ -119,7 +115,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 				if !i.Persistent {
 					player.Location.Inventory.RemoveItem(i)
 				}
-				go player.WriteToDB(db)
+				player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
 			}
 
 			return muddata.MUD_OK
@@ -150,7 +146,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
 						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
 						player.NPCTarget = nil
-						go player.WriteToDB(db)
+						player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
 					}
 				}
 
@@ -299,7 +295,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 			player.Inventory.RemoveItem(invItem)
 			player.SendMessage("You equip " + equipItem.Name + ". " + equipItem.BonusSummary() + "\n")
 			player.SendStatUpdate()
-			go player.WriteToDB(db)
+			player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
 			return muddata.MUD_OK
 		},
 	}
@@ -331,7 +327,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 			*slotPtr = nil
 			player.SendMessage("You unequip " + old.Name + " and stow it in your inventory.\n")
 			player.SendStatUpdate()
-			go player.WriteToDB(db)
+			player.WriteToDB(db) // on the loop for now; step 4 batches saves off the loop
 			return muddata.MUD_OK
 		},
 	}

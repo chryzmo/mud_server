@@ -26,8 +26,7 @@ func main() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) { handleConnections(serverinstance, w, r) })
 
-	go serverinstance.HandleMessages()
-	go serverinstance.RunMaintenanceactions()
+	// CreateMudServer has started the game loop.
 
 	httpServer := &http.Server{Addr: serverinstance.Configuration.Server.ListenPort}
 

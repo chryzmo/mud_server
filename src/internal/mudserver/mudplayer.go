@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -313,6 +314,35 @@ func (mp *MudPlayer) WriteToDB(db *muddatabase.MudDatabase) {
 			fmt.Println("MudPlayer.WriteToDB UPDATE error: " + err.Error())
 		}
 	}
+}
+
+var errUsernameTaken = errors.New("username taken")
+
+// InsertIntoDB creates the player's row and sets mp.ID. If the name is already
+// taken (the unique index on username), it returns errUsernameTaken.
+func (mp *MudPlayer) InsertIntoDB(db *muddatabase.MudDatabase) error {
+	query := "INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid) VALUES (@username,@passwordhash,@inventoryidslice,@equipmentslots,@attackpower,@defense,@hp,@maxhp,@mp,@maxmp,@roomid,@spawnlocationid) RETURNING id;"
+	args := pgx.NamedArgs{
+		"username":         mp.Username,
+		"passwordhash":     mp.PasswordHash,
+		"inventoryidslice": mp.Inventory.IDMap(),
+		"equipmentslots":   mp.Equipment.ToIDMap(),
+		"attackpower":      mp.AttackPower,
+		"defense":          mp.Defense,
+		"hp":               mp.HP,
+		"maxhp":            mp.MaxHP,
+		"mp":               mp.MP,
+		"maxmp":            mp.MaxMP,
+		"roomid":           mp.Location.ID,
+		"spawnlocationid":  mp.SpawnLocation.ID,
+	}
+
+	err := db.Connection.QueryRow(db.Context, query, args).Scan(&mp.ID)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+		return errUsernameTaken
+	}
+	return err
 }
 
 func (mp *MudPlayer) GetIDFromDB(db *muddatabase.MudDatabase) int32 {

@@ -92,7 +92,6 @@ func TestGetDropInventory(t *testing.T) {
 }
 
 func TestInventorySurvivesRelogin(t *testing.T) {
-	skipUntilGameLoop(t)
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
@@ -157,19 +156,7 @@ func waitForNPC(t *testing.T, conn *websocket.Conn) string {
 	}
 }
 
-// Some tests can't pass under the race detector yet, because of known races
-// that step 3 of plans/game-loop.md removes: NPC turns read and change player
-// state from room goroutines, and a disconnecting player is saved from its
-// reader goroutine while the command loop may still be changing it.
-// scripts/test.sh also runs the whole suite without -race, so these still run.
-func skipUntilGameLoop(t *testing.T) {
-	if raceDetectorOn {
-		t.Skip("known data race until the game loop lands (plans/game-loop.md step 3)")
-	}
-}
-
 func TestCombatPlayerKillsNPC(t *testing.T) {
-	skipUntilGameLoop(t)
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 0, attackaccuracy = 0, defense = 0, hp = 5`)
@@ -196,7 +183,6 @@ func TestCombatPlayerKillsNPC(t *testing.T) {
 }
 
 func TestCombatNPCKillsPlayer(t *testing.T) {
-	skipUntilGameLoop(t)
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 25, attackaccuracy = 100`)
