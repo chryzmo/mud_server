@@ -31,3 +31,11 @@ deploy/deploy.sh rollback   # switch back to the previous images
 
 Put `MUD_DEPLOY_HOST=deploy@<droplet IP>` in `deploy/deploy.local.env` (gitignored). A new host
 is set up with `deploy/bootstrap-host.sh`, then `deploy/harden-ssh.sh`; see the comments in each.
+
+### CI and auto-deploy
+
+GitHub Actions runs the tests on every PR. **Merging to `main` in this repo or `mud_frontend`
+deploys to production** once the tests pass, while the repository variable `AUTO_DEPLOY` is
+`true` (Settings → Secrets and variables → Actions → Variables). Set it to `false` in both repos to
+freeze deploys, for example during the con. The Deploy workflow can also be run by hand from the
+Actions tab to deploy `main` or roll back. One-time setup: `deploy/setup-github-ci.sh <droplet IP>`.

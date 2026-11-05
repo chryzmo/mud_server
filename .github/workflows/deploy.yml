@@ -1,0 +1,63 @@
+# Deploys to production with deploy/deploy.sh. Called by CI after a push to main
+# passes its tests (in this repo or mud_frontend), or run by hand from the
+# Actions tab to deploy or roll back.
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      server_ref:
+        type: string
+        default: main
+      frontend_ref:
+        type: string
+        default: main
+      action:
+        type: string
+        default: deploy
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy: deploy main of both repos · rollback: switch back to the previous images"
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+
+# One deploy at a time from this repo; deploy.sh's lock on the host also
+# serializes deploys started from mud_frontend.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: chryzmo/mud_server
+          ref: ${{ inputs.server_ref || 'main' }}
+          path: mud_server
+      - uses: actions/checkout@v7
+        with:
+          repository: chryzmo/mud_frontend
+          ref: ${{ inputs.frontend_ref || 'main' }}
+          path: mud_frontend
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: SSH access to the Droplet
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: ${{ inputs.action || 'deploy' }}
+        env:
+          MUD_DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SKIP_TESTS: "1"
+        run: mud_server/deploy/deploy.sh "${{ inputs.action || 'deploy' }}"

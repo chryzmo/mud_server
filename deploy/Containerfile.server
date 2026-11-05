@@ -1,12 +1,15 @@
 # Game server image. Built by deploy/deploy.sh from the repo root.
-FROM docker.io/library/golang:1.27-alpine AS build
+# Base images are pinned by digest so builds are reproducible: CI rebuilds from
+# scratch, and an unchanged image must keep its ID or deploy.sh would re-upload it.
+# Update a pin deliberately with: skopeo inspect --format '{{.Digest}}' docker://<image>
+FROM docker.io/library/golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY src ./src
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /mud_server ./src
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 WORKDIR /app
 COPY config ./config
 COPY resources ./resources

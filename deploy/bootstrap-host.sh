@@ -4,10 +4,13 @@
 #
 #   ssh root@HOST 'bash -s' < deploy/bootstrap-host.sh
 #
-# It does not turn off root SSH login: confirm `ssh deploy@HOST sudo -n true`
-# works first, then run deploy/harden-ssh.sh.
+# Two users get root's SSH keys: `admin` (sudo, for maintenance) and `deploy`
+# (no sudo; runs the rootless containers and is what CI logs in as). It does not
+# turn off root SSH login: confirm `ssh admin@HOST sudo -n true` works first,
+# then run deploy/harden-ssh.sh.
 set -euo pipefail
 
+ADMIN_USER=admin
 DEPLOY_USER=deploy
 HOSTNAME_FQDN=magmud
 
@@ -20,14 +23,16 @@ dnf -y -q install podman firewalld dnf5-plugin-automatic jq
 echo "== Hostname"
 hostnamectl set-hostname "$HOSTNAME_FQDN"
 
-echo "== Deploy user"
-if ! id "$DEPLOY_USER" > /dev/null 2>&1; then
-	useradd --create-home --groups wheel "$DEPLOY_USER"
-fi
-install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh"
-install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /root/.ssh/authorized_keys "/home/$DEPLOY_USER/.ssh/authorized_keys"
-echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/90-$DEPLOY_USER"
-chmod 440 "/etc/sudoers.d/90-$DEPLOY_USER"
+echo "== Admin user (sudo) and deploy user (no sudo)"
+for user in "$ADMIN_USER" "$DEPLOY_USER"; do
+	id "$user" > /dev/null 2>&1 || useradd --create-home "$user"
+	install -d -m 700 -o "$user" -g "$user" "/home/$user/.ssh"
+	[ -s "/home/$user/.ssh/authorized_keys" ] ||
+		install -m 600 -o "$user" -g "$user" /root/.ssh/authorized_keys "/home/$user/.ssh/authorized_keys"
+done
+usermod -aG wheel "$ADMIN_USER"
+echo "$ADMIN_USER ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/90-$ADMIN_USER"
+chmod 440 "/etc/sudoers.d/90-$ADMIN_USER"
 visudo -cq
 # Rootless containers for the deploy user keep running without a login session.
 loginctl enable-linger "$DEPLOY_USER"

@@ -1,0 +1,45 @@
+# Tests on every PR and every push to main. After a push to main passes, deploy
+# to production, unless the repository variable AUTO_DEPLOY isn't "true"
+# (the deploy freeze switch: Settings → Secrets and variables → Actions → Variables).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mud
+          POSTGRES_PASSWORD: mud
+          POSTGRES_DB: mud_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mud -d mud_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # Set, so scripts/test.sh uses this database instead of starting its own container.
+      MUD_TEST_DATABASE_URL: postgres://mud:mud@127.0.0.1:5432/mud_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+      - run: scripts/test.sh
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && vars.AUTO_DEPLOY == 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      server_ref: ${{ github.sha }}
+      frontend_ref: main
+    secrets: inherit

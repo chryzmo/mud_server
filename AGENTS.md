@@ -64,10 +64,16 @@ comes back. Don't weaken `-race`; a race report is a real bug.
 
 - **Deploy only when the user asks.** `deploy/deploy.sh` changes the live game; never run it,
   `rollback`, or anything over SSH on the Droplet on your own initiative.
+- **Merging to `main` deploys.** CI (`.github/workflows/`) deploys every push to `main` in this repo
+  or `mud_frontend` after the tests pass, while the `AUTO_DEPLOY` repository variable is `true`. So
+  never merge a PR, or push to `main`, unless the user asks; that is a production deploy.
 - `deploy/deploy.sh` refuses uncommitted changes, runs both repos' `scripts/test.sh`, builds the
   images locally, ships only images the host lacks, keeps the previous images for `rollback`, and
   restarts only what changed. `deploy/deploy.sh status` is read-only.
-- Production runs as rootless Podman under the `deploy` user, managed by systemd Quadlet units
+- Base images in `deploy/Containerfile.*` are pinned by digest and built with `--timestamp 0` so
+  unchanged images keep their IDs and aren't re-uploaded. Change a pin deliberately.
+- The `admin` user has sudo, for maintenance. Production runs as rootless Podman under the
+  `deploy` user (no sudo; CI logs in as it), managed by systemd Quadlet units
   (`deploy/quadlet/`); logs are in `journalctl --user -u mud-server` on the host. Secrets live on the
   host in `~/mud/secrets.env` and `~/mud/caddy.env`, never in git.
 - The domain is proxied through Cloudflare: SSH to the Droplet's IP (`deploy/deploy.local.env`), and
