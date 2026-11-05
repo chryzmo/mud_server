@@ -27,15 +27,30 @@ project and any subsystem, and is gitignored, so it is local working state, not 
 ## Build and run
 
 ```sh
+scripts/db.sh up        # start local Postgres 17 (podman-compose or docker compose); seeds `mud` on first start
 go build ./src          # build
-go vet ./...            # vet
 go run ./src            # run from the repo root; config path is relative to the cwd
-go test -race ./...     # once tests exist
+scripts/test.sh         # go vet + all tests with -race against the `mud_test` database
+scripts/db.sh reset     # wipe the database volume and reseed
 ```
 
-The server needs Postgres with the schema from `src/sql/`. Load order matters because of foreign
-keys: `room.sql`, `item.sql`, `equipment.sql`, `baddienpc_generic.sql`, `baddiespawner.sql`,
-`mudplayer.sql`. The seed data is currently inconsistent (see the plan's known-bugs list).
+Config comes from `config/server_config.json`; `MUD_CONFIG`, `MUD_LISTEN_ADDR` and
+`MUD_DATABASE_URL` override it. Schema and seed scripts are in `src/sql/`, loaded in the order
+listed in `src/sql/load_order.txt` (foreign keys depend on it). If you add a table, add its
+script there.
+
+## Tests: run them before you finish
+
+- `scripts/test.sh` runs every check for this repo. Run it before finishing any change and fix
+  failures; don't leave them for the next person. Add or update tests along with behavior changes.
+- In Claude Code, `.claude/settings.json` adds a Stop hook (`scripts/agent-stop-hook.sh`) that runs
+  `scripts/test.sh` when a turn changed the repo and sends failures back to you. Other agents:
+  run it yourself. The hook skips turns that didn't change the working tree.
+
+Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
+drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
+Prefer that style for gameplay behavior: send the command a player would type, assert on what
+comes back. Don't weaken `-race`; a race report is a real bug.
 
 ## How the code works today
 

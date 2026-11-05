@@ -1,0 +1,18 @@
+# Local Postgres for development and tests.  Works with `podman-compose` or `docker compose`;
+# scripts/db.sh picks whichever is installed.
+services:
+  db:
+    image: docker.io/library/postgres:17
+    environment:
+      POSTGRES_USER: mud
+      POSTGRES_PASSWORD: mud
+      POSTGRES_DB: mud
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - mud-pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro,Z
+      - ./src/sql:/sql:ro,Z
+
+volumes:
+  mud-pgdata:

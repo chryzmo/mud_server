@@ -28,6 +28,8 @@ type BaddieSpawnerDB struct {
 
 func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 	count := 0
+	spawner.Location.baddieMu.RLock()
+	defer spawner.Location.baddieMu.RUnlock()
 	for _, b := range spawner.Location.BaddieMap {
 		if b.Race == baddierace {
 			count++
@@ -64,7 +66,9 @@ func (spawner BaddieSpawner) RunTicker () {
 				newbaddie.Name = newbaddie.GenerateName()
 			}
 
+			spawner.Location.baddieMu.Lock()
 			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
+			spawner.Location.baddieMu.Unlock()
 			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
 		}
 	}

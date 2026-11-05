@@ -6,7 +6,9 @@ import (
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
 	"mud_server/src/internal/mudutils"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,6 +16,7 @@ import (
 
 type MudServer struct {
 	playerList  map[*MudPlayer]*MudPlayer
+	playerMu    sync.RWMutex // guards playerList; connections add and remove players concurrently
 	Broadcast   chan MudMessage
 	WhisperChan chan MudMessage
 	World       *World
@@ -26,12 +29,24 @@ type MudServer struct {
 	Use CreateMudServer() to generate a new server instance
 */
 func CreateMudServer() *MudServer {
-	c := Configuration{}
-	c = c.LoadConfig("config/server_config.json")
+	configFile := os.Getenv("MUD_CONFIG")
+	if configFile == "" {
+		configFile = "config/server_config.json"
+	}
 
-	// Form DB URL
-	dburl := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", c.Database.DatabaseUsername, c.Database.DatabasePassword, c.Database.DatabaseHost, c.Database.DatabasePort, c.Database.DatabaseName)
-	db := muddatabase.CreateDatabase(dburl)
+	c := Configuration{}
+	c = c.LoadConfig(configFile)
+	c.ApplyEnvOverrides()
+
+	return NewMudServer(c)
+}
+
+/*
+	NewMudServer builds a server from an already-loaded Configuration.  Tests use
+	this directly to point at the test database.
+*/
+func NewMudServer(c Configuration) *MudServer {
+	db := muddatabase.CreateDatabase(c.DatabaseConnectionURL())
 
 	serverWhisperChannel := make(chan MudMessage)
 	w := createWorld(&db, c.Game.RoomTickDurationInMS, serverWhisperChannel)
@@ -63,9 +78,12 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 	mc := CreateMudPlayer(ws_conn, ms.World.RoomMap[1], stats)
 
 	// Add MudPlayer to Server connectionList
+	ms.playerMu.Lock()
 	ms.playerList[mc] = mc
+	count := len(ms.playerList)
+	ms.playerMu.Unlock()
 
-	fmt.Printf("Client connection - number of connected clients: %d\n", len(ms.playerList))
+	fmt.Printf("Client connection - number of connected clients: %d\n", count)
 
 	mc.SendMessage("Welcome to the MUD!\nType /REGISTER <username> <password> to create an account.\nType /LOGIN <username> <password> to log in.\n")
 
@@ -73,10 +91,14 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 }
 
 func (ms *MudServer) GetPlayerByMudPlayer(mp *MudPlayer) *MudPlayer {
+	ms.playerMu.RLock()
+	defer ms.playerMu.RUnlock()
 	return ms.playerList[mp]
 }
 
 func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
+	ms.playerMu.RLock()
+	defer ms.playerMu.RUnlock()
 	for conn := range ms.playerList {
 		if conn.Username == u {
 			return conn
@@ -87,15 +109,25 @@ func (ms *MudServer) GetPlayerByUsername(u string) *MudPlayer {
 }
 
 func (ms *MudServer) DeleteConnection(mp *MudPlayer) {
+	// Remove the player first so only one caller does the cleanup: a failed send
+	// and the read loop can both notice the same dead connection.
+	ms.playerMu.Lock()
+	if _, ok := ms.playerList[mp]; !ok {
+		ms.playerMu.Unlock()
+		return
+	}
+	delete(ms.playerList, mp)
+	count := len(ms.playerList)
+	ms.playerMu.Unlock()
+
 	if mp.Username != "" {
 		mp.WriteToDB(&ms.DB)
 		mp.Location.Broadcast(mudutils.ColorString(mp.Username, mudutils.COLOR_BLUE)+" has poofed away.", mp.Username)
 		mp.Location.RemovePlayer(mp.Username)
 	}
 
-	ms.playerList[mp].Conn.Close()
-	delete(ms.playerList, mp)
-	fmt.Printf("Client disconnect - number of connected clients: %d\n", len(ms.playerList))
+	mp.Conn.Close()
+	fmt.Printf("Client disconnect - number of connected clients: %d\n", count)
 }
 
 func (ms *MudServer) SendMessageToPlayer(mp *MudPlayer, message string) {
@@ -276,8 +308,16 @@ func (ms *MudServer) RunMaintenanceactions() {
 	maintenanceTicker := time.NewTicker(time.Minute * time.Duration(ms.Configuration.Server.WorldSaveDelayMinutes))
 
 	for range maintenanceTicker.C {
-		// Save all MudPlayer states to DB
+		// Save all MudPlayer states to DB.  Iterate over a snapshot: a failed send
+		// calls DeleteConnection, which needs the lock.
+		ms.playerMu.RLock()
+		players := make([]*MudPlayer, 0, len(ms.playerList))
 		for _, player := range ms.playerList {
+			players = append(players, player)
+		}
+		ms.playerMu.RUnlock()
+
+		for _, player := range players {
 			ms.SendMessageToPlayer(player, "SERVER:  World saving to DB.")
 			player.WriteToDB(&ms.DB)
 		}
