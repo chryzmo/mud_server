@@ -42,6 +42,10 @@ type MudPlayer struct {
 	tokenHash     string         // hash of the resume token; set for a new guest until it is inserted
 	recoveryHash  string         // hash of the recovery code; likewise
 	lastCopy      map[*Area]int  // the copy of each area the player was last in; loop-owned
+	dormant       bool           // connection dropped, still in the world for a grace period (see resume.go)
+	ring          [][]byte       // the last counted frames sent, for replay after a resume
+	sent          uint64         // counted frames sent over the player's lifetime in this process
+	replaySize    int            // ring capacity; 0 means no replay
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	SpawnLocation *Room
 }
@@ -60,6 +64,8 @@ type MudPlayerDB struct {
 	MaxMP            int
 	RoomID           int32
 	SpawnLocationID  int32
+	Guest            bool
+	ResumeTokenHash  string
 }
 
 type PlayerStartStats struct {
@@ -190,9 +196,9 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 
 	switch playerid.(type) {
 	case string:
-		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE username=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash FROM player WHERE username=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid FROM player WHERE id=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash FROM player WHERE id=$1"
 	default:
 		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
 	}
@@ -224,6 +230,8 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 		player.MP = ret.MP
 		player.MaxMP = ret.MaxMP
 		player.savedSpawnID = ret.SpawnLocationID
+		player.guest = ret.Guest
+		player.tokenHash = ret.ResumeTokenHash
 
 		// Build inventory
 		for iid := range ret.InventoryIDSlice {

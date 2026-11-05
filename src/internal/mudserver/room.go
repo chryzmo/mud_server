@@ -85,7 +85,7 @@ func (r *Room) Broadcast(msg string, senderusername string) {
 func (r *Room) BroadcastFrame(frame []byte, senderusername string) {
 	for _, player := range r.UserMap {
 		if player.Username != senderusername {
-			player.Session.Send(frame)
+			player.sendFrame(frame)
 		}
 	}
 }

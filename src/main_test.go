@@ -86,7 +86,13 @@ func startTestServerWithConfig(t *testing.T, configure func(*mudserver.Configura
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	execSQL(t, url, setupSQL...)
+	return serveTestServer(t, url, configure)
+}
 
+// serveTestServer starts a server on url as it is, without reseeding, so a
+// test can start a second server on the first one's data (a restart).
+func serveTestServer(t *testing.T, url string, configure func(*mudserver.Configuration)) (string, *mudserver.MudServer) {
+	t.Helper()
 	c := mudserver.Configuration{}
 	c.Database.DatabaseURL = url
 	c.Game.RoomTickDurationInMS = 250
@@ -198,6 +204,8 @@ func flatten(raw []byte) string {
 	}
 	blue := func(s string) string { return "\x1b[1;34m" + s + "\x1b[0m" }
 	switch m.T {
+	case "hello":
+		return m.Message
 	case "text", "inventory":
 		return m.Text
 	case "auth", "error":

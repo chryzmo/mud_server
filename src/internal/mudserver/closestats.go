@@ -21,6 +21,7 @@ const (
 	closeQueueFull    = "queue_full"    // the client fell behind its outbound queue
 	closeWriteError   = "write_error"   // a message write failed or timed out
 	closePingError    = "ping_error"    // a keepalive ping write failed or timed out
+	closeReplaced     = "replaced"      // the same guest resumed on a newer connection
 	closeClientClosed = "client_closed" // the client sent a close frame
 	closeReadTimeout  = "read_timeout"  // no pong or message within PongTimeout
 	closeReadLimit    = "read_limit"    // a message exceeded ReadLimitBytes

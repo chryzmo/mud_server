@@ -22,10 +22,12 @@ const (
 	msgRegister = "register"
 	msgLogin    = "login"
 	msgJoin     = "join"
+	msgResume   = "resume"
 )
 
 // Server-to-client message types.
 const (
+	msgHello     = "hello"
 	msgText      = "text"
 	msgSay       = "say"
 	msgArrive    = "arrive"
@@ -57,6 +59,7 @@ const (
 	codeInternal        = "internal"
 	codeRestarting      = "restarting"
 	codeAtCapacity      = "at_capacity"
+	codeBadToken        = "bad_token"
 )
 
 // inbound is every client-to-server message. Pointer fields tell "missing"
@@ -66,7 +69,9 @@ type inbound struct {
 	Line     *string `json:"line"`
 	Username string  `json:"username"`
 	Password string  `json:"password"`
-	Name     string  `json:"name"` // join
+	Name     string  `json:"name"`     // join
+	Token    string  `json:"token"`    // resume
+	Received uint64  `json:"received"` // resume: counted frames the client has processed
 }
 
 // Outbound messages. Each struct is one frame; T is the type.
@@ -104,6 +109,17 @@ type (
 		// Guests only, sent once at join: the resume token and the recovery code.
 		Token    string `json:"token,omitempty"`
 		Recovery string `json:"recovery,omitempty"`
+		// Resume only. Gap: some frames could not be replayed, so the client should
+		// treat what it shows as stale (a fresh look and stats follow). Base is the
+		// client's frame count before any replayed frames; Replayed how many follow.
+		Resumed  bool   `json:"resumed,omitempty"`
+		Gap      bool   `json:"gap,omitempty"`
+		Replayed int    `json:"replayed,omitempty"`
+		Base     uint64 `json:"base,omitempty"`
+	}
+	helloMsg struct {
+		T       string `json:"t"`
+		Message string `json:"message"`
 	}
 	errorMsg struct {
 		T       string `json:"t"`
@@ -159,12 +175,21 @@ func encodeLeave(who, to string) []byte { return encode(leaveMsg{T: msgLeave, Wh
 // SendMessage queues a line of game text. It never blocks; it fails only if the
 // session is closed or the client has fallen too far behind.
 func (mp *MudPlayer) SendMessage(message string) error {
-	return mp.Session.Send(encodeText(message))
+	return mp.sendFrame(encodeText(message))
+}
+
+// sendFrame queues a counted frame: it is recorded for replay after a resume.
+// Every frame except hello, auth and error is counted, by the server here and by
+// the client as it processes them (plans/guest-sessions.md, "Replay"). Fan-out
+// calls it with one shared encoding, so the ring holds references, not copies.
+func (mp *MudPlayer) sendFrame(frame []byte) error {
+	mp.record(frame)
+	return mp.Session.Send(frame)
 }
 
 // SendWhisper delivers a whisper; out marks the sender's own echo.
 func (mp *MudPlayer) SendWhisper(who, text string, out bool) error {
-	return mp.Session.Send(encode(whisperMsg{T: msgWhisper, Who: who, Text: text, Out: out}))
+	return mp.sendFrame(encode(whisperMsg{T: msgWhisper, Who: who, Text: text, Out: out}))
 }
 
 // SendAuth answers a register or login attempt.
@@ -175,7 +200,8 @@ func (mp *MudPlayer) SendAuth(ok bool, code, message string) error {
 // SendWelcome tells a player they are in. A new guest's token and recovery code
 // travel here, once.
 func (mp *MudPlayer) SendWelcome(w welcome) error {
-	return mp.Session.Send(encode(authMsg{T: msgAuth, OK: true, Message: w.message, Token: w.token, Recovery: w.recovery}))
+	return mp.Session.Send(encode(authMsg{T: msgAuth, OK: true, Message: w.message, Token: w.token, Recovery: w.recovery,
+		Resumed: w.resumed, Gap: w.gap, Base: w.base}))
 }
 
 // SendError reports a protocol or server problem that isn't game text.
@@ -185,12 +211,12 @@ func (mp *MudPlayer) SendError(code, message string) error {
 
 // SendInventory sends the inventory listing for the client's inventory view.
 func (mp *MudPlayer) SendInventory(text string) error {
-	return mp.Session.Send(encode(inventoryMsg{T: msgInventory, Text: text}))
+	return mp.sendFrame(encode(inventoryMsg{T: msgInventory, Text: text}))
 }
 
 // SendStatUpdate pushes the player's current stats for the stats bar.
 func (mp *MudPlayer) SendStatUpdate() {
-	mp.Session.Send(encode(statsMsg{
+	mp.sendFrame(encode(statsMsg{
 		T: msgStats, HP: mp.HP, MaxHP: mp.EffectiveMaxHP(),
 		MP: mp.MP, MaxMP: mp.EffectiveMaxMP(),
 		Atk: mp.EffectiveAttackPower(), AtkBonus: mp.Equipment.TotalBonusAttackPower(),
@@ -207,7 +233,7 @@ func (mp *MudPlayer) SendLook() {
 		exits = append(exits, dir)
 	}
 	sort.Strings(exits)
-	mp.Session.Send(encode(roomMsg{T: msgRoom, Name: room.Name, Exits: exits}))
+	mp.sendFrame(encode(roomMsg{T: msgRoom, Name: room.Name, Exits: exits}))
 }
 
 // RefuseUnlessProtocol checks that the client negotiated Subprotocol. If not it
@@ -221,4 +247,15 @@ func RefuseUnlessProtocol(conn *websocket.Conn) bool {
 		Message: "Unsupported protocol; connect with the websocket subprotocol " + Subprotocol + "."}))
 	conn.Close()
 	return false
+}
+
+// Session-level replies for the connection's reader goroutine. They go to this
+// session whoever the player becomes, and are never counted or replayed.
+
+func (s *Session) sendAuth(ok bool, code, message string) {
+	s.Send(encode(authMsg{T: msgAuth, OK: ok, Code: code, Message: message}))
+}
+
+func (s *Session) sendError(code, message string) {
+	s.Send(encode(errorMsg{T: msgError, Code: code, Message: message}))
 }

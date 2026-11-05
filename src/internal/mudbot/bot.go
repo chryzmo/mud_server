@@ -358,7 +358,7 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 			}
 			break
 		}
-		if f.T != "text" {
+		if f.T != "text" && f.T != "hello" {
 			return nil, errors.New("unexpected message before authentication: " + f.T)
 		}
 	}
