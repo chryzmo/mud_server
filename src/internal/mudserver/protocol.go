@@ -23,6 +23,7 @@ const (
 	msgLogin    = "login"
 	msgJoin     = "join"
 	msgResume   = "resume"
+	msgRecover  = "recover"
 )
 
 // Server-to-client message types.
@@ -60,6 +61,8 @@ const (
 	codeRestarting      = "restarting"
 	codeAtCapacity      = "at_capacity"
 	codeBadToken        = "bad_token"
+	codeBadRecovery     = "bad_recovery"
+	codeRecoveryLocked  = "recovery_locked"
 )
 
 // inbound is every client-to-server message. Pointer fields tell "missing"
@@ -72,6 +75,7 @@ type inbound struct {
 	Name     string  `json:"name"`     // join
 	Token    string  `json:"token"`    // resume
 	Received uint64  `json:"received"` // resume: counted frames the client has processed
+	Code     string  `json:"code"`     // recover: the recovery code
 }
 
 // Outbound messages. Each struct is one frame; T is the type.
@@ -116,6 +120,7 @@ type (
 		Gap      bool   `json:"gap,omitempty"`
 		Replayed int    `json:"replayed,omitempty"`
 		Base     uint64 `json:"base,omitempty"`
+		RetryMS  int    `json:"retry_ms,omitempty"` // recovery_locked: how long until the name accepts codes again
 	}
 	helloMsg struct {
 		T       string `json:"t"`
