@@ -1,5 +1,10 @@
 # mud_server
-Golang MUD Server using websockets
+
+Go server for the MAGFest 2027 weekend MUD: a guest-only, phone-first text game over websockets,
+built for up to 5,000 players on one small server. A player joins with a name and nothing else, and
+a dropped connection resumes the same character. The browser client is the sibling repo
+[mud_frontend](https://github.com/chryzmo/mud_frontend). Project rules for contributors and agents
+are in `AGENTS.md`; the working plans live in a local, gitignored `plans/` folder.
 
 ## Local development
 
@@ -16,6 +21,71 @@ Config comes from `config/server_config.json`. Environment variables override it
 `MUD_CONFIG` (path to the config file), `MUD_LISTEN_ADDR`, `MUD_DATABASE_URL`.
 
 Run `scripts/install-git-hooks.sh` once per clone to enable the pre-commit hook (secret scan, conflict markers, large files, tests).
+
+## Protocol (`mud.v1`)
+
+Connect to `/ws` offering the websocket subprotocol `mud.v1` (the protocol version; a client that does
+not gets one `bad_version` error and is closed). Every frame, both ways, is a flat JSON object with a
+type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exact shapes pinned by tests.
+
+| Client sends | Fields | Meaning |
+|---|---|---|
+| `join` | `name` | new guest; the reply carries a one-time resume `token` and recovery `recovery` code |
+| `resume` | `token`, `received` | reattach after a drop; `received` is how many counted frames the client has processed |
+| `recover` | `name`, `code` | take a character back with the recovery code; issues a new token and code |
+| `cmd` | `line` | a game command, such as `MOVE N` or `SAY hello` |
+| `login`, `register` | `username`, `password` | password accounts (GMs); `register` goes away once the new client ships |
+
+| Server sends | Fields | Meaning |
+|---|---|---|
+| `hello` | `message` | greeting on connect |
+| `auth` | `ok`, `code`, `message`, and for success `token`, `recovery`, `resumed`, `gap`, `replayed`, `base` | answer to join, resume, recover, login, register |
+| `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`), `idle`, `unknown_command`, `restarting`, `internal` |
+| `text` | `text` | prose, with ANSI colour codes the client styles per line |
+| `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
+| `room`, `stats`, `inventory` | name and exits, vitals, listing | state for the UI |
+
+**Frame counting.** Every frame except `hello`, `auth` and `error` is *counted*, by the server as it
+queues it and by the client as it processes it. After a drop the client sends its count in `resume`;
+the server replays what the client missed from a short per-player ring, or answers `gap: true` with a
+`base` count when it cannot, followed by a fresh look. No sequence number travels in frames, because a
+broadcast shares one encoding among all its recipients.
+
+**Reconnecting.** A dropped guest stays in the world for `ResumeGraceMS` (90 s) with no announcement. An
+`idle` error means the server disconnected a guest who had sent no command for 30 minutes: the client
+should wait for a tap, not reconnect by itself. After a `rate_limited` reply, wait `retry_ms` rather than
+backing off exponentially. Design notes: `plans/json-protocol.md`, `plans/guest-sessions.md`.
+
+## Configuration
+
+`config/server_config.json`, with `MUD_CONFIG`, `MUD_LISTEN_ADDR` and `MUD_DATABASE_URL` overriding as
+above. Zero or absent means the default; `-1` where noted turns a limit off. The server refuses to
+start on an invalid `TrustedProxies` list.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `Server.SaveIntervalMS` | 5000 | how often changed players and rooms are written, in one transaction |
+| `Server.TrustedProxies` | loopback | peers allowed to report a client's address (CIDRs); an empty list trusts nobody |
+| `Server.ClientIPHeader` | `X-Client-IP` | header Caddy uses to pass the client's address |
+| `Server.LogClientIPs` | true | log the address with joins and recovery attempts |
+| `Connection.ReadLimitBytes` | 4096 | largest message, including fragments |
+| `Connection.CommandsPerSecond`, `CommandBurst` | 10, 20 | per-connection command bucket |
+| `Connection.SayPerSecond`, `SayBurst` | 1, 5 | per-player `SAY` bucket |
+| `Connection.OutboundQueueSize` | 256 | frames queued per connection before it is dropped as too slow |
+| `Connection.WriteTimeoutMS`, `PingIntervalMS`, `PongTimeoutMS` | 10000, 30000, 60000 | write deadline and keepalive |
+| `Connection.ResumeGraceMS` | 90000 | how long a dropped guest stays in the world |
+| `Connection.ReplayFrames` | 100 | counted frames kept per guest for replay (clamped under the queue size) |
+| `Connection.RecoveryLockMS` | 900000 | a name refuses recovery this long after 5 wrong codes |
+| `Connection.JoinPerSecond`, `JoinBurst` | 1000, 5000 | one bucket for every join, resume, recover, login and register; `-1` for no limit |
+| `Connection.MaxJoinsPerMinutePerIP` | 0 (off) | optional per-address ceiling; a flood breaker, not a fairness rule |
+| `Connection.IdleTimeoutMS` | 1800000 | a guest with no command this long is disconnected; `-1` never |
+| `Database.*` | see file | connection settings, `MaxConnections` (10), `StartupWaitSeconds` (30) |
+| `Game.*` | see file | tick length and a new player's starting stats |
+| `Crowd.SoftCap`, `HardCap`, `MaxCopies` | 50, 60, 200 | arrivals fill a copy of an area up to the soft cap; movement into a room is refused at the hard cap |
+| `Crowd.Areas` | none | rooms that copy themselves when crowded, by database ID; the shipped config copies the three seeded rooms |
+
+The server logs session-close totals by reason (`queue_full`, `write_error`, `read_timeout`, `idle`,
+`replaced`, ...) every 10 seconds while they change; use them to see why connections dropped under load.
 
 ## Bot client and local load testing
 
@@ -94,6 +164,17 @@ deploy/deploy.sh rollback   # switch back to the previous images
 
 Put `MUD_DEPLOY_HOST=deploy@<droplet IP>` in `deploy/deploy.local.env` (gitignored). A new host
 is set up with `deploy/bootstrap-host.sh`, then `deploy/harden-ssh.sh`; see the comments in each.
+
+### Client addresses behind Cloudflare
+
+Caddy trusts `CF-Connecting-IP` only for connections from Cloudflare's published ranges, kept in
+`deploy/cloudflare-ips.caddy`, and passes the result to the game server as `X-Client-IP`, which the
+server believes only from its trusted proxies (loopback inside the pod). Run
+`deploy/update-cloudflare-ips.sh` (or `--check`) before an event to refresh the ranges, and
+`deploy/test-client-ip.sh` to prove the behaviour with the real pinned Caddy image (needs podman).
+After a deploy, join once and check that the logged address is yours:
+`journalctl --user -u mud-server | grep 'Guest joined'`. If it is a Cloudflare address, the ranges are
+stale. Do not enable `MaxJoinsPerMinutePerIP` before that check.
 
 ### CI and auto-deploy
 

@@ -7,7 +7,9 @@ Go MUD server. Players connect over a websocket. Sibling repo: `../mud_frontend`
 
 The project is being prepared for a weekend event at MAGFest 2027 (mid-January). The plan lives in
 `plans/magfest-2027.md`; read it before starting non-trivial work. `plans/` holds plans for this
-project and any subsystem, and is gitignored, so it is local working state, not repo history.
+project and any subsystem, and is gitignored, so it is local working state, not repo history. In a
+linked git worktree `plans` is a symlink to the main checkout's folder; `.gitignore` covers it, but
+stage files by name anyway.
 
 - Check the plan's phase and checklist before picking up work; don't jump ahead of phases without asking.
 - When work lands, tick the checklist, update the status line, and add a dated entry to the log.
@@ -42,7 +44,15 @@ project and any subsystem, and is gitignored, so it is local working state, not 
 - `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
 - `src/cmd/mudbot/`: opt-in websocket load client; `src/internal/mudbot/` holds its runner
   and test-account seeder. See README.md for local usage and measurement limitations.
-- `src/internal/mudserver/`: game logic: server, players, rooms, world, commands, items, equipment, NPCs, spawners.
+- `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
+  rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.
+  The wire protocol (`protocol.go`) and connections (`session.go`, `closestats.go`). Guests and their
+  lifecycle: `guest.go`, `names.go` (+ `blocked_words.txt`), `resume.go`, `recover.go`, `idle.go`. Crowd
+  control: `crowd.go` (area copies, caps), `ratelimit.go` (join limit), `clientip.go` (client addresses).
+  Saves: `persist.go`. Config: `serverconfig.go`; every key and default is in README.md.
+- `deploy/`: the Droplet deployment: `Caddyfile` and `cloudflare-ips.caddy`, Quadlet units, container
+  files, `deploy.sh`, host setup scripts, and `test-client-ip.sh` (proves the client-IP header handling
+  with the real Caddy image).
 - `src/internal/database/`: pgx pool wrapper.
 - `src/internal/muddata/`: status and error codes. `src/internal/mudutils/`: ANSI color helpers.
 - `src/sql/`: schema and seed scripts, one per table.
@@ -84,7 +94,13 @@ script there.
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
-comes back. The suite includes 200 bots playing for 10 s, with fixture-only bcrypt cost 4
+comes back. Helpers: `startTestServerWithConfig` (build a `Configuration` in the test; defaults apply),
+`register`/`send`/`expect` for a password player with text-style assertions (`flatten` renders frames the
+way a player once saw them), `joinGuest` and its `guest` type (`resume_test.go`: a reference client that
+counts frames, drops, reconnects and resumes), `readMessage`/`expectMessage` for exact frames, and
+`waitForClose` for session-close reasons. A gorilla connection that hits a read timeout is dead, so wait
+for a message instead of probing for silence. `deploy/test-client-ip.sh` (needs podman) checks the Caddy
+side. The suite includes 200 bots playing for 10 s, with fixture-only bcrypt cost 4
 and a durable NPC; it exercises real login and gameplay, not production-cost login storms.
 The manual load fixture uses only a dedicated local `mud_load` database; never point the
 seeder at the development or production DB, or load-test production without authorization.
@@ -124,8 +140,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
   `deploy` user (no sudo; CI logs in as it), managed by systemd Quadlet units
   (`deploy/quadlet/`); logs are in `journalctl --user -u mud-server` on the host. Secrets live on the
   host in `~/mud/secrets.env` and `~/mud/caddy.env`, never in git.
-- The domain is proxied through Cloudflare: SSH to the Droplet's IP (`deploy/deploy.local.env`), and
-  remember Caddy sees Cloudflare's IPs unless trusted-proxy handling is configured.
+- The domain is proxied through Cloudflare: SSH to the Droplet's IP (`deploy/deploy.local.env`). Caddy
+  trusts `CF-Connecting-IP` only from the ranges in `deploy/cloudflare-ips.caddy` (refresh with
+  `deploy/update-cloudflare-ips.sh` before an event) and passes `X-Client-IP` to the game server. After any
+  change there, join once on the live site and confirm the logged address is yours, not Cloudflare's.
 
 ## How the code works today
 
@@ -136,20 +154,22 @@ passes on a many-core machine will fail on `main` and block the deploy.
   ticks and periodic saves recover independently from panics; a panicking command notifies its
   player and the loop continues. Recovery cannot roll back partially changed state.
 - **Never touch game state from another goroutine.** From outside the loop, use `enqueue` (fire and
-  forget) or `onLoop` (run and wait). There are no exceptions: `World.RoomMap`
-  gains cloned rooms as crowds arrive (`crowd.go`), so login records only where a player was saved
-  (`savedRoomID`) and `admit` places them on the loop (`World.place`). Area copies are never saved;
-  persisted room IDs always name the template (`Room.persistID`).
-  Movement goes through `World.resolveMove`: a room at `HardCap` refuses (`ERR_ROOM_FULL`), and crossing an
-  area boundary is a placement that prefers the player's last copy of that area (`MudPlayer.lastCopy`).
+  forget) or `onLoop` (run and wait). There are no exceptions: `World.RoomMap` gains cloned rooms as
+  crowds arrive, so a connection reader must not read it.
+- Area copies (`crowd.go`): login records only where a player was saved (`savedRoomID`) and `admit` places
+  them on the loop (`World.place`, fullest copy below `SoftCap`). Copies are never saved; persisted room IDs
+  always name the template (`Room.persistID`). Movement goes through `World.resolveMove`: a room at
+  `HardCap` refuses (`ERR_ROOM_FULL`), and crossing an area boundary is a placement that prefers the
+  player's last copy of that area (`MudPlayer.lastCopy`).
 - Every websocket frame, both ways, is a flat JSON object with a type, `{"t":"say","who":"bob","text":"hi"}`
   (`protocol.go`; design in `plans/json-protocol.md`). The version is the websocket subprotocol `mud.v1`,
   checked once per connection. Send through `SendMessage`/`SendAuth`/`SendError`/`SendLook`/etc., never
   raw bytes. Fan-out and chatter use typed events (`say`, `arrive`, `leave`, `whisper`), not coloured
   text; encode once (`encodeSay`, `BroadcastFrame`) and queue the same slice to everyone.
-- `ProcessInput` (one goroutine per connection) handles `login` and `register` messages itself (database
-  lookups and bcrypt stay off the loop), then `admit` places the player on the loop. After that it
-  queues each command with `enqueue`, and the player's disconnect when the connection ends.
+- `ProcessInput` (one goroutine per connection) handles `join`, `resume`, `recover`, `login` and `register`
+  itself (database lookups and bcrypt stay off the loop), then `admit` or `attach` puts the player in the
+  world on the loop. After that it queues each command with `enqueue`, and what happens to the player
+  (dormant for a guest, removed otherwise) when the connection ends.
 - Guests (`guest.go`, `names.go`, plans/guest-sessions.md): `join {name}` creates a `player` row with `guest=true`,
   returns a resume token and a recovery code once, and stores only their SHA-256 hashes. Names are 3-16 of
   `[A-Za-z0-9_-]`, unique ignoring case (unique index on `lower(username)`), checked against a reserved list and
@@ -207,11 +227,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
   needs its dirty mark and a test that it reaches the database (see `src/persist_test.go`).
 - Some commands still *read* the database on the loop: `EQUIP` looks up the equipment catalog and
   NPC kills look up the gold item. Prefer not to add more; a catalog cache would remove these.
-- Output is typed JSON (see the protocol bullet above). Chatty room traffic is typed events (`say`,
-  `arrive`, `leave`, `whisper`) that the client words and colours; other prose is `text` with ANSI
-  colours (red = NPC, blue = player, green = item) that the client styles per line. Changing a
-  message type or field, or the ANSI in `text`, can break `../mud_frontend`: change both sides
-  together, and keep the exact-shape and size tests in `protocol_test.go` current.
+- Prose is `text` with ANSI colours (red = NPC, blue = player, green = item) that the client styles per
+  line. Changing a message type or field, or the ANSI in `text`, can break `../mud_frontend`: change both
+  sides together, and keep the exact-shape and size tests in `protocol_test.go` current. What a client
+  must do with each message is in `../mud_frontend/AGENTS.md`.
 
 ## Conventions
 

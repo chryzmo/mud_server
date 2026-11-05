@@ -9,8 +9,9 @@ src/__debug_bin*.exe
 .DS_Store
 Thumbs.db
 
-# Local planning docs
-plans/
+# Local planning docs. No trailing slash: in a linked worktree `plans` is a symlink, which a
+# directory-only pattern would not match.
+plans
 
 # Local deploy settings (host IP etc.)
 deploy/deploy.local.env
