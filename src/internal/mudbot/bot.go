@@ -359,7 +359,8 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 	if c.Register {
 		verb = "register"
 	}
-	if err := conn.WriteMessage(websocket.TextMessage, frame(verb, map[string]string{"username": Name(c.Prefix, index), "password": c.Password})); err != nil {
+	loginFrame := frame(verb, map[string]string{"username": Name(c.Prefix, index), "password": c.Password})
+	if err := conn.WriteMessage(websocket.TextMessage, loginFrame); err != nil {
 		return nil, err
 	}
 	for {
@@ -368,6 +369,16 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 			return nil, err
 		}
 		f := parseFrame(message)
+		if f.T == "error" && f.Code == "rate_limited" {
+			// The server's join limit: wait as told, within the admission budget, and ask again.
+			if err := waitToRetry(dialCtx, f.RetryMS); err != nil {
+				return nil, err
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, loginFrame); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if f.T == "auth" {
 			if !f.OK {
 				return nil, errors.New("authentication rejected")
@@ -548,5 +559,15 @@ func (b *client) action(sequence int) (string, string) {
 		return "SAY mudbot goodbye", "say"
 	default:
 		return "MOVE S", "move"
+	}
+}
+
+// waitToRetry sleeps for the server's retry hint, or until ctx ends.
+func waitToRetry(ctx context.Context, retryMS int) error {
+	select {
+	case <-time.After(time.Duration(max(retryMS, 1)) * time.Millisecond):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }

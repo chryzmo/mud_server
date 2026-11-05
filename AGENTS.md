@@ -171,6 +171,12 @@ passes on a many-core machine will fail on `main` and block the deploy.
   error and is closed (reason `idle`), then goes through the normal dormant grace period. Activity is commands,
   admission and resume, not keepalives; password accounts are never kicked. A client should treat `idle` as
   "wait for a tap" and not reconnect by itself, or it holds the slot again.
+- Join limit (`ratelimit.go`): one token bucket for every join, resume, recover, login and register, checked by
+  the reader before any database work (`MudServer.allowJoin`; requests that do no work, such as one from
+  someone already in the game or with a missing field, do not spend it). It does not look at who is asking:
+  venue WiFi and carrier NAT put many players behind one address. Refusals are `error rate_limited` with a
+  `retry_ms` hint that includes jitter; clients should wait that long, not back off exponentially. Defaults
+  (`JoinPerSecond` 1000, `JoinBurst` 5000, -1 off) come from the storm measurements; see the file comment.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes
