@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -40,13 +39,6 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whispercha
 	}
 
 	return w
-}
-
-// ReLinkRoomExits clears the room's ExitMap and re-populates it from its
-// current ExitJSON. Call this after updating a room's exits at runtime.
-func (w *World) ReLinkRoomExits(room *Room) {
-	room.ExitMap = make(map[string]*Room)
-	w.LinkRoomExits(room)
 }
 
 func (w World) LinkRoomExits(room *Room) {
@@ -118,80 +110,4 @@ func (w World) WriteWorldToDB(db *muddatabase.MudDatabase) {
 	for _, room := range w.RoomMap {
 		room.WriteToDB(db)
 	}
-}
-
-/* For API export */
-func (w World) PrintWorldRoomsAsJSON() string {
-	type roomjson struct {
-		Name             string
-		Description      string
-		ExitJSON         string
-		InventorySliceID string
-	}
-	jsonreadymap := make(map[string]roomjson)
-
-	for id, room := range w.RoomMap {
-		exitmap := make(map[string]string)
-		for dir, r := range room.ExitMap {
-			exitmap[dir] = strconv.Itoa(int(r.ID))
-		}
-
-		jsonexit, _ := json.Marshal(exitmap)
-
-		jsonroom := roomjson{
-			Name:        room.Name,
-			Description: room.Description,
-			ExitJSON:    string(jsonexit),
-		}
-		jsonreadymap[strconv.Itoa(int(id))] = jsonroom
-	}
-
-	jsonreturn, err := json.Marshal(jsonreadymap)
-
-	if err != nil {
-		fmt.Println("PrintWorldRoomsAsJSON error: " + err.Error())
-	}
-
-	return string(jsonreturn)
-}
-
-/* For API export — reads from ExitMap (live in-memory state) so that edits
-   made via PUT /api/nodes are immediately visible without parsing ExitJSON. */
-func (w World) PrintWorldEdgesAsJSON() string {
-	type edgejson struct {
-		ID     string
-		Source string
-		Target string
-	}
-
-	jsonreadymap := make(map[string]edgejson)
-
-	for _, room := range w.RoomMap {
-		for _, targetRoom := range room.ExitMap {
-			if targetRoom == nil {
-				continue
-			}
-			sourceid := strconv.Itoa(int(room.ID))
-			targetid := strconv.Itoa(int(targetRoom.ID))
-			idstring := fmt.Sprintf("%s_%s", sourceid, targetid)
-
-			// Avoid duplicate edges for bidirectional connections.
-			reverseidstring := fmt.Sprintf("%s_%s", targetid, sourceid)
-			if _, alreadyexists := jsonreadymap[reverseidstring]; alreadyexists {
-				continue
-			}
-
-			jsonreadymap[idstring] = edgejson{
-				ID:     idstring,
-				Source: sourceid,
-				Target: targetid,
-			}
-		}
-	}
-
-	jsonreturn, err := json.Marshal(jsonreadymap)
-	if err != nil {
-		fmt.Println("PrintWorldEdgesAsJSON JSON error: " + err.Error())
-	}
-	return string(jsonreturn)
 }

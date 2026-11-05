@@ -50,19 +50,6 @@ type RoomExits struct {
 	D int32 `json:"D"`
 }
 
-// NewRoom builds a minimal Room for DB operations (no goroutines, no tick).
-func NewRoom(name string, description string, exitJSON string) *Room {
-	return &Room{
-		Name:        name,
-		Description: description,
-		ExitJSON:    exitJSON,
-		UserMap:     make(map[string]*MudPlayer),
-		ExitMap:     make(map[string]*Room),
-		BaddieMap:   make(map[string]*BaddieNPC),
-		Inventory:   CreateInventory(),
-	}
-}
-
 func CreateRoom(name string, description string, tickdur int32, whisperchan chan MudMessage) *Room {
 	r := &Room{
 		Name:                 name,
@@ -267,33 +254,6 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid in
 	}
 
 	return &room
-}
-
-// UpdateRoomMetadataInDB updates only the name, description, and exitjson of a
-// room without touching its inventory. Used by the worldbuilder API.
-func UpdateRoomMetadataInDB(db *muddatabase.MudDatabase, roomID int32, name, description, exitJSON string) error {
-	query := "UPDATE room SET name=@name, description=@description, exitjson=@exitjson WHERE id=@roomid"
-	args := pgx.NamedArgs{
-		"name":        name,
-		"description": description,
-		"exitjson":    exitJSON,
-		"roomid":      roomID,
-	}
-	return db.ExecWithArgs(query, args)
-}
-
-// CreateInDB inserts a new room record and returns the assigned ID.
-func (r *Room) CreateInDB(db *muddatabase.MudDatabase) (int32, error) {
-	query := "INSERT INTO room (name, description, exitjson, inventoryidslice) VALUES ($1, $2, $3, $4) RETURNING id"
-	var newID int32
-	err := db.Connection.QueryRow(db.Context, query, r.Name, r.Description, r.ExitJSON, r.Inventory.IDMap()).Scan(&newID)
-	return newID, err
-}
-
-// DeleteFromDB removes the room record from the database.
-func (r *Room) DeleteFromDB(db *muddatabase.MudDatabase) error {
-	_, err := db.Connection.Exec(db.Context, "DELETE FROM room WHERE id=$1", r.ID)
-	return err
 }
 
 func (r *Room) WriteToDB(db *muddatabase.MudDatabase) {

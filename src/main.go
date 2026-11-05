@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	mudapi "mud_server/src/internal/mudapi"
 	mudserver "mud_server/src/internal/mudserver"
 )
 
@@ -21,8 +20,6 @@ func main() {
 
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) { handleConnections(serverinstance, w, r) })
-	http.HandleFunc("/api/nodes", func(w http.ResponseWriter, r *http.Request) { mudapi.HandleNodeRequest(serverinstance, w, r) })
-	http.HandleFunc("/api/edges", func(w http.ResponseWriter, r *http.Request) { mudapi.HandleEdgeRequest(serverinstance, w, r) })
 
 	go serverinstance.HandleMessages()
 	go serverinstance.RunMaintenanceactions()
