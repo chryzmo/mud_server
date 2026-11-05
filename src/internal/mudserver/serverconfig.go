@@ -15,6 +15,7 @@ type Configuration struct {
 	} `json:"Server"`
 	Database struct {
 		DatabaseURL string `json:"DatabaseURL"`
+		StartupWaitSeconds int `json:"StartupWaitSeconds"` // how long to retry an unreachable database at startup (default 30)
 		DatabaseHost string `json:"DatabaseHost"`
 		DatabasePort string `json:"DatabasePort"`
 		DatabaseUsername string `json:"DatabaseUsername"`

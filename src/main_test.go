@@ -65,8 +65,18 @@ func resetDatabase(t *testing.T, url string) {
 
 func startTestServer(t *testing.T) string {
 	t.Helper()
+	wsURL, _ := startTestServerWith(t)
+	return wsURL
+}
+
+// startTestServerWith reseeds the test database, runs any setup SQL on top of
+// the seed (to place items, speed up spawners, ...), and starts a server. The
+// server is shut down when the test ends.
+func startTestServerWith(t *testing.T, setupSQL ...string) (string, *mudserver.MudServer) {
+	t.Helper()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
+	execSQL(t, url, setupSQL...)
 
 	c := mudserver.Configuration{}
 	c.Database.DatabaseURL = url
@@ -78,15 +88,39 @@ func startTestServer(t *testing.T) string {
 	c.Game.PlayerStartAttack = 5
 	c.Game.PlayerStartDefense = 10
 
-	si := mudserver.NewMudServer(c)
+	si, err := mudserver.NewMudServer(c)
+	if err != nil {
+		t.Fatalf("NewMudServer: %v", err)
+	}
 	go si.HandleMessages()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) { handleConnections(si, w, r) })
 	ts := httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
+	// Registered after ts.Close, so it runs first: save everyone and stop the
+	// server's goroutines before the next test reseeds the database.
+	t.Cleanup(func() { si.Shutdown(context.Background()) })
 
-	return "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	return "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws", si
+}
+
+func execSQL(t *testing.T, url string, statements ...string) {
+	t.Helper()
+	if len(statements) == 0 {
+		return
+	}
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		t.Fatalf("connect to test database: %v", err)
+	}
+	defer conn.Close(ctx)
+	for _, stmt := range statements {
+		if _, err := conn.Exec(ctx, stmt); err != nil {
+			t.Fatalf("setup SQL %q: %v", stmt, err)
+		}
+	}
 }
 
 func dial(t *testing.T, wsURL string) *websocket.Conn {
@@ -164,25 +198,11 @@ func TestLoginRestoresSavedLocation(t *testing.T) {
 	expect(t, first, "You are in 'Balcony'")
 	first.Close()
 
-	// The server saves the player when it notices the disconnect, so retry until
-	// the old session is gone.
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		conn := dial(t, wsURL)
-		expect(t, conn, "Welcome to the MUD!")
-		send(t, conn, "/LOGIN walker secret")
-		msg := expect(t, conn, "")
-		if strings.Contains(msg, "already logged in") && time.Now().Before(deadline) {
-			conn.Close()
-			time.Sleep(50 * time.Millisecond)
-			continue
-		}
-		if !strings.Contains(msg, "Welcome back, walker!") {
-			t.Fatalf("login: got %q", msg)
-		}
-		expect(t, conn, "You are in 'Balcony'")
-		return
+	conn, msg := loginWhenFree(t, wsURL, "walker", "secret")
+	if !strings.Contains(msg, "Welcome back, walker!") {
+		t.Fatalf("login: got %q", msg)
 	}
+	expect(t, conn, "You are in 'Balcony'")
 }
 
 func TestLoginRejectsWrongPassword(t *testing.T) {
@@ -194,20 +214,39 @@ func TestLoginRejectsWrongPassword(t *testing.T) {
 	expect(t, first, "Account created!")
 	first.Close()
 
+	_, msg := loginWhenFree(t, wsURL, "guarded", "wrong")
+	if !strings.Contains(msg, "Incorrect password.") {
+		t.Fatalf("login with wrong password: got %q", msg)
+	}
+}
+
+// loginWhenFree logs in, retrying while the server still has the player's
+// previous session (it saves and removes the player when it notices the
+// disconnect). It returns the connection and the server's reply to /LOGIN.
+func loginWhenFree(t *testing.T, wsURL, name, password string) (*websocket.Conn, string) {
+	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		conn := dial(t, wsURL)
 		expect(t, conn, "Welcome to the MUD!")
-		send(t, conn, "/LOGIN guarded wrong")
+		send(t, conn, "/LOGIN "+name+" "+password)
 		msg := expect(t, conn, "")
 		if strings.Contains(msg, "already logged in") && time.Now().Before(deadline) {
 			conn.Close()
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
-		if !strings.Contains(msg, "Incorrect password.") {
-			t.Fatalf("login with wrong password: got %q", msg)
-		}
-		return
+		return conn, msg
 	}
+}
+
+// register connects a new player and waits until they're standing in the start room.
+func register(t *testing.T, wsURL, name string) *websocket.Conn {
+	t.Helper()
+	conn := dial(t, wsURL)
+	expect(t, conn, "Welcome to the MUD!")
+	send(t, conn, "/REGISTER "+name+" secret")
+	expect(t, conn, "Account created! Welcome, "+name+".")
+	expect(t, conn, "You are in 'Start Room'")
+	return conn
 }

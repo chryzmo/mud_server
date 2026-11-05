@@ -16,7 +16,7 @@ type World struct {
 	NPCTurnActionMap map[int32]NPCCommand
 }
 
-func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whisperchan chan MudMessage) *World {
+func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whisperchan chan MudMessage, done <-chan struct{}) *World {
 	w := &World{
 		RoomMap:          make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
@@ -25,7 +25,7 @@ func createWorld(db *muddatabase.MudDatabase, roomTickDuration int32, whispercha
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking
 	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
 	for _, id := range roomIDList {
-		r := Room{GlobalWhisperChannel: whisperchan}
+		r := Room{GlobalWhisperChannel: whisperchan, done: done}
 		w.RoomMap[id] = r.FetchFromDB(db, roomTickDuration, id)
 	}
 

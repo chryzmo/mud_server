@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -24,12 +29,30 @@ func main() {
 	go serverinstance.HandleMessages()
 	go serverinstance.RunMaintenanceactions()
 
+	httpServer := &http.Server{Addr: serverinstance.Configuration.Server.ListenPort}
+
+	// On SIGTERM (systemd stop or restart) or Ctrl-C: stop accepting
+	// connections, then save and disconnect everyone.
+	stop, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	defer cancel()
+	go func() {
+		<-stop.Done()
+		fmt.Println("Shutting down")
+		ctx, cancelShutdown := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancelShutdown()
+		httpServer.Shutdown(ctx)
+		serverinstance.Shutdown(ctx)
+	}()
+
 	fmt.Println("Server starting on "+serverinstance.Configuration.Server.ListenPort)
-	err := http.ListenAndServe(serverinstance.Configuration.Server.ListenPort, nil)
-	if err != nil {
+	err := httpServer.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
 		panic("Error starting server: " + err.Error())
 	}
-	fmt.Println("Server started on "+serverinstance.Configuration.Server.ListenPort)
+	<-stop.Done()
+	// Give the shutdown goroutine time to finish saving before main returns.
+	serverinstance.Shutdown(context.Background())
+	fmt.Println("Server stopped")
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {
