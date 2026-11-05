@@ -25,6 +25,8 @@ type Configuration struct {
 		WriteTimeoutMS    int `json:"WriteTimeoutMS"`
 		PingIntervalMS    int `json:"PingIntervalMS"`
 		PongTimeoutMS     int `json:"PongTimeoutMS"`
+		ResumeGraceMS     int `json:"ResumeGraceMS"` // how long a dropped guest stays in the world (default 90000)
+		ReplayFrames      int `json:"ReplayFrames"`  // frames kept per player for replay after a resume (default 100)
 	} `json:"Connection"`
 	Database struct {
 		DatabaseURL string `json:"DatabaseURL"`

@@ -51,6 +51,11 @@ type MudServer struct {
 	closes     *closeStats // why sessions ended; see closestats.go
 	names      *nameRules  // what guests may call themselves; see names.go
 
+	// Loop-owned. Guests by the hash of their resume token (online or dormant),
+	// and dormant guests with the time their grace period ends; see resume.go.
+	byToken map[string]*MudPlayer
+	dormant map[*MudPlayer]time.Time
+
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
 	closeOnce sync.Once
@@ -116,6 +121,8 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		sessions:      make(map[*Session]struct{}),
 		closes:        newCloseStats(),
 		names:         defaultNameRules(),
+		byToken:       make(map[string]*MudPlayer),
+		dormant:       make(map[*MudPlayer]time.Time),
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
 	}
@@ -151,7 +158,10 @@ func (ms *MudServer) run() {
 		case event := <-ms.events:
 			runEvent("queued event", event)
 		case now := <-tick.C:
-			runEvent("world tick", func() { ms.World.tick(now) })
+			runEvent("world tick", func() {
+				ms.World.tick(now)
+				ms.expireDormant(now)
+			})
 		case <-save.C:
 			runEvent("periodic save", ms.flushDirty)
 		case <-ms.done:
@@ -273,7 +283,7 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
 
 	fmt.Printf("Client connection - number of connected clients: %d\n", count)
 
-	mc.SendMessage("Welcome to the MUD!\nRegister or log in to play.\n")
+	session.Send(encode(helloMsg{T: msgHello, Message: "Welcome to the MUD!\nJoin with a name to play.\n"}))
 
 	return mc
 }
@@ -317,7 +327,16 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.rememberCopy()
 		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
 		player.world = ms.World
+		if player.canResume() {
+			player.replaySize = ms.replayFrames()
+		}
 		ms.players[player.Username] = player
+		if player.tokenHash != "" {
+			if ms.byToken == nil {
+				ms.byToken = make(map[string]*MudPlayer)
+			}
+			ms.byToken[player.tokenHash] = player
+		}
 		player.Location.AddPlayer(player)
 		player.SendWelcome(hello)
 		player.Location.BroadcastFrame(encodeArrive(player.Username, ""), player.Username)
@@ -335,6 +354,10 @@ func (ms *MudServer) disconnect(player *MudPlayer) {
 		return
 	}
 	delete(ms.players, player.Username)
+	delete(ms.dormant, player)
+	if player.tokenHash != "" {
+		delete(ms.byToken, player.tokenHash)
+	}
 
 	l := leavingPlayer{snapshot: player.snapshot(), saved: make(chan struct{})}
 	ms.leaving = append(ms.leaving, l)
@@ -356,18 +379,25 @@ func (ms *MudServer) getCommand(commandname string) (*MudCommand, int) {
 }
 
 /*
-ProcessInput is a connection's reader goroutine. Until the player logs in it
-handles /REGISTER and /LOGIN itself; after that it queues each command on the
-game loop. When the connection ends, it queues the player's disconnect.
+ProcessInput is a connection's reader goroutine. Until the player is admitted it
+handles join, resume and login (and register) itself; after that it queues each
+command on the game loop. When the connection ends, it queues what happens to the
+player (a guest goes dormant; anyone else is removed).
+
+The reader keeps its own session and never reads player.Session after admission:
+a resume can hand the player to a newer connection, and the loop is the only
+goroutine allowed to change which session a player has.
 */
 func (ms *MudServer) ProcessInput(player *MudPlayer) {
+	session := player.Session
 	admitted := false
 	defer func() {
-		if !admitted || !ms.enqueue(func() { ms.disconnect(player) }) {
-			player.Session.Close()
+		p := player
+		if !admitted || !ms.enqueue(func() { ms.connectionEnded(p, session) }) {
+			session.Close()
 		}
 		ms.sessionsMu.Lock()
-		delete(ms.sessions, player.Session)
+		delete(ms.sessions, session)
 		count := len(ms.sessions)
 		ms.sessionsMu.Unlock()
 		fmt.Printf("Client disconnect - number of connected clients: %d\n", count)
@@ -375,7 +405,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 	defer recoverPanic("connection reader", nil)
 
 	for {
-		messagebytes, err := player.Session.ReadMessage()
+		messagebytes, err := session.ReadMessage()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -383,24 +413,24 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 
 		// Limit every data message before parsing, DB lookups or bcrypt. This
 		// includes pre-login input and blanks, so neither can bypass the limit.
-		if !player.Session.allowCommand(time.Now()) {
+		if !session.allowCommand(time.Now()) {
 			continue
 		}
 
 		var in inbound
 		if err := json.Unmarshal(messagebytes, &in); err != nil || in.T == "" {
-			player.SendError(codeBadFrame, "Messages must be JSON objects with a type: {\"t\":\"cmd\",\"line\":\"LOOK\"}.")
+			session.sendError(codeBadFrame, "Messages must be JSON objects with a type: {\"t\":\"cmd\",\"line\":\"LOOK\"}.")
 			continue
 		}
 
 		switch in.T {
 		case msgCmd:
 			if in.Line == nil {
-				player.SendError(codeBadRequest, "A cmd needs {\"line\":\"...\"}.")
+				session.sendError(codeBadRequest, "A cmd needs {\"line\":\"...\"}.")
 				continue
 			}
 			if !admitted {
-				player.SendAuth(false, codeNotLoggedIn, "Please log in or register first.")
+				session.sendAuth(false, codeNotLoggedIn, "Please log in or register first.")
 				continue
 			}
 			messagefields := strings.Fields(*in.Line)
@@ -410,31 +440,41 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			var msg MudMessage
 			msg.Command = strings.ToUpper(messagefields[0])
 			msg.CommandParameter = strings.Join(messagefields[1:], " ")
-			msg.SenderPlayer = player
-			if !ms.enqueue(func() { ms.handleCommand(player, msg) }) {
+			p := player
+			msg.SenderPlayer = p
+			if !ms.enqueue(func() { ms.handleCommand(p, msg) }) {
 				return
 			}
 		case msgJoin:
 			if in.Name == "" {
-				player.SendAuth(false, codeBadRequest, "A join needs a name.")
+				session.sendAuth(false, codeBadRequest, "A join needs a name.")
 				continue
 			}
 			if admitted {
-				player.SendError(codeAlreadyLoggedIn, "You are already in the game.")
+				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
 				continue
 			}
 			admitted = ms.join(player, in.Name)
+		case msgResume:
+			if admitted {
+				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
+				continue
+			}
+			if resumed := ms.resume(player, session, in.Token, in.Received); resumed != nil {
+				player = resumed
+				admitted = true
+			}
 		case msgRegister, msgLogin:
 			if in.Username == "" || in.Password == "" {
-				player.SendAuth(false, codeBadRequest, "A "+in.T+" needs a username and a password.")
+				session.sendAuth(false, codeBadRequest, "A "+in.T+" needs a username and a password.")
 				continue
 			}
 			if admitted {
-				player.SendError(codeAlreadyLoggedIn, "You are already logged in.")
+				session.sendError(codeAlreadyLoggedIn, "You are already logged in.")
 				continue
 			}
 			if strings.IndexFunc(in.Username, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
-				player.SendAuth(false, codeInvalidUsername, "Usernames can't contain spaces or control characters.")
+				session.sendAuth(false, codeInvalidUsername, "Usernames can't contain spaces or control characters.")
 				continue
 			}
 			if in.T == msgRegister {
@@ -443,7 +483,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				admitted = ms.login(player, in.Username, in.Password)
 			}
 		default:
-			player.SendError(codeBadRequest, "Unknown message type "+strconv.Quote(in.T)+".")
+			session.sendError(codeBadRequest, "Unknown message type "+strconv.Quote(in.T)+".")
 		}
 	}
 }

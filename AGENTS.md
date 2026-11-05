@@ -154,6 +154,14 @@ passes on a many-core machine will fail on `main` and block the deploy.
   returns a resume token and a recovery code once, and stores only their SHA-256 hashes. Names are 3-16 of
   `[A-Za-z0-9_-]`, unique ignoring case (unique index on `lower(username)`), checked against a reserved list and
   `blocked_words.txt` (compiled in; format in the file). Schema changes for older databases go in `EnsureSchema`.
+- Resume (`resume.go`): a dropped guest goes dormant for `ResumeGraceMS` (default 90 s), still in its room with
+  no announcement, and `resume {token, received}` reattaches a new connection and replays what it missed;
+  after the grace period, or a restart, it is an ordinary arrival (`gap`). Replay needs no sequence number in
+  frames: every frame except `hello`, `auth` and `error` is *counted* (server: `MudPlayer.sendFrame`; client:
+  as it processes them) and a ring of shared references keeps the last `ReplayFrames`. So send counted frames
+  only through `sendFrame` (or `SendMessage` and friends), and replies to the reader's own session only through
+  `Session.sendAuth/sendError`. Reader goroutines keep their own `session` and never read `player.Session`
+  after admission: a resume can hand the player to a newer connection, and only the loop may change it.
 - Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
   `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
   reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes

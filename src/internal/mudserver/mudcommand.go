@@ -42,7 +42,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			heard := encodeSay(player.Username, msg)
 			for _, target_mp := range player.Location.Players() {
 				if target_mp.Username != player.Username {
-					target_mp.Session.Send(heard)
+					target_mp.sendFrame(heard)
 				}
 			}
 

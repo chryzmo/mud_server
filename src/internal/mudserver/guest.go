@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	muddatabase "mud_server/src/internal/database"
 	"strings"
 )
 
@@ -25,6 +26,22 @@ type welcome struct {
 	message  string
 	token    string // resume token; guests only, sent once
 	recovery string // recovery code; guests only, sent once
+
+	// Set when a guest resumes without a live session to continue (a restart,
+	// or the grace period ran out): their frame count restarts at zero.
+	resumed bool
+	gap     bool
+	base    uint64
+}
+
+// tokenLength is the length of a resume token: 32 random bytes as unpadded base64.
+const tokenLength = 43
+
+// lookupGuestByToken finds the guest whose resume token hashes to hash. Reader
+// goroutine only (it reads the database, like login).
+func (mp *MudPlayer) lookupGuestByToken(db *muddatabase.MudDatabase, hash string) (id int32, username string, err error) {
+	err = db.Connection.QueryRow(db.Context, "SELECT id, username FROM player WHERE guest AND resumetokenhash=$1", hash).Scan(&id, &username)
+	return id, username, err
 }
 
 // newCredentials makes a resume token (256 random bits, URL-safe) and a
