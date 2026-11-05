@@ -23,6 +23,16 @@ Run `scripts/install-git-hooks.sh` once per clone to enable the pre-commit hook 
 MOVE, SAY, ATTACK, and WHISPER. It continuously reads every connection. The ordinary
 `scripts/test.sh` suite includes 200 bots playing for 10 seconds under `-race`.
 
+### Reconnect storms
+
+`mudbot storm` joins guests by name, plays lightly, then cuts a share of their connections at once; each bot
+reconnects after a random delay (growing on failure) and resumes with its token and frame count. It reports,
+per storm, how many came back with the character kept or with a gap, frames replayed, retries and the time to
+resume. `-cycles 0 -between 30s` just plays, so you can restart the server from outside and read the
+"unplanned_reconnects" section. Names are prefix plus five digits (prefix at most 11 characters), and guests
+persist in the database, so use a fresh prefix or a reset local database for each run. The target must be
+loopback unless `-allow-remote` is given.
+
 For a manual run, **stop any previous load server first** and use the dedicated local
 `mud_load` database, never the development or production database. From the repo root:
 
