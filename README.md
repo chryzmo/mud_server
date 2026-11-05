@@ -19,7 +19,7 @@ Run `scripts/install-git-hooks.sh` once per clone to enable the pre-commit hook 
 
 ## Bot client and local load testing
 
-`src/cmd/mudbot` uses the public websocket protocol: login (or optional registration),
+`src/cmd/mudbot` uses the public websocket protocol (JSON frames, subprotocol `mud.v1`): login (or optional registration),
 MOVE, SAY, ATTACK, and WHISPER. It continuously reads every connection. The ordinary
 `scripts/test.sh` suite includes 200 bots playing for 10 seconds under `-race`.
 

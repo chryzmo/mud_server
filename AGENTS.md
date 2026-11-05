@@ -163,9 +163,11 @@ passes on a many-core machine will fail on `main` and block the deploy.
   needs its dirty mark and a test that it reaches the database (see `src/persist_test.go`).
 - Some commands still *read* the database on the loop: `EQUIP` looks up the equipment catalog and
   NPC kills look up the gold item. Prefer not to add more; a catalog cache would remove these.
-- Output is plain text with ANSI colors. The client depends on those colors (red = NPC,
-  blue = player, green = item, magenta = whisper) and on `STATUPDATE:` lines. Changing message text
-  or colors can break `../mud_frontend`.
+- Output is typed JSON (see the protocol bullet above). Chatty room traffic is typed events (`say`,
+  `arrive`, `leave`, `whisper`) that the client words and colours; other prose is `text` with ANSI
+  colours (red = NPC, blue = player, green = item) that the client styles per line. Changing a
+  message type or field, or the ANSI in `text`, can break `../mud_frontend`: change both sides
+  together, and keep the exact-shape and size tests in `protocol_test.go` current.
 
 ## Conventions
 
