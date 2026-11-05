@@ -138,6 +138,16 @@ func (s *Session) allowCommand(now time.Time) bool {
 	return allowed
 }
 
+// isClosed reports whether the session has been closed.
+func (s *Session) isClosed() bool {
+	select {
+	case <-s.closed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Close stops the session for a reason the game chose. See CloseWith.
 func (s *Session) Close() { s.CloseWith(closeServer) }
 

@@ -28,6 +28,7 @@ type Configuration struct {
 		ResumeGraceMS     int `json:"ResumeGraceMS"` // how long a dropped guest stays in the world (default 90000)
 		ReplayFrames      int `json:"ReplayFrames"`  // frames kept per player for replay after a resume (default 100)
 		RecoveryLockMS    int `json:"RecoveryLockMS"` // a name refuses recovery this long after 5 wrong codes (default 900000)
+		IdleTimeoutMS     int `json:"IdleTimeoutMS"`  // a guest with no command for this long is disconnected (default 1800000; -1 never)
 	} `json:"Connection"`
 	Database struct {
 		DatabaseURL string `json:"DatabaseURL"`
