@@ -1,0 +1,3 @@
+# Caddy's certificates and ACME account; keeping them avoids Let's Encrypt rate limits.
+[Volume]
+VolumeName=mud-caddy-data

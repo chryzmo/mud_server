@@ -1,0 +1,18 @@
+[Unit]
+Description=MUD game server
+Requires=mud-db.service
+After=mud-db.service
+
+[Container]
+ContainerName=mud-server
+Image=localhost/mud-server:current
+Pod=mud.pod
+Environment=MUD_LISTEN_ADDR=127.0.0.1:8080
+EnvironmentFile=%h/mud/secrets.env
+
+[Service]
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=default.target

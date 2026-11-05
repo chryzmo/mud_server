@@ -61,6 +61,19 @@ drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_UR
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
 comes back. Don't weaken `-race`; a race report is a real bug.
 
+## Deploying
+
+- **Deploy only when the user asks.** `deploy/deploy.sh` changes the live game; never run it,
+  `rollback`, or anything over SSH on the Droplet on your own initiative.
+- `deploy/deploy.sh` refuses uncommitted changes, runs both repos' `scripts/test.sh`, builds the
+  images locally, ships only images the host lacks, keeps the previous images for `rollback`, and
+  restarts only what changed. `deploy/deploy.sh status` is read-only.
+- Production runs as rootless Podman under the `deploy` user, managed by systemd Quadlet units
+  (`deploy/quadlet/`); logs are in `journalctl --user -u mud-server` on the host. Secrets live on the
+  host in `~/mud/secrets.env` and `~/mud/caddy.env`, never in git.
+- The domain is proxied through Cloudflare: SSH to the Droplet's IP (`deploy/deploy.local.env`), and
+  remember Caddy sees Cloudflare's IPs unless trusted-proxy handling is configured.
+
 ## How the code works today
 
 - `ProcessInput` (one goroutine per connection) reads frames, handles `/LOGIN` and `/REGISTER`

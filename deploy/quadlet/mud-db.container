@@ -1,0 +1,22 @@
+[Unit]
+Description=MUD Postgres
+
+[Container]
+ContainerName=mud-db
+Image=localhost/mud-db:current
+Pod=mud.pod
+Volume=mud-pgdata.volume:/var/lib/postgresql/data
+Environment=POSTGRES_USER=mud POSTGRES_DB=mud
+EnvironmentFile=%h/mud/secrets.env
+HealthCmd=pg_isready -h 127.0.0.1 -U mud -d mud
+HealthInterval=5s
+HealthStartPeriod=60s
+# Report started only once Postgres is healthy, so the game server waits for it.
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
