@@ -140,6 +140,8 @@ passes on a many-core machine will fail on `main` and block the deploy.
   gains cloned rooms as crowds arrive (`crowd.go`), so login records only where a player was saved
   (`savedRoomID`) and `admit` places them on the loop (`World.place`). Area copies are never saved;
   persisted room IDs always name the template (`Room.persistID`).
+  Movement goes through `World.resolveMove`: a room at `HardCap` refuses (`ERR_ROOM_FULL`), and crossing an
+  area boundary is a placement that prefers the player's last copy of that area (`MudPlayer.lastCopy`).
 - Every websocket frame, both ways, is a flat JSON object with a type, `{"t":"say","who":"bob","text":"hi"}`
   (`protocol.go`; design in `plans/json-protocol.md`). The version is the websocket subprotocol `mud.v1`,
   checked once per connection. Send through `SendMessage`/`SendAuth`/`SendError`/`SendLook`/etc., never

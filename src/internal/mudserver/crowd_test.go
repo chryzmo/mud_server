@@ -3,6 +3,8 @@ package mudserver
 import (
 	"fmt"
 	"testing"
+
+	"mud_server/src/internal/muddata"
 )
 
 // crowdWorld is the seeded layout without a database: Start (1) -N-> Balcony
@@ -10,6 +12,12 @@ import (
 // any area. Rooms 1-3 are an area; the Arena has a spawner and the Start Room
 // holds one item.
 func crowdWorld(t *testing.T, softCap, maxCopies int) *World {
+	t.Helper()
+	return crowdWorldCaps(t, softCap, 0, maxCopies)
+}
+
+// crowdWorldCaps is crowdWorld with a hard cap (0 takes the default).
+func crowdWorldCaps(t *testing.T, softCap, hardCap, maxCopies int) *World {
 	t.Helper()
 	w := &World{RoomMap: make(map[int32]*Room)}
 	room := func(id int32, name string) *Room {
@@ -29,7 +37,7 @@ func crowdWorld(t *testing.T, softCap, maxCopies int) *World {
 	start.Inventory.AddItemByQuantity(&Item{ID: 1, Name: "lamp", Quantity: 1}, 1)
 	w.Spawners = []*BaddieSpawner{{ID: 1, TotalNumber: 1, tickDurationMS: 5000, Location: arena}}
 
-	w.configureAreas(CrowdConfig{SoftCap: softCap, MaxCopies: maxCopies, Areas: []AreaConfig{{Name: "start", Rooms: []int32{1, 2, 3}}}})
+	w.configureAreas(CrowdConfig{SoftCap: softCap, HardCap: hardCap, MaxCopies: maxCopies, Areas: []AreaConfig{{Name: "start", Rooms: []int32{1, 2, 3}}}})
 	return w
 }
 
@@ -44,7 +52,7 @@ func arrive(w *World, templateID int32, name string) *Room {
 
 func TestPlaceWithoutAreasUsesTheRoomItself(t *testing.T) {
 	w := &World{RoomMap: map[int32]*Room{1: {ID: 1, UserMap: map[string]*MudPlayer{}}, 7: {ID: 7, UserMap: map[string]*MudPlayer{}}}}
-	w.configureAreas(CrowdConfig{})
+	w.configureAreas(CrowdConfig{HardCap: 1000})
 	for i := 0; i < 500; i++ {
 		if got := arrive(w, 7, fmt.Sprint("p", i)); got != w.RoomMap[7] {
 			t.Fatalf("player %d went to room %v, want the room itself", i, got)
@@ -231,5 +239,146 @@ func TestCloneRoomsAreNeverPersistedAndNameTheirTemplate(t *testing.T) {
 	snap := p.snapshot()
 	if snap.RoomID != 1 || snap.SpawnLocationID != 1 {
 		t.Errorf("snapshot saved room %d / spawn %d, want the template 1 / 1", snap.RoomID, snap.SpawnLocationID)
+	}
+}
+
+// crowdPlayer is a player standing in room, able to move and be told things.
+func crowdPlayer(w *World, name string, room *Room) *MudPlayer {
+	p := &MudPlayer{Username: name, Session: &Session{out: make(chan []byte, 256), closed: make(chan struct{})},
+		Equipment: NewEquipmentSlots(), Inventory: CreateInventory(), world: w, Location: room}
+	room.AddPlayer(p)
+	p.rememberCopy()
+	return p
+}
+
+func fillRoom(room *Room, n int, prefix string) {
+	for i := 0; i < n; i++ {
+		name := fmt.Sprint(prefix, i)
+		room.UserMap[name] = &MudPlayer{Username: name, Session: &Session{out: make(chan []byte, 256), closed: make(chan struct{})}}
+	}
+}
+
+func TestMoveIsRefusedAtTheHardCapAndChangesNothing(t *testing.T) {
+	w := crowdWorldCaps(t, 50, 2, 10)
+	balcony := w.RoomMap[2]
+	fillRoom(balcony, 2, "fan")
+	mover := crowdPlayer(w, "mover", w.RoomMap[1])
+	bystander := crowdPlayer(w, "bystander", w.RoomMap[1])
+
+	if got := mover.MoveRoom("N"); got != muddata.ERR_ROOM_FULL {
+		t.Fatalf("MoveRoom into a full room = %d, want ERR_ROOM_FULL", got)
+	}
+	if mover.Location != w.RoomMap[1] || w.RoomMap[1].UserMap["mover"] != mover || balcony.UserMap["mover"] != nil {
+		t.Error("a refused move must leave the player where they were")
+	}
+	if len(bystander.Session.out) != 0 || len(balcony.UserMap["fan0"].Session.out) != 0 {
+		t.Error("a refused move must not announce a departure or an arrival")
+	}
+
+	delete(balcony.UserMap, "fan0")
+	if got := mover.MoveRoom("N"); got != muddata.MUD_OK || mover.Location != balcony {
+		t.Errorf("after space opened, MoveRoom = %d into room %d, want a normal move into the Balcony", got, mover.Location.ID)
+	}
+}
+
+func TestSharedRoomsAreCappedToo(t *testing.T) {
+	w := crowdWorldCaps(t, 50, 1, 10)
+	fillRoom(w.RoomMap[4], 1, "gardener")
+	p := crowdPlayer(w, "p", w.RoomMap[3])
+	if got := p.MoveRoom("E"); got != muddata.ERR_ROOM_FULL {
+		t.Errorf("MoveRoom into a full shared room = %d, want ERR_ROOM_FULL", got)
+	}
+	// An arrival whose saved room is a full shared room starts in the start area instead.
+	room, ok := w.place(4)
+	if !ok || room.area == nil || room.ID == 4 {
+		t.Errorf("arrival saved in a full shared room went to %v, want the start area", room)
+	}
+}
+
+func TestMovingInsideACopyStaysInTheCopy(t *testing.T) {
+	w := crowdWorld(t, 1, 10)
+	arrive(w, 1, "first")
+	p := crowdPlayer(w, "p", mustPlace(t, w, 1)) // opens copy 1
+	if p.Location.copy != 1 {
+		t.Fatalf("setup: player is in copy %d, want 1", p.Location.copy)
+	}
+	if got := p.MoveRoom("N"); got != muddata.MUD_OK {
+		t.Fatalf("MoveRoom = %d", got)
+	}
+	if p.Location.copy != 1 || !p.Location.clone || p.Location.TemplateID != 2 {
+		t.Errorf("after N the player is in copy %d template %d, want copy 1's Balcony", p.Location.copy, p.Location.TemplateID)
+	}
+	if p.lastCopy[p.Location.area] != 1 {
+		t.Errorf("remembered copy = %d, want 1", p.lastCopy[p.Location.area])
+	}
+}
+
+func mustPlace(t *testing.T, w *World, id int32) *Room {
+	t.Helper()
+	room, ok := w.place(id)
+	if !ok {
+		t.Fatalf("place(%d) refused", id)
+	}
+	return room
+}
+
+// Leaving the area through a shared room and coming back is a placement, and
+// the player returns to the copy they left, not whichever copy is fullest.
+func TestReturningToAnAreaBringsYouBackToYourCopy(t *testing.T) {
+	w := crowdWorld(t, 2, 10)
+	area := w.areas[3]
+	arrive(w, 3, "stayer") // copy 0's Arena holds 1: the fullest copy with space
+	copyOne := area.copies[w.cloneArea(area)][3]
+	p := crowdPlayer(w, "p", copyOne)
+
+	if got := p.MoveRoom("E"); got != muddata.MUD_OK || p.Location != w.RoomMap[4] {
+		t.Fatalf("leaving to the Garden: %d, in room %d", got, p.Location.ID)
+	}
+	if got := p.MoveRoom("W"); got != muddata.MUD_OK {
+		t.Fatalf("coming back: %d", got)
+	}
+	if p.Location != copyOne {
+		t.Errorf("came back to copy %d, want the copy they left (1); fill-first alone would have picked copy 0", p.Location.copy)
+	}
+}
+
+func TestReturningFallsBackWhenYourCopyIsFull(t *testing.T) {
+	w := crowdWorldCaps(t, 2, 3, 10)
+	area := w.areas[3]
+	copyOne := area.copies[w.cloneArea(area)][3]
+	p := crowdPlayer(w, "p", copyOne)
+	p.MoveRoom("E")
+	fillRoom(copyOne, 3, "squatter") // their old Arena fills while they are away
+	if got := p.MoveRoom("W"); got != muddata.MUD_OK {
+		t.Fatalf("coming back: %d", got)
+	}
+	if p.Location == copyOne || p.Location.persistID() != 3 {
+		t.Errorf("came back to room %d, want another copy of the Arena", p.Location.ID)
+	}
+}
+
+func TestCrossingIntoAFullAreaIsRefusedAtTheCopyLimit(t *testing.T) {
+	w := crowdWorldCaps(t, 1, 5, 1) // one copy, soft cap 1
+	arrive(w, 3, "stayer")
+	p := crowdPlayer(w, "p", w.RoomMap[4])
+	if got := p.MoveRoom("W"); got != muddata.ERR_ROOM_FULL {
+		t.Errorf("MoveRoom into an area with no space = %d, want ERR_ROOM_FULL", got)
+	}
+	if p.Location != w.RoomMap[4] {
+		t.Error("a refused crossing must leave the player in the Garden")
+	}
+}
+
+func TestRespawnPrefersTheCopyYouDiedIn(t *testing.T) {
+	w := crowdWorld(t, 3, 10)
+	area := w.areas[3]
+	arrive(w, 1, "a")
+	arrive(w, 1, "b") // copy 0's Start Room is the fuller one
+	copyOne := area.copies[w.cloneArea(area)]
+	p := crowdPlayer(w, "p", copyOne[3])
+	p.SpawnLocation = w.RoomMap[1]
+	p.Respawn()
+	if p.Location != copyOne[1] {
+		t.Errorf("respawned in copy %d, want the copy they died in (1)", p.Location.copy)
 	}
 }

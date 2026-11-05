@@ -65,9 +65,12 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 		action: func(player *MudPlayer, arguments string) int {
 			direction := arguments
 
-			if player.MoveRoom(direction) == muddata.ERR_ROOM_DNE {
+			switch player.MoveRoom(direction) {
+			case muddata.ERR_ROOM_DNE:
 				player.SendMessage("You cannot move there.\n")
-			} else {
+			case muddata.ERR_ROOM_FULL:
+				player.SendMessage("It's too crowded to go that way right now.\n")
+			default:
 				player.dirty = true
 				// Send description of new room
 				player.SendLook()

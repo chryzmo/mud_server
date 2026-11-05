@@ -38,6 +38,7 @@ type MudPlayer struct {
 	savedRoomID   int32
 	savedSpawnID  int32
 	world         *World         // set at admission; used to place a respawn
+	lastCopy      map[*Area]int  // the copy of each area the player was last in; loop-owned
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	SpawnLocation *Room
 }
@@ -158,17 +159,21 @@ func (mp *MudPlayer) MoveRoom(dir string) int {
 		dir = "D"
 	}
 
-	if mp.Location.ExitMap[dir] == nil {
+	newroom := mp.Location.ExitMap[dir]
+	if newroom == nil {
 		// Room does not exist
 		retcode = muddata.ERR_ROOM_DNE
+	} else if mp.world != nil && !mp.world.canEnter(mp, &newroom) {
+		// Too crowded; nothing has changed.
+		retcode = muddata.ERR_ROOM_FULL
 	} else {
 		// Clean up location info in old room, set new room
 		mp.Location.RemovePlayer(mp.Username)
 		mp.Location.BroadcastFrame(encodeLeave(mp.Username, dir), mp.Username)
 
 		// Set new location for Player
-		newroom := mp.Location.ExitMap[dir]
 		mp.Location = newroom
+		mp.rememberCopy()
 		mp.Location.BroadcastFrame(encodeArrive(mp.Username, dir), mp.Username)
 		mp.Location.AddPlayer(mp)
 	}
@@ -315,12 +320,13 @@ func (mp *MudPlayer) Respawn() {
 		if mp.world != nil {
 			// A respawn lands in a copy with room, like an arrival; if every copy is
 			// full the player still returns to their spawn room.
-			if room, ok := mp.world.place(mp.SpawnLocation.persistID()); ok {
+			if room, ok := mp.world.placeNear(mp.SpawnLocation.persistID(), mp.preferredCopy(mp.SpawnLocation)); ok {
 				mp.Location = room
 			}
 		}
 	}
 	mp.Location.AddPlayer(mp)
+	mp.rememberCopy()
 	mp.Location.BroadcastFrame(encodeArrive(mp.Username, ""), mp.Username)
 	mp.SendLook()
 }

@@ -312,6 +312,7 @@ func (ms *MudServer) admit(player *MudPlayer, greeting string) string {
 		}
 		refusal = ""
 		player.Location = room
+		player.rememberCopy()
 		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
 		player.world = ms.World
 		ms.players[player.Username] = player

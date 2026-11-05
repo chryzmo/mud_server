@@ -6,4 +6,5 @@ const (
 	ERR_USER_DNE        // User does not exist
 	ERR_COMMAND_UNKNOWN // Command unknown
 	ERR_INV_NOITEM      // Item not in inventory
+	ERR_ROOM_FULL       // Room is at its occupancy limit
 )

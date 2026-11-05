@@ -13,9 +13,13 @@ import (
 )
 
 func crowdConfig(softCap, maxCopies int) func(*mudserver.Configuration) {
+	return crowdConfigCaps(softCap, 0, maxCopies)
+}
+
+func crowdConfigCaps(softCap, hardCap, maxCopies int) func(*mudserver.Configuration) {
 	return func(c *mudserver.Configuration) {
 		c.Crowd = mudserver.CrowdConfig{
-			SoftCap: softCap, MaxCopies: maxCopies,
+			SoftCap: softCap, HardCap: hardCap, MaxCopies: maxCopies,
 			Areas: []mudserver.AreaConfig{{Name: "start", Rooms: []int32{1, 2, 3}}},
 		}
 	}
@@ -160,4 +164,29 @@ func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
 	for err := range errs {
 		t.Error(err)
 	}
+}
+
+func TestCrowdedRoomRefusesMovesOverTheWire(t *testing.T) {
+	wsURL, _ := startTestServerWithConfig(t, crowdConfigCaps(5, 1, 10))
+	ann := register(t, wsURL, "ann")
+	bob := register(t, wsURL, "bob") // placement fills copy 0 up to the soft cap of 5
+
+	send(t, ann, "MOVE N")
+	expect(t, ann, "You are in 'Balcony'")
+
+	send(t, bob, "MOVE N") // the Balcony is at the hard cap of 1
+	expect(t, bob, "too crowded")
+	if look := lookText(t, bob); !strings.Contains(look, "Start Room") {
+		t.Errorf("bob after a refused move:\n%s", look)
+	}
+
+	// The cap applies to every room, including the one ann wants to return to.
+	send(t, ann, "MOVE S")
+	expect(t, ann, "too crowded")
+
+	// Once ann moves on, the Balcony is free.
+	send(t, ann, "MOVE E")
+	expect(t, ann, "You are in 'Arena'")
+	send(t, bob, "MOVE N")
+	expect(t, bob, "You are in 'Balcony'")
 }
