@@ -41,9 +41,15 @@ func (spawner BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 
 func (spawner BaddieSpawner) RunTicker () {
 	spawner.ticker = time.NewTicker(time.Millisecond * time.Duration(spawner.tickDurationMS))
+	defer spawner.ticker.Stop()
 
+	for {
+		select {
+		case <-spawner.ticker.C:
+		case <-spawner.Location.done:
+			return
+		}
 
-	for range spawner.ticker.C {
 		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
 			// Spawn another baddie!
 			newbaddie := &BaddieNPC{

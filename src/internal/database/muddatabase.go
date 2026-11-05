@@ -2,6 +2,7 @@ package muddatabase
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,6 +29,20 @@ func CreateDatabase(db_url string) (MudDatabase) {
 	}
 
 	return muddb
+}
+
+// WaitUntilReachable pings the database until it answers or the wait runs out.
+func (db MudDatabase) WaitUntilReachable(wait time.Duration) error {
+	deadline := time.Now().Add(wait)
+	for {
+		ctx, cancel := context.WithTimeout(db.Context, 2*time.Second)
+		err := db.Connection.Ping(ctx)
+		cancel()
+		if err == nil || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func (db MudDatabase) ExecWithArgs(query string, args pgx.NamedArgs) error {

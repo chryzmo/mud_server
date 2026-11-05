@@ -2,6 +2,8 @@ package mudserver
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
@@ -23,6 +25,8 @@ type MudServer struct {
 	Commands    map[string]*MudCommand
 	Configuration Configuration
 	DB          muddatabase.MudDatabase
+	done        chan struct{} // closed by Shutdown; every server goroutine exits when it closes
+	closeOnce   sync.Once
 }
 
 /*
@@ -38,18 +42,35 @@ func CreateMudServer() *MudServer {
 	c = c.LoadConfig(configFile)
 	c.ApplyEnvOverrides()
 
-	return NewMudServer(c)
+	server, err := NewMudServer(c)
+	if err != nil {
+		fmt.Println("Startup failed: " + err.Error())
+		os.Exit(1)
+	}
+	return server
 }
 
 /*
 	NewMudServer builds a server from an already-loaded Configuration.  Tests use
 	this directly to point at the test database.
 */
-func NewMudServer(c Configuration) *MudServer {
+func NewMudServer(c Configuration) (*MudServer, error) {
 	db := muddatabase.CreateDatabase(c.DatabaseConnectionURL())
 
+	// Fail fast rather than start with an empty world: loading rooms from an
+	// unreachable database silently yields none.
+	wait := time.Duration(c.Database.StartupWaitSeconds) * time.Second
+	if wait <= 0 {
+		wait = 30 * time.Second
+	}
+	if err := db.WaitUntilReachable(wait); err != nil {
+		db.Connection.Close()
+		return nil, errors.New("database unreachable: " + err.Error())
+	}
+
+	done := make(chan struct{})
 	serverWhisperChannel := make(chan MudMessage)
-	w := createWorld(&db, c.Game.RoomTickDurationInMS, serverWhisperChannel)
+	w := createWorld(&db, c.Game.RoomTickDurationInMS, serverWhisperChannel, done)
 
 	server := &MudServer{
 		playerList:    make(map[*MudPlayer]*MudPlayer),
@@ -59,11 +80,40 @@ func NewMudServer(c Configuration) *MudServer {
 		Commands:      GenerateCommandList(&db),
 		Configuration: c,
 		DB:            db,
+		done:          done,
 	}
 
 	go server.ProcessGlobalWhispers()
 
-	return server
+	return server, nil
+}
+
+/*
+	Shutdown stops every server goroutine, saves and disconnects every player,
+	saves every room, and closes the database pool.  Safe to call more than once.
+*/
+func (ms *MudServer) Shutdown(ctx context.Context) {
+	ms.closeOnce.Do(func() {
+		close(ms.done)
+
+		ms.playerMu.RLock()
+		players := make([]*MudPlayer, 0, len(ms.playerList))
+		for _, player := range ms.playerList {
+			players = append(players, player)
+		}
+		ms.playerMu.RUnlock()
+
+		for _, player := range players {
+			if ctx.Err() != nil {
+				break
+			}
+			player.SendMessage("SERVER:  The server is restarting.  Reconnect in a moment.\n")
+			ms.DeleteConnection(player)
+		}
+
+		ms.World.WriteWorldToDB(&ms.DB)
+		ms.DB.Connection.Close()
+	})
 }
 
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
@@ -150,7 +200,12 @@ func (ms *MudServer) getCommand(commandname string) (*MudCommand, int) {
 
 func (ms *MudServer) ProcessGlobalWhispers() {
 	for {
-		whisperMUDMessage := <-ms.WhisperChan
+		var whisperMUDMessage MudMessage
+		select {
+		case whisperMUDMessage = <-ms.WhisperChan:
+		case <-ms.done:
+			return
+		}
 
 		targetPlayer := ms.GetPlayerByUsername(whisperMUDMessage.CommandTarget)
 		messageContent := whisperMUDMessage.CommandParameter
@@ -269,7 +324,11 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			player.SendStatUpdate()
 
 		} else {
-			ms.Broadcast <- msg
+			select {
+			case ms.Broadcast <- msg:
+			case <-ms.done:
+				return
+			}
 		}
 	}
 }
@@ -281,7 +340,12 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 func (ms *MudServer) HandleMessages() {
 	for {
 		// Pop message off queue
-		msg := <-ms.Broadcast
+		var msg MudMessage
+		select {
+		case msg = <-ms.Broadcast:
+		case <-ms.done:
+			return
+		}
 
 		// Prepare variables for lookup & action
 		player := ms.GetPlayerByMudPlayer(msg.SenderPlayer)
@@ -307,7 +371,15 @@ func (ms *MudServer) HandleMessages() {
 func (ms *MudServer) RunMaintenanceactions() {
 	maintenanceTicker := time.NewTicker(time.Minute * time.Duration(ms.Configuration.Server.WorldSaveDelayMinutes))
 
-	for range maintenanceTicker.C {
+	defer maintenanceTicker.Stop()
+
+	for {
+		select {
+		case <-maintenanceTicker.C:
+		case <-ms.done:
+			return
+		}
+
 		// Save all MudPlayer states to DB.  Iterate over a snapshot: a failed send
 		// calls DeleteConnection, which needs the lock.
 		ms.playerMu.RLock()

@@ -29,6 +29,7 @@ type Room struct {
 	ticker               *time.Ticker
 	tickDurationInMS     int32
 	GlobalWhisperChannel chan MudMessage
+	done                 <-chan struct{} // the server's shutdown signal
 	userMu               sync.RWMutex
 	baddieMu             sync.RWMutex
 }
@@ -71,8 +72,15 @@ func CreateRoom(name string, description string, tickdur int32, whisperchan chan
 
 func (room *Room) RunTicker() {
 	room.ticker = time.NewTicker(time.Millisecond * time.Duration(room.tickDurationInMS))
+	defer room.ticker.Stop()
 
-	for range room.ticker.C {
+	for {
+		select {
+		case <-room.ticker.C:
+		case <-room.done:
+			return
+		}
+
 		// Snapshot BaddieMap so TurnAction (which may call KillNPC) can safely
 		// acquire the write lock without deadlocking the ticker.
 		room.baddieMu.RLock()
@@ -90,7 +98,12 @@ func (room *Room) RunTicker() {
 
 func (r *Room) ProcessBroadcast() {
 	for {
-		msg := <-r.RoomBroadcastChannel
+		var msg RoomMessage
+		select {
+		case msg = <-r.RoomBroadcastChannel:
+		case <-r.done:
+			return
+		}
 
 		r.userMu.RLock()
 		for _, player := range r.UserMap {
@@ -108,7 +121,10 @@ func (r *Room) Broadcast(msg string, senderusername string) {
 		CommandParameter: msg,
 		SenderUsername:   senderusername,
 	}
-	r.RoomBroadcastChannel <- roommsg
+	select {
+	case r.RoomBroadcastChannel <- roommsg:
+	case <-r.done:
+	}
 }
 
 func (r *Room) LookDescription() string {
@@ -240,6 +256,7 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, tickdur int32, roomid in
 			ExitJSON:             ret.ExitJSON,
 			tickDurationInMS:     tickdur,
 			GlobalWhisperChannel: r.GlobalWhisperChannel,
+			done:                 r.done,
 		}
 
 		for iid := range ret.InventoryIDSlice {

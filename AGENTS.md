@@ -58,7 +58,9 @@ script there.
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
-comes back. Don't weaken `-race`; a race report is a real bug.
+comes back. Don't weaken `-race`; a race report is a real bug. The only sanctioned exception is
+`skipUntilGameLoop` in `src/gameplay_test.go`, for the known races listed in `plans/game-loop.md`
+that step 3 removes; don't add tests to it for new races.
 
 ## Deploying
 

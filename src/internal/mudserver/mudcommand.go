@@ -88,7 +88,11 @@ func GenerateCommandList(db *muddatabase.MudDatabase) map[string]*MudCommand {
 					SenderPlayer:     player,
 				}
 
-				player.Location.GlobalWhisperChannel <- mudMessage
+				select {
+				case player.Location.GlobalWhisperChannel <- mudMessage:
+				case <-player.Location.done:
+					return muddata.MUD_OK
+				}
 				player.SendMessage(mudutils.ColorString("You whisper to "+target+", \""+message+"\"", mudutils.COLOR_MAGENTA))
 			}
 

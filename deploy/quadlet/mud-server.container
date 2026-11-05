@@ -9,10 +9,13 @@ Image=localhost/mud-server:current
 Pod=mud.pod
 Environment=MUD_LISTEN_ADDR=127.0.0.1:8080
 EnvironmentFile=%h/mud/secrets.env
+# On stop, the server saves and disconnects everyone; give it time before SIGKILL.
+StopTimeout=30
 
 [Service]
 Restart=always
 RestartSec=1
+TimeoutStopSec=45
 
 [Install]
 WantedBy=default.target
