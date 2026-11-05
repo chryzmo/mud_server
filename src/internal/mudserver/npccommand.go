@@ -21,11 +21,12 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 				baddie.TargetPC = nil
 			}
 			if baddie.TargetPC == nil {
-				// Janky way to select first PC in Room Map. (It actually looks at every
-				// player in turn and keeps the last; kept as-is, see the plan's Phase 4 combat fixes.)
+				// Select one occupant and announce once. Broadcasting for every
+				// candidate floods each client's queue in a crowded room.
 				for _, p := range baddie.Location.Players() {
 					baddie.TargetPC = p
 					baddie.Location.Broadcast(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED)+" looks at "+p.Username+".", "")
+					break
 				}
 			} else {
 				// If NPC has target, attack
