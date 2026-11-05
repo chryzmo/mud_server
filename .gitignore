@@ -11,3 +11,6 @@ Thumbs.db
 
 # Local planning docs
 plans/
+
+# Local deploy settings (host IP etc.)
+deploy/deploy.local.env

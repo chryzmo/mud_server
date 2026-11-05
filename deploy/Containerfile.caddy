@@ -1,0 +1,5 @@
+# Caddy serving the built frontend and proxying /ws to the game server.
+# deploy/deploy.sh passes the frontend's dist/ as the "frontend" build context.
+FROM docker.io/library/caddy:2
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=frontend . /srv

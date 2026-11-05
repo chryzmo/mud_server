@@ -1,0 +1,7 @@
+# All three containers share this pod's network namespace, so they reach each
+# other on 127.0.0.1. Only Caddy's ports are published.
+[Pod]
+PodName=mud
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=443:443/udp

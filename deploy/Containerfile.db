@@ -1,0 +1,5 @@
+# Postgres with the schema and seed data baked in. The seed runs only when the
+# data volume is first initialized; later deploys don't touch existing data.
+FROM docker.io/library/postgres:17
+COPY src/sql /sql
+COPY db/init/02-seed.sh /docker-entrypoint-initdb.d/02-seed.sh

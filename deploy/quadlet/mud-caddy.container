@@ -1,0 +1,15 @@
+[Unit]
+Description=MUD Caddy (TLS, static frontend, /ws proxy)
+
+[Container]
+ContainerName=mud-caddy
+Image=localhost/mud-caddy:current
+Pod=mud.pod
+Volume=mud-caddy-data.volume:/data
+EnvironmentFile=%h/mud/caddy.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
