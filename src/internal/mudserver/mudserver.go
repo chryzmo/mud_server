@@ -57,6 +57,7 @@ type MudServer struct {
 	dormant map[*MudPlayer]time.Time
 
 	recoveries *recoveryGuard // wrong recovery codes per name; used by readers, has its own lock
+	joinLimit  *joinLimiter   // one bucket for every join/resume/recover/login/register; has its own lock
 
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
@@ -129,6 +130,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		loopDone:      make(chan struct{}),
 	}
 	server.recoveries = newRecoveryGuard(server.recoveryLock())
+	server.joinLimit = newJoinLimiter(c.Connection.JoinPerSecond, c.Connection.JoinBurst)
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
@@ -459,10 +461,16 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
 				continue
 			}
+			if !ms.allowJoin(session) {
+				continue
+			}
 			admitted = ms.join(player, in.Name)
 		case msgResume:
 			if admitted {
 				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
+				continue
+			}
+			if !ms.allowJoin(session) {
 				continue
 			}
 			if resumed := ms.resume(player, session, in.Token, in.Received); resumed != nil {
@@ -472,6 +480,9 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 		case msgRecover:
 			if admitted {
 				session.sendError(codeAlreadyLoggedIn, "You are already in the game.")
+				continue
+			}
+			if !ms.allowJoin(session) {
 				continue
 			}
 			if recovered := ms.recoverGuest(player, session, in.Name, in.Code); recovered != nil {
@@ -489,6 +500,9 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			}
 			if strings.IndexFunc(in.Username, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
 				session.sendAuth(false, codeInvalidUsername, "Usernames can't contain spaces or control characters.")
+				continue
+			}
+			if !ms.allowJoin(session) {
 				continue
 			}
 			if in.T == msgRegister {

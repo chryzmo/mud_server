@@ -119,16 +119,17 @@ func (c *StormCycle) finish() {
 }
 
 type StormReport struct {
-	Requested      int           `json:"requested"`
-	Joined         int           `json:"joined"`
-	JoinFailures   int           `json:"join_failures"`
-	ActiveAtEnd    int64         `json:"active_at_end"`
-	ActionsSent    int64         `json:"actions_sent"`
-	AdmissionTime  time.Duration `json:"admission_ns"`
-	Cycles         []*StormCycle `json:"cycles"`
-	Unplanned      *StormCycle   `json:"unplanned_reconnects"`
-	UnplannedDrops int           `json:"unplanned_drops"`
-	FirstErrors    []string      `json:"first_errors,omitempty"`
+	Requested       int           `json:"requested"`
+	Joined          int           `json:"joined"`
+	JoinFailures    int           `json:"join_failures"`
+	ActiveAtEnd     int64         `json:"active_at_end"`
+	ActionsSent     int64         `json:"actions_sent"`
+	AdmissionTime   time.Duration `json:"admission_ns"`
+	Cycles          []*StormCycle `json:"cycles"`
+	Unplanned       *StormCycle   `json:"unplanned_reconnects"`
+	UnplannedDrops  int           `json:"unplanned_drops"`
+	JoinRateLimited int           `json:"join_rate_limited_replies"` // refused by the server's join limit while joining; the bots waited and retried
+	FirstErrors     []string      `json:"first_errors,omitempty"`
 }
 
 type stormBot struct {
@@ -155,6 +156,7 @@ type stormRun struct {
 	active    atomic.Int64
 	actions   atomic.Int64
 	drops     atomic.Int64
+	limited   atomic.Int64 // rate_limited replies seen while joining
 	errMu     sync.Mutex
 	errs      []string
 }
@@ -222,6 +224,7 @@ feed:
 	workers.Wait()
 	cancelJoin()
 	report.AdmissionTime = time.Since(started)
+	report.JoinRateLimited = int(run.limited.Load())
 
 	// Play.
 	var wg sync.WaitGroup
@@ -325,7 +328,8 @@ func (r *stormRun) join(ctx context.Context, index int) (*stormBot, error) {
 		}
 	}()
 	b := &stormBot{cfg: &r.cfg, index: index, name: Name(r.cfg.Prefix, index), report: r, wake: make(chan struct{}, 1)}
-	if err := conn.WriteMessage(websocket.TextMessage, frame("join", map[string]string{"name": b.name})); err != nil {
+	joinFrame := frame("join", map[string]string{"name": b.name})
+	if err := conn.WriteMessage(websocket.TextMessage, joinFrame); err != nil {
 		return nil, err
 	}
 	for {
@@ -335,6 +339,15 @@ func (r *stormRun) join(ctx context.Context, index int) (*stormBot, error) {
 		}
 		f := parseFrame(raw)
 		switch {
+		case f.T == "error" && f.Code == "rate_limited":
+			// The server's join limit: wait as told, within the admission budget, and ask again.
+			r.limited.Add(1)
+			if err := waitToRetry(ctx, f.RetryMS); err != nil {
+				return nil, err
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, joinFrame); err != nil {
+				return nil, err
+			}
 		case f.T == "auth" && f.OK:
 			b.token = f.Token
 			if b.token == "" {
@@ -484,8 +497,14 @@ func (b *stormBot) reconnect(ctx context.Context, cycle *StormCycle, cutAt time.
 			return
 		}
 		cycle.record(func(c *StormCycle) { c.Retries++ })
-		wait = max(retryAfter, backoff) + jitter(b.cfg.Jitter)
-		backoff = min(backoff*2, 10*time.Second)
+		if retryAfter > 0 {
+			// The server said when to come back: do that, with a little jitter. Its hint
+			// already spreads the crowd out, so this is not a failure to back off from.
+			wait = retryAfter + jitter(min(b.cfg.Jitter, time.Second))
+		} else {
+			wait = backoff + jitter(b.cfg.Jitter)
+			backoff = min(backoff*2, 10*time.Second)
+		}
 	}
 }
 

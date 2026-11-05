@@ -130,6 +130,7 @@ type (
 		T       string `json:"t"`
 		Code    string `json:"code"`
 		Message string `json:"message"`
+		RetryMS int    `json:"retry_ms,omitempty"` // rate_limited: when to try again
 	}
 	statsMsg struct {
 		T        string `json:"t"`
