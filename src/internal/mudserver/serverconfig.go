@@ -2,7 +2,9 @@ package mudserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Configuration struct {
@@ -12,6 +14,7 @@ type Configuration struct {
 		WorldSaveDelayMinutes int32 `json:"WorldSaveDelayMinutes"`
 	} `json:"Server"`
 	Database struct {
+		DatabaseURL string `json:"DatabaseURL"`
 		DatabaseHost string `json:"DatabaseHost"`
 		DatabasePort string `json:"DatabasePort"`
 		DatabaseUsername string `json:"DatabaseUsername"`
@@ -30,8 +33,11 @@ type Configuration struct {
 }
 
 func (c Configuration) LoadConfig (config_file string) (Configuration) {
-	pwd, _ := os.Getwd()
-	file, _ := os.Open(pwd+"/"+config_file)
+	if !filepath.IsAbs(config_file) {
+		pwd, _ := os.Getwd()
+		config_file = pwd + "/" + config_file
+	}
+	file, _ := os.Open(config_file)
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
@@ -44,4 +50,27 @@ func (c Configuration) LoadConfig (config_file string) (Configuration) {
 
 	return serverconfig
 
+}
+
+/*
+	Environment variables override the config file, so the same file works for
+	local development, tests and the VPS.
+		MUD_LISTEN_ADDR    overrides Server.ListenPort (e.g. "127.0.0.1:8080")
+		MUD_DATABASE_URL   overrides all Database settings (postgres://user:pass@host:port/db)
+*/
+func (c *Configuration) ApplyEnvOverrides() {
+	if v := os.Getenv("MUD_LISTEN_ADDR"); v != "" {
+		c.Server.ListenPort = v
+	}
+	if v := os.Getenv("MUD_DATABASE_URL"); v != "" {
+		c.Database.DatabaseURL = v
+	}
+}
+
+// DatabaseConnectionURL returns DatabaseURL if set, otherwise builds one from the individual fields.
+func (c Configuration) DatabaseConnectionURL() string {
+	if c.Database.DatabaseURL != "" {
+		return c.Database.DatabaseURL
+	}
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", c.Database.DatabaseUsername, c.Database.DatabasePassword, c.Database.DatabaseHost, c.Database.DatabasePort, c.Database.DatabaseName)
 }

@@ -1,0 +1,8 @@
+# Order to load the schema and seed scripts in (foreign keys depend on it).
+# Read by db/init/02-seed.sh and the Go integration tests.
+room.sql
+item.sql
+equipment.sql
+baddienpc_generic.sql
+baddiespawner.sql
+mudplayer.sql
