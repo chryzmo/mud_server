@@ -107,3 +107,31 @@ func TestNPCTargetSelectionRetainsAndReplacesTarget(t *testing.T) {
 		}
 	})
 }
+
+// SAY costs one send per occupant, so a throttled SAY must reach nobody and
+// the speaker is told once, not once per refused attempt.
+func TestSayIsLimitedPerPlayerOnLoop(t *testing.T) {
+	ms := startBareLoop(t)
+	callLoop(t, ms, func() {
+		room := &Room{UserMap: make(map[string]*MudPlayer)}
+		speaker := npcTestPlayer("speaker")
+		listener := npcTestPlayer("listener")
+		speaker.Session.settings = SessionSettings{SayPerSecond: 1, SayBurst: 2}.withDefaults()
+		speaker.Location, listener.Location = room, room
+		room.AddPlayer(speaker)
+		room.AddPlayer(listener)
+
+		say := GenerateCommandList(nil, nil)["SAY"]
+		for i := 0; i < 10; i++ {
+			say.action(speaker, "hi")
+		}
+
+		if got := len(listener.Session.out); got != 2 {
+			t.Errorf("listener received %d SAYs, want burst of 2", got)
+		}
+		// 2 echoes plus a single coalesced notice.
+		if got := len(speaker.Session.out); got != 3 {
+			t.Errorf("speaker received %d messages, want 2 echoes and 1 notice", got)
+		}
+	})
+}

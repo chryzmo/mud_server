@@ -32,7 +32,8 @@ type MudPlayer struct {
 	MaxHP         int
 	MaxMP         int
 	NPCTarget     *BaddieNPC
-	dirty         bool // changed since the last save; see persist.go
+	dirty         bool           // changed since the last save; see persist.go
+	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	SpawnLocation *Room
 }
 
@@ -76,6 +77,19 @@ func CreateMudPlayer(session *Session, room *Room, stats PlayerStartStats) *MudP
 		MaxMP:         stats.MaxMP,
 		SpawnLocation: room,
 	}
+}
+
+// allowSay reports whether the player may SAY now, telling them when it is
+// refused. Runs on the game loop.
+func (mp *MudPlayer) allowSay(now time.Time) bool {
+	if mp.sayLimiter.capacity == 0 {
+		mp.sayLimiter = newSayLimiter(mp.Session.settings, now)
+	}
+	allowed, notify := mp.sayLimiter.allow(now)
+	if notify {
+		mp.SendMessage("You are talking too fast.")
+	}
+	return allowed
 }
 
 // EffectiveAttackPower returns base attack plus all equipment bonuses.

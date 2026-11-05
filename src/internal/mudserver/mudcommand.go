@@ -8,6 +8,7 @@ import (
 	"mud_server/src/internal/mudutils"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type MudCommand struct {
@@ -28,6 +29,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 
 			if msg == "" {
 				player.SendMessage("You stand in silence.")
+				return muddata.MUD_OK
+			}
+
+			if !player.allowSay(time.Now()) {
 				return muddata.MUD_OK
 			}
 

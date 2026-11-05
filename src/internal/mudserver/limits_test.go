@@ -80,3 +80,32 @@ func TestSessionLimitDefaultsAndConfig(t *testing.T) {
 		t.Fatalf("configured limits lost: %+v", s)
 	}
 }
+
+func TestSayLimiterDefaultsAndPerPlayerBuckets(t *testing.T) {
+	now := time.Unix(100, 0)
+	settings := SessionSettings{}
+	a := newSayLimiter(settings, now)
+	for i := 0; i < 5; i++ {
+		if allowed, notify := a.allow(now); !allowed || notify {
+			t.Fatalf("burst SAY %d: allowed=%v notify=%v", i, allowed, notify)
+		}
+	}
+	if allowed, notify := a.allow(now); allowed || !notify {
+		t.Fatalf("excess SAY: allowed=%v notify=%v", allowed, notify)
+	}
+	if allowed, _ := a.allow(now.Add(999 * time.Millisecond)); allowed {
+		t.Fatal("refill below one token permitted a SAY")
+	}
+	if allowed, _ := a.allow(now.Add(time.Second)); !allowed {
+		t.Fatal("one second at 1/s should permit one SAY")
+	}
+	b := newSayLimiter(settings, now)
+	if allowed, _ := b.allow(now); !allowed {
+		t.Fatal("one player exhausted another player's bucket")
+	}
+	custom := newSayLimiter(SessionSettings{SayPerSecond: 2, SayBurst: 1}, now)
+	custom.allow(now)
+	if allowed, _ := custom.allow(now.Add(500 * time.Millisecond)); !allowed {
+		t.Fatal("configured rate of 2/s should refill a token in 500ms")
+	}
+}
