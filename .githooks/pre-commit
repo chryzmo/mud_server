@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Pre-commit checks. Enable once per clone with scripts/install-git-hooks.sh.
+#
+#   1. Refuse files that usually hold secrets (.env, private keys, keystores).
+#   2. Scan the staged changes for secrets: gitleaks if it's installed, plus
+#      built-in patterns for private keys, cloud and API tokens, and credentials.
+#   3. Refuse merge-conflict markers and files over 1 MB.
+#   4. Run scripts/test.sh, unless this exact tree already passed.
+#
+# A line that trips the secret scan but is safe can be marked with a
+# "pre-commit: allow-secret" comment. Bypass the whole hook only when the user
+# asks for it: git commit --no-verify
+set -uo pipefail
+
+repo="$(git rev-parse --show-toplevel)"
+cd "$repo"
+git_dir="$(git rev-parse --absolute-git-dir)"
+failed=0
+fail() { printf 'pre-commit: %s\n' "$*" >&2; failed=1; }
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -n "$staged" ] || exit 0
+
+# 1. Files that usually hold secrets.
+while IFS= read -r f; do
+	case "$(basename "$f")" in
+		*.example | *.sample | *.template) ;;
+		.env | .env.* | *.pem | *.key | *.p12 | *.pfx | *.keystore | *.jks | \
+			id_rsa* | id_dsa* | id_ecdsa* | id_ed25519* | credentials.json | service-account*.json)
+			fail "$f: refusing to commit a file that usually holds secrets" ;;
+	esac
+done <<< "$staged"
+
+# 2. Secrets in added lines. Lockfiles are skipped: they're generated and only hold hashes.
+patterns=(
+	'private key|-----BEGIN ([A-Z]+ )?PRIVATE KEY'
+	'AWS access key|(AKIA|ASIA)[0-9A-Z]{16}'
+	'GitHub token|(gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})'
+	'Anthropic API key|sk-ant-[A-Za-z0-9_-]{20,}'
+	'OpenAI-style API key|sk-[A-Za-z0-9]{32,}'
+	'Slack token|xox[abposr]-[A-Za-z0-9-]{10,}'
+	'Google API key|AIza[0-9A-Za-z_-]{35}'
+	'Stripe key|(sk|rk)_live_[0-9A-Za-z]{16,}'
+	'credentials in a URL|[a-z][a-z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]:@]{8,}@'
+	'hardcoded secret|(password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"'[:space:]]{8,}["'"'"']'
+)
+added="$(git diff --cached -U0 --no-color --diff-filter=ACMR -- . \
+	':(exclude)package-lock.json' ':(exclude)go.sum' ':(exclude)*.lock' |
+	awk '/^\+\+\+ b\// { file = substr($0, 7); next }
+	     /^\+/ && !/^\+\+\+/ { print file "\t" substr($0, 2) }' |
+	grep -v 'pre-commit: allow-secret')"
+if [ -n "$added" ]; then
+	for entry in "${patterns[@]}"; do
+		name="${entry%%|*}"
+		regex="${entry#*|}"
+		while IFS= read -r file; do
+			[ -n "$file" ] && fail "$file: possible $name in the staged changes"
+		done < <(printf '%s\n' "$added" | grep -iE -- "$regex" | cut -f1 | sort -u)
+	done
+fi
+if command -v gitleaks > /dev/null; then
+	if ! gitleaks git --pre-commit --staged --redact --no-banner > /dev/null 2>&1 &&
+		! gitleaks protect --staged --redact --no-banner > /dev/null 2>&1; then
+		fail "gitleaks found possible secrets; run 'gitleaks git --pre-commit --staged --redact' for details"
+	fi
+fi
+
+# 3. Conflict markers and large files.
+conflicts="$(printf '%s\n' "$added" | grep -E $'\t(<<<<<<<|>>>>>>>)( |$)|\t=======$' | cut -f1 | sort -u)"
+while IFS= read -r file; do
+	[ -n "$file" ] && fail "$file: contains merge-conflict markers"
+done <<< "$conflicts"
+while IFS= read -r f; do
+	size="$(git cat-file -s ":$f" 2> /dev/null || echo 0)"
+	[ "$size" -gt 1048576 ] && fail "$f: $((size / 1024)) KB is over the 1 MB limit"
+done <<< "$staged"
+
+if [ "$failed" -ne 0 ]; then
+	echo "pre-commit: commit blocked. Remove the secret (rotate it if it was real) or fix the file, then commit again." >&2
+	exit 1
+fi
+
+# 4. Tests. They run against the working tree, so snapshot it the same way the
+# agent Stop hook does and skip if this exact tree already passed.
+state="$git_dir/agent-tests-passed-tree"
+tmp_index="$(mktemp)"
+trap 'rm -f "$tmp_index"' EXIT
+cp "${GIT_INDEX_FILE:-$git_dir/index}" "$tmp_index" 2> /dev/null || true
+GIT_INDEX_FILE="$tmp_index" git add -A > /dev/null 2>&1
+worktree="$(GIT_INDEX_FILE="$tmp_index" git write-tree)"
+staged_tree="$(git write-tree)"
+
+if [ "$worktree" = "$staged_tree" ] && [ -f "$state" ] && [ "$(cat "$state")" = "$worktree" ]; then
+	exit 0
+fi
+if [ "$worktree" != "$staged_tree" ]; then
+	echo "pre-commit: note: tests run on the working tree, which has changes that aren't staged." >&2
+fi
+
+echo "pre-commit: running scripts/test.sh" >&2
+if ! output="$(scripts/test.sh 2>&1)"; then
+	printf '%s\n' "$output" | tail -n 60 >&2
+	echo "pre-commit: scripts/test.sh failed; commit blocked." >&2
+	exit 1
+fi
+[ "$worktree" = "$staged_tree" ] && echo "$worktree" > "$state"
+exit 0

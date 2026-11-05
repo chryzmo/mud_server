@@ -14,3 +14,5 @@ scripts/db.sh reset   # wipe the database volume and reseed
 
 Config comes from `config/server_config.json`. Environment variables override it:
 `MUD_CONFIG` (path to the config file), `MUD_LISTEN_ADDR`, `MUD_DATABASE_URL`.
+
+Run `scripts/install-git-hooks.sh` once per clone to enable the pre-commit hook (secret scan, conflict markers, large files, tests).
