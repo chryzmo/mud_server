@@ -16,6 +16,9 @@ type Configuration struct {
 	} `json:"Server"`
 	// Per-connection tuning; zero means the default (see SessionSettings).
 	Connection struct {
+		ReadLimitBytes    int64 `json:"ReadLimitBytes"`
+		CommandsPerSecond int `json:"CommandsPerSecond"`
+		CommandBurst      int `json:"CommandBurst"`
 		OutboundQueueSize int `json:"OutboundQueueSize"`
 		WriteTimeoutMS    int `json:"WriteTimeoutMS"`
 		PingIntervalMS    int `json:"PingIntervalMS"`
@@ -80,6 +83,9 @@ func (c *Configuration) ApplyEnvOverrides() {
 func (c Configuration) SessionSettings() SessionSettings {
 	ms := func(n int) time.Duration { return time.Duration(n) * time.Millisecond }
 	return SessionSettings{
+		ReadLimitBytes:    c.Connection.ReadLimitBytes,
+		CommandsPerSecond: c.Connection.CommandsPerSecond,
+		CommandBurst:      c.Connection.CommandBurst,
 		OutboundQueueSize: c.Connection.OutboundQueueSize,
 		WriteTimeout:      ms(c.Connection.WriteTimeoutMS),
 		PingInterval:      ms(c.Connection.PingIntervalMS),

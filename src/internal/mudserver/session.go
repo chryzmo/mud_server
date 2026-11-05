@@ -9,15 +9,15 @@ import (
 )
 
 /*
-	A Session is one websocket connection. Everything sent to the client goes
-	through its bounded outbound queue; one writer goroutine drains the queue,
-	so a slow or stalled client can never block the game. When the queue is
-	full the client is too far behind, and the session is closed (the reader
-	then sees the error and cleans up the player, as for any disconnect).
+A Session is one websocket connection. Its reader limits message size and
+command rate before parsing or authentication. Everything sent to the client
+goes through its bounded outbound queue; one writer goroutine drains it, so
+a slow or stalled client can never block the game. When the queue is full,
+the session is closed and the reader cleans up the player.
 
-	The writer also pings the client. Browsers answer pings automatically; the
-	pong extends the read deadline, so a client that has silently gone away
-	(phone asleep, Wi-Fi dropped) is noticed within PongTimeout.
+The writer also pings the client. Browsers answer pings automatically; the
+pong extends the read deadline, so a client that has silently gone away
+(phone asleep, Wi-Fi dropped) is noticed within PongTimeout.
 */
 type Session struct {
 	conn      *websocket.Conn
@@ -25,10 +25,15 @@ type Session struct {
 	closed    chan struct{}
 	closeOnce sync.Once
 	settings  SessionSettings
+	limiter   commandLimiter // reader-owned, including before login
 }
 
-// SessionSettings tunes the outbound queue and keepalives. Zero fields take the defaults.
+// SessionSettings tunes connection limits, the outbound queue and keepalives.
+// Zero fields take the defaults.
 type SessionSettings struct {
+	ReadLimitBytes    int64         // per message, including fragments; default 4096
+	CommandsPerSecond int           // reader-side token refill rate; default 10
+	CommandBurst      int           // token bucket capacity; default 20
 	OutboundQueueSize int           // messages; default 256
 	WriteTimeout      time.Duration // per write; default 10s
 	PingInterval      time.Duration // default 30s; Cloudflare closes websockets idle for 100s
@@ -38,6 +43,15 @@ type SessionSettings struct {
 var errSessionClosed = errors.New("session closed")
 
 func (s SessionSettings) withDefaults() SessionSettings {
+	if s.ReadLimitBytes <= 0 {
+		s.ReadLimitBytes = 4096
+	}
+	if s.CommandsPerSecond <= 0 {
+		s.CommandsPerSecond = 10
+	}
+	if s.CommandBurst <= 0 {
+		s.CommandBurst = 20
+	}
 	if s.OutboundQueueSize <= 0 {
 		s.OutboundQueueSize = 256
 	}
@@ -60,7 +74,9 @@ func NewSession(conn *websocket.Conn, settings SessionSettings) *Session {
 		closed:   make(chan struct{}),
 	}
 	s.out = make(chan []byte, s.settings.OutboundQueueSize)
+	s.limiter = newCommandLimiter(s.settings, time.Now())
 
+	conn.SetReadLimit(s.settings.ReadLimitBytes)
 	conn.SetReadDeadline(time.Now().Add(s.settings.PongTimeout))
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(s.settings.PongTimeout))
@@ -98,6 +114,16 @@ func (s *Session) ReadMessage() ([]byte, error) {
 	return message, err
 }
 
+// allowCommand runs only on the reader, before parsing or authentication. Notices
+// are coalesced to at most one per second, so a flood cannot flood the output too.
+func (s *Session) allowCommand(now time.Time) bool {
+	allowed, notify := s.limiter.allow(now)
+	if notify {
+		s.Send([]byte("SERVER:  Slow down. Too many commands.\n"))
+	}
+	return allowed
+}
+
 // Close stops the session. The writer flushes what's already queued (briefly)
 // and closes the connection, which also ends the reader. Safe to call repeatedly.
 func (s *Session) Close() {
@@ -108,8 +134,10 @@ func (s *Session) writeLoop() {
 	ping := time.NewTicker(s.settings.PingInterval)
 	defer func() {
 		ping.Stop()
+		s.Close()
 		s.conn.Close()
 	}()
+	defer recoverPanic("session writer", nil)
 
 	for {
 		select {

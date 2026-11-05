@@ -143,11 +143,11 @@ func (ms *MudServer) run() {
 	for {
 		select {
 		case event := <-ms.events:
-			event()
+			runEvent("queued event", event)
 		case now := <-tick.C:
-			ms.World.tick(now)
+			runEvent("world tick", func() { ms.World.tick(now) })
 		case <-save.C:
-			ms.flushDirty()
+			runEvent("periodic save", ms.flushDirty)
 		case <-ms.done:
 			ms.shutdownOnLoop()
 			return
@@ -175,7 +175,7 @@ func (ms *MudServer) enqueue(f func()) bool {
 // if the server shut down before f ran.
 func (ms *MudServer) onLoop(f func()) bool {
 	finished := make(chan struct{})
-	if !ms.enqueue(func() { f(); close(finished) }) {
+	if !ms.enqueue(func() { defer close(finished); f() }) {
 		return false
 	}
 	select {
@@ -348,6 +348,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 		ms.sessionsMu.Unlock()
 		fmt.Printf("Client disconnect - number of connected clients: %d\n", count)
 	}()
+	defer recoverPanic("connection reader", nil)
 
 	for {
 		var msg MudMessage
@@ -356,6 +357,12 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 		if err != nil {
 			fmt.Println(err)
 			return
+		}
+
+		// Limit every data message before parsing, DB lookups or bcrypt. This
+		// includes pre-login input and blanks, so neither can bypass the limit.
+		if !player.Session.allowCommand(time.Now()) {
+			continue
 		}
 
 		// If message is blank, disregard it
@@ -482,6 +489,7 @@ func (ms *MudServer) login(player *MudPlayer, params string) bool {
 
 // handleCommand runs one player command. Loop only.
 func (ms *MudServer) handleCommand(player *MudPlayer, msg MudMessage) {
+	defer recoverPanic("player command", player)
 	if ms.players[player.Username] != player {
 		return // disconnected while the command was queued
 	}
