@@ -26,6 +26,8 @@ type Session struct {
 	closeOnce sync.Once
 	settings  SessionSettings
 	limiter   commandLimiter // reader-owned, including before login
+	stats     *closeStats    // where the close reason is counted; may be nil
+	reason    string         // why it closed; valid once closed is closed
 }
 
 // SessionSettings tunes connection limits, the outbound queue and keepalives.
@@ -75,8 +77,9 @@ func (s SessionSettings) withDefaults() SessionSettings {
 	return s
 }
 
-func NewSession(conn *websocket.Conn, settings SessionSettings) *Session {
+func NewSession(conn *websocket.Conn, settings SessionSettings, stats *closeStats) *Session {
 	s := &Session{
+		stats:    stats,
 		conn:     conn,
 		settings: settings.withDefaults(),
 		closed:   make(chan struct{}),
@@ -106,7 +109,7 @@ func (s *Session) Send(message []byte) error {
 	case s.out <- message:
 		return nil
 	default:
-		s.Close()
+		s.CloseWith(closeQueueFull)
 		return errSessionClosed
 	}
 }
@@ -119,6 +122,9 @@ func (s *Session) Send(message []byte) error {
 func (s *Session) ReadMessage() ([]byte, error) {
 	s.conn.SetReadDeadline(time.Now().Add(s.settings.PongTimeout))
 	_, message, err := s.conn.ReadMessage()
+	if err != nil {
+		s.CloseWith(classifyReadError(err))
+	}
 	return message, err
 }
 
@@ -132,10 +138,18 @@ func (s *Session) allowCommand(now time.Time) bool {
 	return allowed
 }
 
-// Close stops the session. The writer flushes what's already queued (briefly)
-// and closes the connection, which also ends the reader. Safe to call repeatedly.
-func (s *Session) Close() {
-	s.closeOnce.Do(func() { close(s.closed) })
+// Close stops the session for a reason the game chose. See CloseWith.
+func (s *Session) Close() { s.CloseWith(closeServer) }
+
+// CloseWith stops the session and counts why. The writer flushes what's already
+// queued (briefly) and closes the connection, which also ends the reader. Safe
+// to call repeatedly; the first reason wins.
+func (s *Session) CloseWith(reason string) {
+	s.closeOnce.Do(func() {
+		s.reason = reason
+		s.stats.record(reason)
+		close(s.closed)
+	})
 }
 
 func (s *Session) writeLoop() {
@@ -151,12 +165,12 @@ func (s *Session) writeLoop() {
 		select {
 		case message := <-s.out:
 			if !s.write(websocket.TextMessage, message, time.Now().Add(s.settings.WriteTimeout)) {
-				s.Close()
+				s.CloseWith(closeWriteError)
 				return
 			}
 		case <-ping.C:
 			if !s.write(websocket.PingMessage, nil, time.Now().Add(s.settings.WriteTimeout)) {
-				s.Close()
+				s.CloseWith(closePingError)
 				return
 			}
 		case <-s.closed:

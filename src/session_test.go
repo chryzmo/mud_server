@@ -77,7 +77,7 @@ func await(t *testing.T, ch <-chan string, want string) string {
 // the shared command loop on a websocket write, freezing the game for everyone.
 func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 	// Default queue size; a short write timeout so the stalled writer gives up quickly.
-	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
+	wsURL, ms := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.WriteTimeoutMS = 500
 		// This test deliberately floods broadcasts to exercise the outbound
 		// queue, not the inbound limiter (covered separately).
@@ -125,6 +125,19 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+
+	// The drop is counted with its reason: the queue filled, or the write timed out.
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		counts := ms.SessionCloseCounts()
+		if counts["queue_full"]+counts["write_error"] >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("session closes = %v, want queue_full or write_error", counts)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 func TestServerPingsClients(t *testing.T) {
@@ -146,7 +159,7 @@ func TestServerPingsClients(t *testing.T) {
 }
 
 func TestUnresponsiveClientIsDisconnected(t *testing.T) {
-	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
+	wsURL, ms := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.PingIntervalMS = 100
 		c.Connection.PongTimeoutMS = 500
 	})
@@ -170,4 +183,26 @@ func TestUnresponsiveClientIsDisconnected(t *testing.T) {
 		t.Errorf("disconnected after %v, want about 0.5s", elapsed)
 	}
 	await(t, watcher, "silent\x1b[0m has poofed away.")
+	waitForClose(t, ms, "read_timeout", 1)
+}
+
+// A client that says goodbye and one whose connection just vanishes are
+// different reasons, and neither is a server-side drop.
+func TestSessionCloseReasonsForClientDisconnects(t *testing.T) {
+	wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
+
+	polite := register(t, wsURL, "polite")
+	polite.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
+	polite.Close()
+	waitForClose(t, ms, "client_closed", 1)
+
+	vanishing := register(t, wsURL, "vanishing")
+	vanishing.UnderlyingConn().Close() // no close frame
+	counts := waitForClose(t, ms, "read_error", 1)
+
+	for _, serverSide := range []string{"queue_full", "write_error", "ping_error", "read_timeout", "read_limit"} {
+		if counts[serverSide] != 0 {
+			t.Errorf("%s = %d after ordinary client disconnects, want 0 (counts %v)", serverSide, counts[serverSide], counts)
+		}
+	}
 }

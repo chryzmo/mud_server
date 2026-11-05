@@ -48,6 +48,7 @@ type MudServer struct {
 	// Every open connection, logged in or not, so Shutdown can close them all.
 	sessions   map[*Session]struct{}
 	sessionsMu sync.Mutex
+	closes     *closeStats // why sessions ended; see closestats.go
 
 	done      chan struct{} // closed by Shutdown
 	loopDone  chan struct{} // closed when the game loop has exited
@@ -112,11 +113,13 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		saverDone:     make(chan struct{}),
 		savingNames:   make(map[string]chan struct{}),
 		sessions:      make(map[*Session]struct{}),
+		closes:        newCloseStats(),
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
 	}
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 
+	go server.closes.logPeriodically(server.done, 10*time.Second)
 	go server.saver(server.saves, server.saverDone)
 	go server.run()
 
@@ -207,7 +210,7 @@ func (ms *MudServer) Shutdown(ctx context.Context) {
 
 		ms.sessionsMu.Lock()
 		for s := range ms.sessions {
-			s.Close()
+			s.CloseWith(closeShutdown)
 		}
 		ms.sessionsMu.Unlock()
 
@@ -237,12 +240,17 @@ func (ms *MudServer) shutdownOnLoop() {
 	<-ms.saverDone
 
 	for _, player := range ms.players {
-		player.Session.Close()
+		player.Session.CloseWith(closeShutdown)
 	}
 }
 
+// SessionCloseCounts reports how many sessions have ended, by reason: queue_full,
+// write_error, ping_error, client_closed, read_timeout, read_limit, read_error,
+// shutdown or server.
+func (ms *MudServer) SessionCloseCounts() map[string]int64 { return ms.closes.Counts() }
+
 func (ms *MudServer) AddConnection(ws_conn *websocket.Conn) *MudPlayer {
-	session := NewSession(ws_conn, ms.Configuration.SessionSettings())
+	session := NewSession(ws_conn, ms.Configuration.SessionSettings(), ms.closes)
 
 	stats := PlayerStartStats{
 		HP:      ms.Configuration.Game.PlayerStartHP,

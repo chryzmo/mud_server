@@ -146,6 +146,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - `ProcessInput` (one goroutine per connection) handles `login` and `register` messages itself (database
   lookups and bcrypt stay off the loop), then `admit` places the player on the loop. After that it
   queues each command with `enqueue`, and the player's disconnect when the connection ends.
+- Every session close has a reason (`Session.CloseWith`, `closestats.go`): `queue_full`, `write_error`,
+  `ping_error`, `client_closed`, `read_timeout`, `read_limit`, `read_error`, `shutdown`, `server`. The first
+  reason wins, totals are logged every 10 s while they change, and `MudServer.SessionCloseCounts()` exposes
+  them. Use it when drops happen under load; add a reason rather than a bare `Close()` for new close paths.
 - Timed behavior is a timestamp checked on the tick (`nextAttackAt`, `nextSpawnAt`), not a goroutine
   or `time.Ticker`.
 - Each connection is a `Session` (`session.go`): sends go into its bounded queue and one writer
