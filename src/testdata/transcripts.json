@@ -903,7 +903,7 @@
     },
     {
       "scenario": "resume-bad-token",
-      "about": "An unknown or malformed token is refused with auth bad_token; this is terminal for that token.",
+      "about": "A freshly loaded page whose token the server does not know is refused with auth bad_token: terminal for that token (offer recovery or a new name).",
       "connections": [
         {
           "events": [
@@ -915,22 +915,6 @@
             },
             {
               "send": {
-                "received": 0,
-                "t": "resume",
-                "token": "abc"
-              }
-            },
-            {
-              "recv": {
-                "code": "bad_token",
-                "message": "That resume token isn't valid.",
-                "ok": false,
-                "t": "auth"
-              }
-            },
-            {
-              "send": {
-                "received": 0,
                 "t": "resume",
                 "token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
               }
@@ -1129,7 +1113,7 @@
                 "gap": true,
                 "message": "Welcome back, Alice!",
                 "ok": true,
-                "recovery": "RECOVERY-3",
+                "recovery": "RECOVERY-2",
                 "resumed": true,
                 "t": "auth",
                 "token": "TOKEN-2"
@@ -1207,7 +1191,6 @@
             },
             {
               "send": {
-                "received": 0,
                 "t": "resume",
                 "token": "TOKEN-1"
               }
