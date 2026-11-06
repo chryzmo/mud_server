@@ -90,6 +90,22 @@ func Render(w *World, res *Result) string {
 			}
 			b.WriteString("\n")
 		}
+		if len(r.People) > 0 {
+			b.WriteString("**People:**\n\n")
+			for _, pk := range sortedKeys(r.People) {
+				pe := r.People[pk]
+				fmt.Fprintf(&b, "- **%s** (`%s`): %s\n", md(strings.Join(pe.Names, " / ")), pk, md(strings.Join(strings.Fields(pe.Examine), " ")))
+				fmt.Fprintf(&b, "  - greets: %s\n", md(strings.Join(strings.Fields(pe.Greeting), " ")))
+				for _, tk := range sortedKeys(pe.Topics) {
+					t := pe.Topics[tk]
+					fmt.Fprintf(&b, "  - ask about *%s*: %s\n", md(strings.Join(t.Keywords, " / ")), md(strings.Join(strings.Fields(t.Say), " ")))
+				}
+				if strings.TrimSpace(pe.Shrug) != "" {
+					fmt.Fprintf(&b, "  - otherwise: %s\n", md(strings.Join(strings.Fields(pe.Shrug), " ")))
+				}
+			}
+			b.WriteString("\n")
+		}
 		if len(r.Items) > 0 {
 			var parts []string
 			for _, ik := range sortedKeys(r.Items) {

@@ -54,6 +54,7 @@ stage files by name anyway.
   when `World.ContentDir` (env `MUD_WORLD_DIR`) is set: upsert by `contentkey`, adopting same-name rows, never resetting
   runtime state; the world then loads only content rooms and takes its start room and areas from the content.
   Rooms may have `features` (examinable scenery; `mudserver/examine.go`: EXAMINE, aliases, prefixes, ambiguity).
+  Rooms may have `people` (friendly characters with greeting and topics; `mudserver/people.go`: TALK and ASK).
 - `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
   rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.
   The wire protocol (`protocol.go`) and connections (`session.go`, `closestats.go`). Guests and their

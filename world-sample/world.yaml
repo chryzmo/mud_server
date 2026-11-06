@@ -13,6 +13,19 @@ rooms:
       sign:
         names: [wooden sign, sign, notice]
         examine: "A hand-painted sign nailed beside the door: WELCOME. EXAMINE things to learn more about them."
+    people:
+      gatewarden:
+        names: [Gatewarden, gargoyle, warden]
+        examine: "A stone gargoyle with a surprisingly kind face, perched above the door."
+        greeting: "\"Welcome, welcome!\" the Gatewarden rumbles. \"Mind the step, and do look around.\""
+        shrug: "The Gatewarden shrugs, which sounds like gravel."
+        topics:
+          moving:
+            keywords: [moving, directions, compass]
+            say: "\"Use the buttons, or type MOVE and a direction. North, south, east, west, up or down.\""
+          looking:
+            keywords: [looking, examine]
+            say: "\"EXAMINE anything that catches your eye. Signs, railings, even me.\""
 
   balcony:
     name: Balcony

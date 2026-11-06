@@ -24,6 +24,11 @@ and the text `EXAMINE` shows; `unlisted: true` keeps one out of LOOK's "You noti
 prefix of three letters or more, and when several fit the server asks which (`EXAMINE MY <item>` looks only in the pack). Features
 are stored with the room (`room.featuresjson`) and are shared by its crowd copies.
 
+A room may also list `people`: friendly characters (not monsters; they never fight or move) with `names`, `examine` text, a `greeting`, an
+optional `shrug` (the answer to an unknown topic) and `topics`, each with `keywords` and what they `say`. `TALK <person>` shows the greeting
+and lists the topics (just `TALK` if there is only one person), and `ASK <person> ABOUT <topic>` answers one; people are named in LOOK's
+"Also here" line and can be examined. Every word is authored. People are stored with the room (`room.peoplejson`) and shared by copies.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners

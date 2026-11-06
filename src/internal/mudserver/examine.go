@@ -121,6 +121,11 @@ func (mp *MudPlayer) examineTargets(packOnly bool) []examineTarget {
 				out = append(out, examineTarget{display: f.Names[0], names: f.Names, text: f.Examine})
 			}
 		}
+		for _, pe := range room.People {
+			if len(pe.Names) > 0 {
+				out = append(out, examineTarget{display: pe.Names[0], names: pe.Names, text: pe.Examine})
+			}
+		}
 		if room.Inventory != nil {
 			for _, it := range room.Inventory.items {
 				out = append(out, item(it))

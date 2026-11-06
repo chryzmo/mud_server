@@ -44,6 +44,8 @@ const MaxDescription = 1500
 const (
 	MaxFeatures    = 24
 	MaxFeatureName = 40
+	MaxPeople      = 8  // per room
+	MaxTopics      = 12 // per person
 )
 
 // File is one content file as written by an author.
@@ -71,6 +73,25 @@ type Room struct {
 	Spawners []Spawner      `yaml:"spawners"`
 	// Features are scenery to EXAMINE: key to its names and its text.
 	Features map[string]Feature `yaml:"features"`
+	// People are friendly characters to TALK to and ASK: key to the person.
+	People map[string]Person `yaml:"people"`
+}
+
+// Person is a friendly character: not a monster, never fights, never moves. Everything they
+// say is written here. The first name is what they are called; the rest are aliases.
+type Person struct {
+	Names    []string         `yaml:"names"`
+	Examine  string           `yaml:"examine"`  // what EXAMINE shows
+	Greeting string           `yaml:"greeting"` // what TALK shows first
+	Shrug    string           `yaml:"shrug"`    // the answer to a topic they do not know (optional)
+	Topics   map[string]Topic `yaml:"topics"`
+}
+
+// Topic is something a person can be asked about. Keywords are what a player may type after
+// ASK <person> ABOUT; the first is shown in the list TALK prints.
+type Topic struct {
+	Keywords []string `yaml:"keywords"`
+	Say      string   `yaml:"say"`
 }
 
 // Feature is something in a room that cannot be picked up but can be looked at. The first
@@ -441,6 +462,78 @@ func (w *World) Validate(res *Result) {
 			}
 			if len(ex) > MaxDescription {
 				res.warnf(f, fp+".examine", "text is %d characters; over %d reads badly on a phone", len(ex), MaxDescription)
+			}
+		}
+		if len(r.People) > MaxPeople {
+			res.errorf(f, p+".people", "%d people; at most %d per room", len(r.People), MaxPeople)
+		}
+		for _, pk := range sortedKeys(r.People) {
+			pe := r.People[pk]
+			pp := p + ".people." + pk
+			if !keyPattern.MatchString(pk) {
+				res.errorf(f, pp, "key must be lower case letters, digits and dashes, starting with a letter or digit, at most 40 characters")
+			}
+			if len(pe.Names) == 0 {
+				res.errorf(f, pp+".names", "a person needs at least one name (the first is what they are called, the rest are aliases)")
+			}
+			for i, n := range pe.Names {
+				np := fmt.Sprintf("%s.names[%d]", pp, i)
+				name := strings.ToUpper(strings.TrimSpace(n))
+				switch {
+				case name == "":
+					res.errorf(f, np, "a name cannot be empty")
+					continue
+				case len(name) > MaxFeatureName:
+					res.errorf(f, np, "%q is over %d characters", n, MaxFeatureName)
+				}
+				if i == 0 { // what they are called shares EXAMINE's namespace with the features
+					if other, dup := taken[name]; dup && other != pk {
+						res.errorf(f, np, "%q is also what %q is called in this room; the first name of each thing must differ", n, other)
+					}
+					taken[name] = pk
+				}
+				if floor[name] {
+					res.warnf(f, np, "%q is also the name of an item lying in this room; EXAMINE would be ambiguous", n)
+				}
+			}
+			for _, field := range []struct{ name, text string }{{"examine", pe.Examine}, {"greeting", pe.Greeting}} {
+				if strings.TrimSpace(field.text) == "" {
+					res.errorf(f, pp+"."+field.name, "a person needs %s text", field.name)
+				}
+				if len(field.text) > MaxDescription {
+					res.warnf(f, pp+"."+field.name, "text is %d characters; over %d reads badly on a phone", len(field.text), MaxDescription)
+				}
+			}
+			if len(pe.Topics) > MaxTopics {
+				res.errorf(f, pp+".topics", "%d topics; at most %d per person", len(pe.Topics), MaxTopics)
+			}
+			word := map[string]string{} // upper-cased keyword -> topic key
+			for _, tk := range sortedKeys(pe.Topics) {
+				tp := pp + ".topics." + tk
+				t := pe.Topics[tk]
+				if !keyPattern.MatchString(tk) {
+					res.errorf(f, tp, "key must be lower case letters, digits and dashes, starting with a letter or digit, at most 40 characters")
+				}
+				if len(t.Keywords) == 0 {
+					res.errorf(f, tp+".keywords", "a topic needs at least one keyword")
+				}
+				for i, kw := range t.Keywords {
+					k := strings.ToUpper(strings.TrimSpace(kw))
+					if k == "" || len(k) > MaxFeatureName {
+						res.errorf(f, fmt.Sprintf("%s.keywords[%d]", tp, i), "a keyword must be 1 to %d characters", MaxFeatureName)
+						continue
+					}
+					if other, dup := word[k]; dup && other != tk {
+						res.errorf(f, fmt.Sprintf("%s.keywords[%d]", tp, i), "%q is also a keyword of topic %q; ASK could not tell them apart", kw, other)
+					}
+					word[k] = tk
+				}
+				if strings.TrimSpace(t.Say) == "" {
+					res.errorf(f, tp+".say", "a topic needs something to say")
+				}
+				if len(t.Say) > MaxDescription {
+					res.warnf(f, tp+".say", "text is %d characters; over %d reads badly on a phone", len(t.Say), MaxDescription)
+				}
 			}
 		}
 		for _, ik := range sortedKeys(r.Items) {
