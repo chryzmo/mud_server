@@ -46,6 +46,13 @@ type File struct {
 	Rooms     map[string]Room `yaml:"rooms"`
 	Items     map[string]Item `yaml:"items"`
 	NPCs      map[string]NPC  `yaml:"npcs"`
+	Areas     map[string]Area `yaml:"areas"`
+}
+
+// Area is a set of rooms that copy together when a crowd arrives (see crowd control):
+// players are spread over copies of the area instead of piling into one room.
+type Area struct {
+	Rooms []string `yaml:"rooms"`
 }
 
 // Room is a place. Exits map a direction to another room's key.
@@ -104,6 +111,7 @@ type World struct {
 	Rooms     map[string]Room
 	Items     map[string]Item
 	NPCs      map[string]NPC
+	Areas     map[string]Area
 	source    map[string]string // "room:lobby" -> file it was defined in
 }
 
@@ -168,7 +176,7 @@ func Load(dir string) (*World, *Result, error) {
 	}
 	sort.Strings(files)
 
-	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, source: map[string]string{}}
+	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, source: map[string]string{}}
 	res := &Result{}
 	for _, path := range files {
 		rel, _ := filepath.Rel(dir, path)
@@ -212,6 +220,14 @@ func (w *World) merge(file string, f *File, res *Result) {
 		}
 		w.Items[k] = v
 		w.source["item:"+k] = file
+	}
+	for k, v := range f.Areas {
+		if prev, dup := w.source["area:"+k]; dup {
+			res.errorf(file, "areas."+k, "duplicate area key (also in %s)", prev)
+			continue
+		}
+		w.Areas[k] = v
+		w.source["area:"+k] = file
 	}
 	for k, v := range f.NPCs {
 		if prev, dup := w.source["npc:"+k]; dup {
@@ -380,6 +396,27 @@ func (w *World) Validate(res *Result) {
 			}
 			if s.TickMS < 250 {
 				res.errorf(f, sp+".tick_ms", "tick_ms must be at least 250")
+			}
+		}
+	}
+
+	inArea := map[string]string{}
+	for _, name := range sortedKeys(w.Areas) {
+		f, p := file("area", name), "areas."+name
+		if !keyPattern.MatchString(name) {
+			res.errorf(f, p, "key must be lower case letters, digits and dashes, starting with a letter or digit, at most 40 characters")
+		}
+		if len(w.Areas[name].Rooms) == 0 {
+			res.errorf(f, p+".rooms", "an area needs at least one room")
+		}
+		for i, rk := range w.Areas[name].Rooms {
+			rp := fmt.Sprintf("%s.rooms[%d]", p, i)
+			if _, ok := w.Rooms[rk]; !ok {
+				res.errorf(f, rp, "%q is not a room", rk)
+			} else if other, dup := inArea[rk]; dup {
+				res.errorf(f, rp, "room %q is already in area %q; a room can be in only one", rk, other)
+			} else {
+				inArea[rk] = name
 			}
 		}
 	}

@@ -19,7 +19,7 @@ func crowdWorld(t *testing.T, softCap, maxCopies int) *World {
 // crowdWorldCaps is crowdWorld with a hard cap (0 takes the default).
 func crowdWorldCaps(t *testing.T, softCap, hardCap, maxCopies int) *World {
 	t.Helper()
-	w := &World{RoomMap: make(map[int32]*Room)}
+	w := &World{RoomMap: make(map[int32]*Room), startRoomID: defaultStartRoomID}
 	room := func(id int32, name string) *Room {
 		r := &Room{
 			ID: id, Name: name, Description: name + " description",
@@ -51,7 +51,7 @@ func arrive(w *World, templateID int32, name string) *Room {
 }
 
 func TestPlaceWithoutAreasUsesTheRoomItself(t *testing.T) {
-	w := &World{RoomMap: map[int32]*Room{1: {ID: 1, UserMap: map[string]*MudPlayer{}}, 7: {ID: 7, UserMap: map[string]*MudPlayer{}}}}
+	w := &World{startRoomID: defaultStartRoomID, RoomMap: map[int32]*Room{1: {ID: 1, UserMap: map[string]*MudPlayer{}}, 7: {ID: 7, UserMap: map[string]*MudPlayer{}}}}
 	w.configureAreas(CrowdConfig{HardCap: 1000})
 	for i := 0; i < 500; i++ {
 		if got := arrive(w, 7, fmt.Sprint("p", i)); got != w.RoomMap[7] {
@@ -178,7 +178,7 @@ func TestClonesAreSelfContainedCopies(t *testing.T) {
 }
 
 func TestConfigureAreasSkipsBadRooms(t *testing.T) {
-	w := &World{RoomMap: map[int32]*Room{
+	w := &World{startRoomID: defaultStartRoomID, RoomMap: map[int32]*Room{
 		1: {ID: 1, UserMap: map[string]*MudPlayer{}, Inventory: CreateInventory()},
 		2: {ID: 2, UserMap: map[string]*MudPlayer{}, Inventory: CreateInventory()},
 	}}

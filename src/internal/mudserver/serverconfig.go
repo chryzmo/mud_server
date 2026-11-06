@@ -61,6 +61,11 @@ type Configuration struct {
 	} `json:"Game"`
 	// Area copies for crowds; none by default. See crowd.go.
 	Crowd CrowdConfig `json:"Crowd"`
+	// World content files (YAML; see src/internal/worldfile). Empty means the world comes from the
+	// database as seeded by src/sql, as before.
+	World struct {
+		ContentDir string `json:"ContentDir"`
+	} `json:"World"`
 }
 
 func (c Configuration) LoadConfig (config_file string) (Configuration) {
@@ -88,6 +93,7 @@ func (c Configuration) LoadConfig (config_file string) (Configuration) {
 	local development, tests and the VPS.
 		MUD_LISTEN_ADDR    overrides Server.ListenPort (e.g. "127.0.0.1:8080")
 		MUD_DATABASE_URL   overrides all Database settings (postgres://user:pass@host:port/db)
+		MUD_WORLD_DIR      overrides World.ContentDir (a directory of world YAML files)
 */
 func (c *Configuration) ApplyEnvOverrides() {
 	if v := os.Getenv("MUD_LISTEN_ADDR"); v != "" {
@@ -95,6 +101,9 @@ func (c *Configuration) ApplyEnvOverrides() {
 	}
 	if v := os.Getenv("MUD_DATABASE_URL"); v != "" {
 		c.Database.DatabaseURL = v
+	}
+	if v := os.Getenv("MUD_WORLD_DIR"); v != "" {
+		c.World.ContentDir = v
 	}
 }
 
