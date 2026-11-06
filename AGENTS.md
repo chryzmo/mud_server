@@ -44,6 +44,11 @@ stage files by name anyway.
 - `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
 - `src/cmd/mudbot/`: opt-in websocket load client; `src/internal/mudbot/` holds its runner
   and test-account seeder. See README.md for local usage and measurement limitations.
+- `src/internal/worldfile/` and `world-sample/`: the world content format (YAML: rooms, items, NPCs) and its
+  validator, `mud_server -validate-world [-strict] DIR` (no database, no server). `world-sample/` is the small
+  public sample used by tests and `scripts/test.sh`; the real world lives in the private `mud_content` repository
+  (plans/event-systems.md). Keys are lower-case words and dashes, global per kind. Applying content to the
+  database is a later step; today the server still seeds from `src/sql`.
 - `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
   rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.
   The wire protocol (`protocol.go`) and connections (`session.go`, `closestats.go`). Guests and their

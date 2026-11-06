@@ -6,6 +6,14 @@ a dropped connection resumes the same character. The browser client is the sibli
 [mud_frontend](https://github.com/chryzmo/mud_frontend). Project rules for contributors and agents
 are in `AGENTS.md`; the working plans live in a local, gitignored `plans/` folder.
 
+## World content
+
+The world (rooms, items, NPCs) is described in YAML files; the format and its checks are in `src/internal/worldfile`.
+`world-sample/` is a small example. Check a directory with `go run ./src -validate-world [-strict] DIR`: it reads every
+`.yaml`/`.yml` file under `DIR`, reports errors (unknown fields, bad keys, exits to missing rooms, items or NPCs that
+do not exist, a missing start room) and warnings (one-way exits, rooms unreachable from the start), and exits 1 on errors
+(or on warnings with `-strict`). The server does not load these files yet; it still seeds from `src/sql`.
+
 ## Local development
 
 Requires Go 1.24+ and either `podman-compose` or `docker compose`.
