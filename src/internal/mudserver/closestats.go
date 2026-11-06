@@ -22,6 +22,7 @@ const (
 	closeWriteError   = "write_error"   // a message write failed or timed out
 	closePingError    = "ping_error"    // a keepalive ping write failed or timed out
 	closeReplaced     = "replaced"      // the same guest resumed on a newer connection
+	closeKicked       = "kicked"        // a GM removed the character
 	closeClientClosed = "client_closed" // the client sent a close frame
 	closeReadTimeout  = "read_timeout"  // no pong or message within PongTimeout
 	closeReadLimit    = "read_limit"    // a message exceeded ReadLimitBytes

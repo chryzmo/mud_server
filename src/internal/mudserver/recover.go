@@ -133,6 +133,9 @@ func (ms *MudServer) recoverGuest(shell *MudPlayer, session *Session, name, code
 		session.sendAuth(false, codeBadRequest, "A recover needs a name and a recovery code.")
 		return nil
 	}
+	if ms.refuseIfKicked(session, name) {
+		return nil
+	}
 	id, username, storedHash, err := lookupGuestForRecovery(&ms.DB, name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		session.sendAuth(false, codeBadRecovery, recoverFailed)

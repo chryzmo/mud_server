@@ -544,6 +544,26 @@ func wire(t *testing.T) []transcript {
 		add(r)
 	})
 
+	t.Run("kicked", func(t *testing.T) {
+		wsURL, _ := startTestServerWithConfig(t, graceConfig(5000, 50))
+		r := newRecorder(t, "kicked",
+			"A GM removes the character for a while: the client is told kicked and closed and must not reconnect by itself; a page reloaded during the break is refused with auth kicked (terminal for now, the token stays).", wsURL)
+		c1 := r.open()
+		c1.hello()
+		c1.join("Alice")
+		gm := gmPlayer(t, wsURL, "boss")
+		send(t, gm, "GM KICK alice 10")
+		c1.until(func(f map[string]any) bool { return f["t"] == "error" && f["code"] == "kicked" })
+		c1.serverCloses()
+		c2 := r.open()
+		c2.hello()
+		c2.send(map[string]any{"t": "resume", "token": r.token}) // a cold page: no count
+		a := c2.read()
+		need(t, a["ok"] == false && a["code"] == "kicked", "resume during the break = %v", a)
+		c2.left()
+		add(r)
+	})
+
 	t.Run("server-restarting", func(t *testing.T) {
 		wsURL, ms := startTestServerWithConfig(t, nil)
 		r := newRecorder(t, "server-restarting", "A shutting-down server says restarting and closes: the client reconnects with jitter (it is not terminal).", wsURL)
