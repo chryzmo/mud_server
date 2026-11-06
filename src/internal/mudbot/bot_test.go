@@ -51,7 +51,7 @@ func protocolPeer(t *testing.T, mode string) string {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
-		if json.Unmarshal(message, &login) != nil || (login.T != "login" && login.T != "register") {
+		if json.Unmarshal(message, &login) != nil || login.T != "login" {
 			return
 		}
 		if mode == "stall-login" {
@@ -63,9 +63,6 @@ func protocolPeer(t *testing.T, mode string) string {
 			return
 		}
 		greeting := "Welcome back, " + login.Username + "!"
-		if login.T == "register" {
-			greeting = "Account created! Welcome, " + login.Username + "."
-		}
 		if conn.WriteMessage(websocket.TextMessage, peerFrame("auth", map[string]any{"ok": true, "message": greeting})) != nil {
 			return
 		}
@@ -129,9 +126,8 @@ func protocolPeer(t *testing.T, mode string) string {
 }
 
 func TestRunExercisesProtocolAndReportsLatency(t *testing.T) {
-	for _, register := range []bool{false, true} {
+	{
 		c := testConfig(protocolPeer(t, "ok"))
-		c.Register = register
 		r, err := Run(context.Background(), c)
 		if err != nil {
 			t.Fatalf("run: %v; report: %+v", err, r)

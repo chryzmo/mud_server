@@ -446,7 +446,7 @@ func TestConcurrentResumesOfOneToken(t *testing.T) {
 func TestPasswordPlayersStillLeaveImmediately(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(60000, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
-	pw := register(t, wsURL, "Passworded")
+	pw := passwordPlayer(t, wsURL, "Passworded")
 	watcher.until(func(typ string, m map[string]any) bool { return typ == "arrive" && m["who"] == "Passworded" })
 	pw.UnderlyingConn().Close()
 	watcher.until(func(typ string, m map[string]any) bool { return typ == "leave" && m["who"] == "Passworded" })

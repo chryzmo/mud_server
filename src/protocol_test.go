@@ -67,7 +67,7 @@ func TestMalformedFramesGetBadFrameAndConnectionSurvives(t *testing.T) {
 			t.Errorf("frame %q: code = %v, want bad_frame", frame, data["code"])
 		}
 		// Still usable.
-		send(t, conn, "/REGISTER survivor"+strings.Repeat("x", len(frame)%5)+" secret")
+		send(t, conn, "/LOGIN nobody secret")
 		expectMessage(t, conn, "auth")
 	}
 }
@@ -109,9 +109,10 @@ func TestUnknownTypeAndBadPayloads(t *testing.T) {
 		{`{"t":"cmd"}`, "error", "bad_request"},
 		{`{"t":"cmd","line":5}`, "error", "bad_frame"},
 		{`{"t":"login","username":"x"}`, "auth", "bad_request"},
-		{`{"t":"register","username":"","password":"p"}`, "auth", "bad_request"},
-		{`{"t":"register","username":"two words","password":"p"}`, "auth", "invalid_username"},
-		{`{"t":"register","username":"tab\there","password":"p"}`, "auth", "invalid_username"},
+		{`{"t":"login","username":"","password":"p"}`, "auth", "bad_request"},
+		{`{"t":"register","username":"x","password":"p"}`, "error", "bad_request"}, // there is no register: players join as guests
+		{`{"t":"login","username":"two words","password":"p"}`, "auth", "invalid_username"},
+		{`{"t":"login","username":"tab\there","password":"p"}`, "auth", "invalid_username"},
 		{`{"t":"cmd","line":"LOOK"}`, "auth", "not_logged_in"},
 	} {
 		writeRaw(t, conn, tc.frame)
@@ -130,10 +131,11 @@ func TestAuthStatsAndRoomMessages(t *testing.T) {
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
 
-	writeRaw(t, conn, `{"t":"register","username":"typed","password":"secret pass"}`)
+	createAccount(t, "typed", "secret pass")
+	writeRaw(t, conn, `{"t":"login","username":"typed","password":"secret pass"}`)
 	auth := expectMessage(t, conn, "auth")
-	if auth["ok"] != true || !strings.Contains(auth["message"].(string), "Account created! Welcome, typed.") {
-		t.Errorf("register auth = %v", auth)
+	if auth["ok"] != true || !strings.Contains(auth["message"].(string), "Welcome back, typed!") {
+		t.Errorf("login auth = %v", auth)
 	}
 	text := expectMessage(t, conn, "text")
 	if !strings.Contains(text["text"].(string), "You are in 'Start Room'") {
@@ -168,8 +170,8 @@ func TestAuthStatsAndRoomMessages(t *testing.T) {
 // wording and colour.
 func TestRoomEventsAreTypedAndCompact(t *testing.T) {
 	wsURL := startTestServer(t)
-	alice := register(t, wsURL, "alice")
-	bob := register(t, wsURL, "bob")
+	alice := passwordPlayer(t, wsURL, "alice")
+	bob := passwordPlayer(t, wsURL, "bob")
 
 	data := expectMessage(t, alice, "arrive")
 	if data["who"] != "bob" || data["from"] != nil {
@@ -212,7 +214,7 @@ func TestRoomEventsAreTypedAndCompact(t *testing.T) {
 
 func TestInventoryAndErrorTypes(t *testing.T) {
 	wsURL := startTestServer(t)
-	conn := register(t, wsURL, "pack")
+	conn := passwordPlayer(t, wsURL, "pack")
 	send(t, conn, "INVENTORY")
 	if data := expectMessage(t, conn, "inventory"); !strings.Contains(data["text"].(string), "Your inventory is empty.") {
 		t.Errorf("inventory = %v", data)
@@ -223,9 +225,9 @@ func TestInventoryAndErrorTypes(t *testing.T) {
 	}
 }
 
-func TestLoginAfterRegisterRestoresAndWrongPasswordCodes(t *testing.T) {
+func TestLoginRestoresAndWrongPasswordCodes(t *testing.T) {
 	wsURL := startTestServer(t)
-	first := register(t, wsURL, "again")
+	first := passwordPlayer(t, wsURL, "again")
 	first.Close()
 
 	conn, _ := loginWhenFree(t, wsURL, "again", "secret")

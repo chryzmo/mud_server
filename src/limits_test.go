@@ -31,11 +31,11 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
-			watcher := register(t, wsURL, "watcher")
+			watcher := passwordPlayer(t, wsURL, "watcher")
 			conn := dial(t, wsURL)
 			expect(t, conn, "Welcome to the MUD!")
 			if tc.loggedIn {
-				send(t, conn, "/REGISTER oversized secret")
+				loginNew(t, conn, "oversized")
 				expect(t, conn, "You are in 'Start Room'")
 			}
 
@@ -47,7 +47,7 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 			if tc.loggedIn {
 				expect(t, conn, "Unknown command.")
 			} else {
-				expect(t, conn, "Please log in or register first.")
+				expect(t, conn, "Please join first.")
 			}
 			message += "x"
 			if tc.fragmented {
@@ -108,7 +108,7 @@ func TestCommandFloodIsLimitedBeforeAndAfterLogin(t *testing.T) {
 			conn := dial(t, wsURL)
 			expect(t, conn, "Welcome to the MUD!")
 			if loggedIn {
-				send(t, conn, "/REGISTER flooder secret")
+				loginNew(t, conn, "flooder")
 				expect(t, conn, "You are in 'Start Room'")
 			}
 			incoming := reader(conn)
@@ -148,7 +148,7 @@ func TestCommandFloodIsLimitedBeforeAndAfterLogin(t *testing.T) {
 			}
 			// Limits are per session, not global. A flood must not stop a new
 			// session from logging in or executing a command.
-			other := register(t, wsURL, "other")
+			other := passwordPlayer(t, wsURL, "other")
 			send(t, other, "MOVE N")
 			expect(t, other, "You are in 'Balcony'")
 		})

@@ -130,16 +130,6 @@ func (mp *MudPlayer) EffectiveMaxMP() int {
 	return mp.MaxMP + mp.Equipment.TotalBonusMaxMP()
 }
 
-// SetPassword hashes and stores the player's password using bcrypt.
-func (mp *MudPlayer) SetPassword(password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	mp.PasswordHash = string(hash)
-	return nil
-}
-
 // CheckPassword returns true if the given password matches the stored hash.
 func (mp *MudPlayer) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(mp.PasswordHash), []byte(password))

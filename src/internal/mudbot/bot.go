@@ -91,7 +91,6 @@ type Config struct {
 	LoginWorkers int
 	Prefix       string
 	Password     string
-	Register     bool
 	AllowRemote  bool // explicit opt-in; the default is loopback targets only
 }
 
@@ -355,11 +354,7 @@ func connect(ctx context.Context, c Config, index int, m *metrics, active *atomi
 	conn.SetReadLimit(4 << 20)
 	conn.SetReadDeadline(deadline)
 	conn.SetWriteDeadline(deadline)
-	verb := "login"
-	if c.Register {
-		verb = "register"
-	}
-	loginFrame := frame(verb, map[string]string{"username": Name(c.Prefix, index), "password": c.Password})
+	loginFrame := frame("login", map[string]string{"username": Name(c.Prefix, index), "password": c.Password})
 	if err := conn.WriteMessage(websocket.TextMessage, loginFrame); err != nil {
 		return nil, err
 	}

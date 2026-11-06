@@ -35,7 +35,7 @@ type Configuration struct {
 		ResumeGraceMS     int `json:"ResumeGraceMS"` // how long a dropped guest stays in the world (default 90000)
 		ReplayFrames      int `json:"ReplayFrames"`  // frames kept per player for replay after a resume (default 100)
 		RecoveryLockMS    int `json:"RecoveryLockMS"` // a name refuses recovery this long after 5 wrong codes (default 900000)
-		JoinPerSecond     int `json:"JoinPerSecond"`  // join/resume/recover/login/register tokens per second, all connections together (default 1000; -1 no limit)
+		JoinPerSecond     int `json:"JoinPerSecond"`  // join/resume/recover/login tokens per second, all connections together (default 1000; -1 no limit)
 		JoinBurst         int `json:"JoinBurst"`      // bucket size (default 5000)
 		MaxJoinsPerMinutePerIP int `json:"MaxJoinsPerMinutePerIP"` // 0 = off. A flood breaker for staff, not a fairness rule: many players share an address at a venue
 		IdleTimeoutMS     int `json:"IdleTimeoutMS"`  // a guest with no command for this long is disconnected (default 1800000; -1 never)
