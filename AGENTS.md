@@ -82,6 +82,11 @@ script there.
 - **The local suite must pass before you open or update a PR.** Run `scripts/test.sh` and make
   sure it passes, then report it in the PR's testing section. Don't open a PR with failing or
   skipped checks; if a failure isn't caused by your change, raise it with the user first.
+- **Every PR gets a real description.** Say what changed and why, the deploy note (merging deploys while
+  `AUTO_DEPLOY` is true; say whether players see a change), what was tested and what was not verified.
+  Pass it with `gh pr create --body-file <file>` (or `--body "<text>"`), never `--body -`: `gh` takes that
+  as the literal text "-" and the PR is left blank. After creating or editing, check it with
+  `gh pr view <n> --json body -q '.body|length'`.
 - **Commit through the pre-commit hook.** Run `scripts/install-git-hooks.sh` once per clone. The
   hook (`.githooks/pre-commit`) blocks files that usually hold secrets, secrets in the staged
   changes, merge-conflict markers and files over 1 MB, then runs `scripts/test.sh` (skipped if
