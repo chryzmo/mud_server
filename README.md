@@ -31,7 +31,7 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 | Client sends | Fields | Meaning |
 |---|---|---|
 | `join` | `name` | new guest; the reply carries a one-time resume `token` and recovery `recovery` code |
-| `resume` | `token`, `received` | reattach after a drop; `received` is how many counted frames the client has processed |
+| `resume` | `token`, `received` | reattach after a drop; `received` is how many counted frames the client has processed; leave it out (a freshly loaded page) and you get a gap and a fresh look |
 | `recover` | `name`, `code` | take a character back with the recovery code; issues a new token and code |
 | `cmd` | `line` | a game command, such as `MOVE N` or `SAY hello` |
 | `login`, `register` | `username`, `password` | password accounts (GMs); `register` goes away once the new client ships |
@@ -40,7 +40,7 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 |---|---|---|
 | `hello` | `message` | greeting on connect |
 | `auth` | `ok`, `code`, `message`, and for success `token`, `recovery`, `resumed`, `gap`, `replayed`, `base` | answer to join, resume, recover, login, register |
-| `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`), `idle`, `unknown_command`, `restarting`, `internal` |
+| `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `unknown_command`, `restarting`, `internal` |
 | `text` | `text` | prose, with ANSI colour codes the client styles per line |
 | `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
 | `room`, `stats`, `inventory` | name and exits, vitals, listing | state for the UI |

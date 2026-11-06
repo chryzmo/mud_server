@@ -483,7 +483,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			if !ms.allowJoin(session) {
 				continue
 			}
-			if resumed := ms.resume(player, session, in.Token, in.Received); resumed != nil {
+			if resumed := ms.resume(player, session, in.Token, in.receivedCount()); resumed != nil {
 				player = resumed
 				admitted = true
 			}
