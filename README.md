@@ -55,6 +55,7 @@ hidden staff route, planned) and plays as an ordinary character; password accoun
 | `GM TELEPORT <name>` / `GM TELEPORT ROOM <text>` | go to a player, or to the room whose name starts with the text (ignores crowd caps) |
 | `GM SUMMON <name>` | bring a player to the GM's room |
 | `GM ANNOUNCE <text>` | a `[GM] text` line to every player, once encoded |
+| `GM KICK <name> [minutes]` | remove a character from the world for a break (default 10, at most 1440): the client gets `error kicked` and is closed, and resume, recover and login for that name are refused (`auth` code `kicked`) until it ends; the character and its token are kept. A GM cannot be kicked. The break is in memory (a restart ends it) and is by name, so a determined player can rejoin under another name: `GM LOCK` is the answer to that |
 | `GM LOCK` / `GM UNLOCK` | refuse or allow new guests (`auth` code `joins_locked`); players already in can reconnect |
 
 Every use is logged and written to the `gm_audit` table (who, what, arguments, result). More commands (flags, events, kick,
@@ -94,7 +95,7 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 |---|---|---|
 | `hello` | `message` | greeting on connect |
 | `auth` | `ok`, `code`, `message`, and for success `token`, `recovery`, `resumed`, `gap`, `replayed`, `base` | answer to join, resume, recover, login |
-| `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `unknown_command`, `restarting`, `internal` |
+| `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `kicked` (a GM removed the character for a break, said before the close; do not reconnect by itself; resume, recover and login are then refused with `auth` code `kicked` until the break ends), `unknown_command`, `restarting`, `internal` |
 | `text` | `text` | prose, with ANSI colour codes the client styles per line |
 | `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
 | `room`, `stats`, `inventory` | name and exits, vitals, listing | state for the UI |

@@ -63,6 +63,7 @@ const (
 	codeReplaced        = "replaced" // error: another connection took this character over
 	codeBadRecovery     = "bad_recovery"
 	codeRecoveryLocked  = "recovery_locked"
+	codeKicked          = "kicked" // a GM removed the character for a while: an error before the close, an auth refusal during the break
 )
 
 // inbound is every client-to-server message. Pointer fields tell "missing"

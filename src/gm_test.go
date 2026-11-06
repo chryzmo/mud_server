@@ -303,3 +303,81 @@ func TestJoinThenResumeAtOnceDoesNotRace(t *testing.T) {
 		again.Close()
 	}
 }
+
+func TestGMKickRemovesTheCharacterAndRefusesItsReturn(t *testing.T) {
+	wsURL := startTestServer(t)
+	gm := gmPlayer(t, wsURL, "boss")
+	victim, auth := joinAs(t, wsURL, "Victim")
+	if auth["ok"] != true {
+		t.Fatalf("join = %v", auth)
+	}
+	expect(t, victim, "You are in")
+	watcher := passwordPlayer(t, wsURL, "watcher")
+
+	send(t, gm, "GM KICK victim 10")
+	expect(t, gm, "Victim is out for 10 minutes.")
+
+	// The victim is told why, then disconnected; the room sees them leave.
+	bye := expectMessage(t, victim, "error")
+	if bye["code"] != "kicked" || !strings.Contains(bye["message"].(string), "10 minutes") {
+		t.Errorf("kick error = %v", bye)
+	}
+	victim.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for {
+		if _, _, err := victim.ReadMessage(); err != nil {
+			break // closed by the server
+		}
+	}
+	expect(t, watcher, "Victim")
+	send(t, gm, "GM WHO")
+	if out := expect(t, gm, "Online:"); strings.Contains(out, "Victim (") {
+		t.Errorf("a kicked character is still listed: %q", out)
+	}
+
+	// During the break neither the token nor the recovery code gets them back.
+	again := dial(t, wsURL)
+	expect(t, again, "Welcome to the MUD!")
+	writeRaw(t, again, fmt.Sprintf(`{"t":"resume","token":%q}`, auth["token"]))
+	if got := expectMessage(t, again, "auth"); got["ok"] != false || got["code"] != "kicked" {
+		t.Errorf("resume during the break = %v, want kicked", got)
+	}
+	writeRaw(t, again, fmt.Sprintf(`{"t":"recover","name":"victim","code":%q}`, auth["recovery"]))
+	if got := expectMessage(t, again, "auth"); got["ok"] != false || got["code"] != "kicked" {
+		t.Errorf("recover during the break = %v, want kicked", got)
+	}
+	eventually(t, "audit", "SELECT count(*)::text FROM gm_audit WHERE command='KICK' AND result='kicked Victim 10m'", func(v string) bool { return v == "1" })
+}
+
+func TestGMKickAlsoStopsAPasswordAccountLoggingBackIn(t *testing.T) {
+	wsURL := startTestServer(t)
+	gm := gmPlayer(t, wsURL, "boss")
+	rowdy := passwordPlayer(t, wsURL, "rowdy")
+	expect(t, gm, "rowdy")
+	send(t, gm, "GM KICK rowdy")
+	expect(t, gm, "rowdy is out for 10 minutes.") // the default
+	expectMessage(t, rowdy, "error")
+
+	conn := dial(t, wsURL)
+	expect(t, conn, "Welcome to the MUD!")
+	writeRaw(t, conn, `{"t":"login","username":"rowdy","password":"secret"}`)
+	if got := expectMessage(t, conn, "auth"); got["ok"] != false || got["code"] != "kicked" {
+		t.Errorf("login during the break = %v, want kicked", got)
+	}
+}
+
+func TestGMKickRefusals(t *testing.T) {
+	wsURL := startTestServer(t)
+	gm := gmPlayer(t, wsURL, "boss")
+	send(t, gm, "GM KICK")
+	expect(t, gm, "Usage: GM KICK")
+	send(t, gm, "GM KICK nobody")
+	expect(t, gm, "No one called nobody is here.")
+	send(t, gm, "GM KICK boss")
+	expect(t, gm, "A GM cannot be kicked.")
+	passwordPlayer(t, wsURL, "bob")
+	expect(t, gm, "bob")
+	send(t, gm, "GM KICK bob soon")
+	expect(t, gm, "Minutes must be a whole number")
+	send(t, gm, "GM KICK bob 0")
+	expect(t, gm, "Minutes must be a whole number")
+}
