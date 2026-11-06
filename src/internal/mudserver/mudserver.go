@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -32,6 +33,8 @@ the loop too; see persist.go.
 */
 type MudServer struct {
 	players       map[string]*MudPlayer // online players by name; loop-owned
+	joinsLocked   atomic.Bool           // GM LOCK: no new guests (players already in can reconnect)
+	offLoopWG     sync.WaitGroup        // database writes started by GM commands, away from the loop
 	events        chan func()
 	World         *World
 	Commands      map[string]*MudCommand
@@ -70,7 +73,9 @@ type MudServer struct {
 /*
 Use CreateMudServer() to generate a new server instance
 */
-func CreateMudServer() *MudServer {
+// loadConfiguration reads the config file (MUD_CONFIG, default config/server_config.json) and applies
+// the environment overrides.
+func loadConfiguration() Configuration {
 	configFile := os.Getenv("MUD_CONFIG")
 	if configFile == "" {
 		configFile = "config/server_config.json"
@@ -79,6 +84,11 @@ func CreateMudServer() *MudServer {
 	c := Configuration{}
 	c = c.LoadConfig(configFile)
 	c.ApplyEnvOverrides()
+	return c
+}
+
+func CreateMudServer() *MudServer {
+	c := loadConfiguration()
 
 	server, err := NewMudServer(c)
 	if err != nil {
@@ -150,6 +160,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	server.ipLimit = newIPLimiter(c.Connection.MaxJoinsPerMinutePerIP)
 	server.proxies = proxies
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
+	server.Commands["GM"] = server.gmCommand()
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
 	go server.saver(server.saves, server.saverDone)
@@ -588,7 +599,7 @@ func (ms *MudServer) handleCommand(player *MudPlayer, msg MudMessage) {
 	command_name, arguments := ms.processAliases(msg.Command, msg.CommandParameter)
 
 	command, err := ms.getCommand(command_name)
-	if err == muddata.ERR_COMMAND_UNKNOWN {
+	if err == muddata.ERR_COMMAND_UNKNOWN || (err == muddata.MUD_OK && command.gmOnly && !player.gm) {
 		player.SendError(codeUnknownCommand, "Unknown command.")
 	} else {
 		// Run command

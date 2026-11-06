@@ -27,6 +27,28 @@ created and never reset. Content removed from the files is not deleted: it just 
 in a room that left starts at the start room. With no `World.ContentDir` the world is whatever the database holds, as
 before. The real world lives in the private `mud_content` repository.
 
+## Game master
+
+There is one game master (GM), the owner. A GM is a password account with the `gm` flag, created on the host with
+`mud_server -add-gm NAME` (it prompts for a password of at least 12 characters, twice, without echo; piped input reads one line;
+an existing password account is promoted and its password replaced; a guest's name is refused). On the Droplet run it inside
+the container: `ssh deploy@<host> podman exec -it mud-server /app/mud_server -add-gm NAME`. The GM logs in with `login` (the client's
+hidden staff route, planned) and plays as an ordinary character; password accounts are never idle-kicked.
+
+`GM` is one command with sub-commands, and for anyone else it does not exist ("Unknown command.", and `HELP` does not list it):
+
+| Command | Effect |
+|---|---|
+| `GM WHO [prefix]` | counts (online, guests, accounts, away, whether visitors are locked), then names with rooms |
+| `GM MUTE <name> [minutes]` / `GM UNMUTE <name>` | refuse `SAY` and `WHISPER` (default 15 minutes, at most 1440); stored, so it survives a restart; a GM cannot be muted |
+| `GM TELEPORT <name>` / `GM TELEPORT ROOM <text>` | go to a player, or to the room whose name starts with the text (ignores crowd caps) |
+| `GM SUMMON <name>` | bring a player to the GM's room |
+| `GM ANNOUNCE <text>` | a `[GM] text` line to every player, once encoded |
+| `GM LOCK` / `GM UNLOCK` | refuse or allow new guests (`auth` code `joins_locked`); players already in can reconnect |
+
+Every use is logged and written to the `gm_audit` table (who, what, arguments, result). More commands (flags, events, kick,
+reports, chat controls) arrive with their features; see the event-systems plan.
+
 ## Local development
 
 Requires Go 1.24+ and either `podman-compose` or `docker compose`.

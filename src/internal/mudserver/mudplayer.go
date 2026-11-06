@@ -48,6 +48,8 @@ type MudPlayer struct {
 	sent          uint64         // counted frames sent over the player's lifetime in this process
 	replaySize    int            // ring capacity; 0 means no replay
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
+	gm            bool           // a game master (a password account with the gm flag; never a guest); see gm.go
+	mutedUntil    time.Time      // SAY and WHISPER are refused until then; loop-owned
 	SpawnLocation *Room
 }
 
@@ -67,6 +69,8 @@ type MudPlayerDB struct {
 	SpawnLocationID  int32
 	Guest            bool
 	ResumeTokenHash  string
+	GM               bool
+	MutedUntil       *time.Time
 }
 
 type PlayerStartStats struct {
@@ -187,9 +191,9 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 
 	switch playerid.(type) {
 	case string:
-		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash FROM player WHERE username=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash,gm,muteduntil FROM player WHERE username=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash FROM player WHERE id=$1"
+		query = "SELECT id,username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid,guest,resumetokenhash,gm,muteduntil FROM player WHERE id=$1"
 	default:
 		err = errors.New("Player.LoadFromDB invalid ID.  ID must be string|int32")
 	}
@@ -223,6 +227,10 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 		player.savedSpawnID = ret.SpawnLocationID
 		player.guest = ret.Guest
 		player.tokenHash = ret.ResumeTokenHash
+		player.gm = ret.GM && !ret.Guest // a guest is never a GM, whatever the row says
+		if ret.MutedUntil != nil {
+			player.mutedUntil = *ret.MutedUntil
+		}
 
 		// Build inventory
 		for iid := range ret.InventoryIDSlice {

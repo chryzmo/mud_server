@@ -44,6 +44,8 @@ stage files by name anyway.
 - `src/main.go`: HTTP entry point; routes `/ws` (and `/`, a plain-text liveness check).
 - `src/cmd/mudbot/`: opt-in websocket load client; `src/internal/mudbot/` holds its runner
   and test-account seeder. See README.md for local usage and measurement limitations.
+- `src/internal/mudserver/gm.go`: the game master: the `GM` command (gmOnly commands are invisible to others), `AddGM` and
+  `mud_server -add-gm NAME`, mutes (`muteduntil`) and the `gm_audit` table. One GM, the owner; guests are never GMs.
 - `src/internal/worldfile/` and `world-sample/`: the world content format (YAML: rooms, items, NPCs) and its
   validator, `mud_server -validate-world [-strict] DIR` (no database, no server), and `-render-world DIR` (a Markdown
   overview with a Mermaid map, for review). `world-sample/` is the small
