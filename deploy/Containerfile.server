@@ -8,10 +8,17 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY src ./src
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /mud_server ./src
+# The world content (mud_content, checked out into world/ by the deploy workflow). Errors in it fail the
+# build, so a broken world never reaches the host; warnings do not (the content repository's CI is strict).
+COPY world ./world
+# Not the content repository's git history: the image holds the world as files only.
+RUN rm -rf ./world/.git && /mud_server -validate-world ./world
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 WORKDIR /app
 COPY config ./config
 COPY resources ./resources
+COPY --from=build /src/world ./world
 COPY --from=build /mud_server /app/mud_server
+ENV MUD_WORLD_DIR=/app/world
 ENTRYPOINT ["/app/mud_server"]
