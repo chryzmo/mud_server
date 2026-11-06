@@ -2,20 +2,37 @@
 # One-time setup for CI deploys. Run locally, from the mud_server repo, with gh
 # logged in and SSH access to the Droplet as deploy:
 #
-#   deploy/setup-github-ci.sh <droplet IP>
+#   deploy/setup-github-ci.sh <droplet IP> [owner/repo ...]
+#
+# With no repositories it sets up mud_server and mud_frontend. Name repositories
+# to set up only those (for example a new one: chryzmo/mud_content). Each run
+# generates a new CI key and stores it only in the repositories it names, so
+# running it for one repository leaves the others' keys untouched; the old
+# keys stay authorized on the host until you remove them from
+# ~deploy/.ssh/authorized_keys.
 #
 # 1. Generates an SSH key just for CI and authorizes it for `deploy` on the host
 #    (restricted: no port forwarding, agent forwarding or PTY).
-# 2. Creates a "production" environment in mud_server and mud_frontend and stores
-#    the private key, the host's SSH host key and the deploy target as
-#    environment secrets.
-# 3. Turns auto-deploy on (repository variable AUTO_DEPLOY=true) in both repos.
+# 2. Creates a "production" environment in each repository (an existing one and
+#    its other secrets are left alone) and stores the private key, the host's SSH
+#    host key and the deploy target as environment secrets.
+# 3. Turns auto-deploy on (repository variable AUTO_DEPLOY=true) in each.
 # The private key exists only in a temp directory and in GitHub; it's deleted
 # from this machine at the end.
 set -euo pipefail
 
-ip="${1:?usage: deploy/setup-github-ci.sh <droplet IP>}"
-repos=(chryzmo/mud_server chryzmo/mud_frontend)
+ip="${1:?usage: deploy/setup-github-ci.sh <droplet IP> [owner/repo ...]}"
+shift
+repos=("$@")
+if [ "${#repos[@]}" -eq 0 ]; then
+	repos=(chryzmo/mud_server chryzmo/mud_frontend)
+fi
+for repo in "${repos[@]}"; do
+	case "$repo" in
+		*/*) ;;
+		*) echo "setup-github-ci.sh: '$repo' is not owner/repo" >&2; exit 2 ;;
+	esac
+done
 host="deploy@$ip"
 
 known_hosts="$(ssh-keygen -F "$ip" | grep -v '^#' || true)"
@@ -42,4 +59,4 @@ for repo in "${repos[@]}"; do
 	printf '%s' "$host" | gh secret set DEPLOY_HOST --repo "$repo" --env production
 	gh variable set AUTO_DEPLOY --repo "$repo" --body true
 done
-echo "Done. Flip AUTO_DEPLOY to false in either repo to freeze its auto-deploys."
+echo "Done. Flip AUTO_DEPLOY to false in a repo to freeze its auto-deploys."
