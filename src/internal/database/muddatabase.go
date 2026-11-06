@@ -85,6 +85,12 @@ func (db MudDatabase) EnsureSchema() error {
 		"ALTER TABLE room ADD COLUMN IF NOT EXISTS featuresjson text NOT NULL DEFAULT '[]'",
 		// The friendly characters in a room (plans/interactive-world.md section 4); JSON, written by the content loader.
 		"ALTER TABLE room ADD COLUMN IF NOT EXISTS peoplejson text NOT NULL DEFAULT '[]'",
+		// Rules, gates and puzzle tokens (plans/interactive-world.md sections 3 and 5), and each player's puzzle state.
+		// There is deliberately no foreign key from player_state to player: the seed scripts drop player.
+		"ALTER TABLE room ADD COLUMN IF NOT EXISTS rulesjson text NOT NULL DEFAULT '[]'",
+		"ALTER TABLE room ADD COLUMN IF NOT EXISTS gatesjson text NOT NULL DEFAULT '{}'",
+		"ALTER TABLE item ADD COLUMN IF NOT EXISTS bound boolean NOT NULL DEFAULT false",
+		"CREATE TABLE IF NOT EXISTS player_state (player_id integer NOT NULL, kind text NOT NULL, key text NOT NULL, value text NOT NULL DEFAULT '', PRIMARY KEY (player_id, kind, key))",
 		// Names are unique ignoring case. Last, because it fails if an older
 		// database already holds two names that differ only in case.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",

@@ -106,6 +106,7 @@ func Render(w *World, res *Result) string {
 			}
 			b.WriteString("\n")
 		}
+		renderRules(&b, w, key)
 		if len(r.Items) > 0 {
 			var parts []string
 			for _, ik := range sortedKeys(r.Items) {
@@ -172,7 +173,14 @@ func readingOrder(w *World) ([]string, map[string]int) {
 			order = append(order, level...)
 			var next []string
 			for _, cur := range level {
+				var leads []string
 				for _, to := range w.Rooms[cur].Exits {
+					leads = append(leads, to)
+				}
+				for _, g := range w.Rooms[cur].Gates {
+					leads = append(leads, g.Exit.To)
+				}
+				for _, to := range leads {
 					if _, ok := w.Rooms[to]; !ok {
 						continue
 					}
@@ -247,6 +255,9 @@ func mermaid(w *World, order []string, areaOf map[string]string) string {
 				fmt.Fprintf(&b, "    %s -->|%s| %s\n", id[key], dir, id[to])
 			}
 		}
+	}
+	for _, e := range gateEdges(w) { // a gate is a dotted line: the way exists once a puzzle is solved
+		fmt.Fprintf(&b, "    %s -.->|%s gate| %s\n", id[e[0]], e[2], id[e[1]])
 	}
 	b.WriteString("```\n")
 	return b.String()

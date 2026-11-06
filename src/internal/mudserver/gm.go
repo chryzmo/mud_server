@@ -362,24 +362,9 @@ func (ms *MudServer) findPlayerFold(name string) *MudPlayer {
 	return nil
 }
 
-// relocate moves a player to a room, with the usual arrival and departure notices, and
-// shows them the room. It skips the crowd caps: a GM put them there. Loop only.
-func (ms *MudServer) relocate(p *MudPlayer, dest *Room) {
-	if p.Location == dest {
-		return
-	}
-	if p.Location != nil {
-		p.Location.RemovePlayer(p.Username)
-		p.Location.BroadcastFrame(encodeLeave(p.Username, ""), p.Username)
-	}
-	p.NPCTarget = nil
-	p.Location = dest
-	p.rememberCopy()
-	dest.BroadcastFrame(encodeArrive(p.Username, ""), p.Username)
-	dest.AddPlayer(p)
-	p.dirty = true
-	p.SendLook()
-}
+// relocate moves a player to a room, with the usual arrival and departure notices, and shows them the
+// room. It skips the crowd caps: a GM put them there. Loop only.
+func (ms *MudServer) relocate(p *MudPlayer, dest *Room) { relocatePlayer(p, dest) }
 
 // audit records a GM command, in the log now and in the database off the loop. The time is
 // taken here, on the loop, so the trail is in the order things happened even though the

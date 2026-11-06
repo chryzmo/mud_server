@@ -50,6 +50,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 					target_mp.sendFrame(heard)
 				}
 			}
+			player.said(msg)
 
 			return muddata.MUD_OK
 		},
@@ -104,10 +105,13 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				player.SendMessage("You cannot move there.\n")
 			case muddata.ERR_ROOM_FULL:
 				player.SendMessage("It's too crowded to go that way right now.\n")
+			case retRoomLocked:
+				// the gate's own message was sent
 			default:
 				player.dirty = true
 				// Send description of new room
 				player.SendLook()
+				player.entered()
 			}
 
 			return muddata.MUD_OK
@@ -215,6 +219,8 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			i := player.Inventory.GetItem(itemname)
 			if i == nil {
 				player.SendMessage("You do not have that item.")
+			} else if i.Bound {
+				player.SendMessage("The " + i.Name + " is bound to you; you cannot drop it.")
 			} else {
 				player.SendMessage("You drop " + i.Name + ".")
 
@@ -427,6 +433,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["UNEQUIP"] = &c_unequip
 	cList["HELP"] = &c_help
 	cList["?"] = &c_help
+	registerRuleVerbs(cList)
 
 	return cList
 }

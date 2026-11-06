@@ -75,6 +75,9 @@ type Room struct {
 	Features map[string]Feature `yaml:"features"`
 	// People are friendly characters to TALK to and ASK: key to the person.
 	People map[string]Person `yaml:"people"`
+	// Rules are what happens when a player acts on things here; Gates are exits that rules open.
+	Rules []Rule          `yaml:"rules"`
+	Gates map[string]Gate `yaml:"gates"`
 }
 
 // Person is a friendly character: not a monster, never fights, never moves. Everything they
@@ -114,6 +117,7 @@ type Item struct {
 	Name        string     `yaml:"name"`
 	Description string     `yaml:"description"`
 	Persistent  bool       `yaml:"persistent"` // stays in the room after being picked up (a fixture)
+	Bound       bool       `yaml:"bound"`      // a puzzle token: cannot be dropped or given away; some rule must give it
 	Equipment   *Equipment `yaml:"equipment"`
 }
 
@@ -410,7 +414,15 @@ func (w *World) Validate(res *Result) {
 				continue
 			}
 			if back, has := dest.Exits[opposite[dir]]; !has {
-				res.warnf(f, ep, "one-way: %q has no %s exit back to %q", to, opposite[dir], key)
+				gated := false
+				for _, g := range dest.Gates { // a gate back counts: it opens when its puzzle is solved
+					if g.Exit.Dir == opposite[dir] && g.Exit.To == key {
+						gated = true
+					}
+				}
+				if !gated {
+					res.warnf(f, ep, "one-way: %q has no %s exit back to %q", to, opposite[dir], key)
+				}
 			} else if back != key {
 				res.warnf(f, ep, "%q's %s exit goes to %q, not back to %q", to, opposite[dir], back, key)
 			}
@@ -579,6 +591,8 @@ func (w *World) Validate(res *Result) {
 		}
 	}
 
+	w.validateRules(res)
+
 	// Rooms a player can never reach from the start are almost always a mistake.
 	if _, ok := w.Rooms[w.StartRoom]; ok {
 		seen := map[string]bool{w.StartRoom: true}
@@ -590,6 +604,12 @@ func (w *World) Validate(res *Result) {
 				if _, ok := w.Rooms[to]; ok && !seen[to] {
 					seen[to] = true
 					queue = append(queue, to)
+				}
+			}
+			for _, g := range w.Rooms[cur].Gates { // reachable once the gates are open
+				if _, ok := w.Rooms[g.Exit.To]; ok && !seen[g.Exit.To] {
+					seen[g.Exit.To] = true
+					queue = append(queue, g.Exit.To)
 				}
 			}
 		}

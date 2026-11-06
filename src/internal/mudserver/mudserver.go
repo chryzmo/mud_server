@@ -35,6 +35,8 @@ type MudServer struct {
 	players       map[string]*MudPlayer // online players by name; loop-owned
 	joinsLocked   atomic.Bool           // GM LOCK: no new guests (players already in can reconnect)
 	kicks         kickList              // GM KICK: characters on a break; has its own lock
+	stateQ        chan stateWrite       // puzzle state changes for the writer (state.go)
+	stateDone     chan struct{}
 	offLoopWG     sync.WaitGroup        // database writes started by GM commands, away from the loop
 	events        chan func()
 	World         *World
@@ -155,6 +157,8 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		dormant:       make(map[*MudPlayer]time.Time),
 		done:          make(chan struct{}),
 		loopDone:      make(chan struct{}),
+		stateQ:        make(chan stateWrite, stateQueueSize),
+		stateDone:     make(chan struct{}),
 	}
 	server.recoveries = newRecoveryGuard(server.recoveryLock())
 	server.joinLimit = newJoinLimiter(c.Connection.JoinPerSecond, c.Connection.JoinBurst)
@@ -165,6 +169,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
 	go server.saver(server.saves, server.saverDone)
+	go server.stateWriter()
 	go server.run()
 
 	return server, nil
@@ -253,6 +258,11 @@ func (ms *MudServer) Shutdown(ctx context.Context) {
 		close(ms.done)
 		select {
 		case <-ms.loopDone:
+		case <-ctx.Done():
+		}
+		close(ms.stateQ) // the loop is the only sender and has stopped; let the writer finish what is queued
+		select {
+		case <-ms.stateDone:
 		case <-ctx.Done():
 		}
 
@@ -364,6 +374,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.rememberCopy()
 		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
 		player.world = ms.World
+		player.stateSink = ms.queueState
 		player.lastActive = time.Now()
 		if player.canResume() {
 			player.replaySize = ms.replayFrames()
@@ -381,6 +392,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
 		player.SendStatUpdate()
+		player.entered()
 	})
 	return refusal
 }

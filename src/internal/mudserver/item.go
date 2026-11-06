@@ -14,6 +14,8 @@ type Item struct {
 	Description string
 	Quantity int32
 	Persistent bool
+	Bound bool // a puzzle token: cannot be dropped; some rule gives it (content key in ContentKey)
+	ContentKey *string
 }
 
 // Create a copy of the item.  May be useful for breaking up stacks
@@ -24,6 +26,8 @@ func (i Item) createCopy() (*Item) {
 		Description: i.Description,
 		Quantity: i.Quantity,
 		Persistent: i.Persistent,
+		Bound: i.Bound,
+		ContentKey: i.ContentKey,
 	}
 }
 
@@ -33,9 +37,9 @@ func (i Item) FetchFromDB (db *muddatabase.MudDatabase, itemid  interface{}) (*I
 
 	switch itemid.(type) {
 	case string:
-		query = "SELECT id,name,description,quantity,persistent FROM ITEM WHERE name=$1"
+		query = "SELECT id,name,description,quantity,persistent,bound,contentkey FROM ITEM WHERE name=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,name,description,quantity,persistent FROM ITEM WHERE id=$1"
+		query = "SELECT id,name,description,quantity,persistent,bound,contentkey FROM ITEM WHERE id=$1"
 	default:
 		err = errors.New("Item.FetchFromDB invalid ID.  ID must be string|int32")
 	}
