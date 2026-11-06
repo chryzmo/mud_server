@@ -319,7 +319,7 @@ func (rr *ruleRun) finish() {
 
 // sendExits sends the room frame again, with this player's exits.
 func (mp *MudPlayer) sendExits() {
-	mp.sendFrame(encode(roomMsg{T: msgRoom, Name: mp.Location.Name, Exits: mp.usableExits()}))
+	mp.sendRoomFrame()
 }
 
 // act runs the first rule in the player's room that matches a verb on a target, with an
