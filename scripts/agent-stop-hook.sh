@@ -2,8 +2,9 @@
 # Claude Code Stop hook: when an agent finishes a turn that changed this repo,
 # run scripts/test.sh. Wired up in .claude/settings.json.
 #
-# - Skips when the working tree (tracked and untracked files) matches the last
-#   tree that passed, so turns that changed nothing here cost nothing.
+# - Skips when the tracked files match the last tree that passed, so turns that
+#   changed nothing here cost nothing. Untracked files (notes, scratch files) do
+#   not count; a new file counts once it is staged.
 # - On failure, exits 2 so the test output goes back to the agent to fix.
 # - If the agent is already continuing because of this hook and the tests still
 #   fail, reports to the user instead of blocking again, so it can't loop.
@@ -14,11 +15,12 @@ input="$(cat)"
 git_dir="$(git -C "$repo" rev-parse --absolute-git-dir)"
 state="$git_dir/agent-tests-passed-tree"
 
-# Snapshot the working tree as a git tree object using a throwaway index.
+# Snapshot the tracked files of the working tree as a git tree object using a
+# throwaway index.
 tmp_index="$(mktemp)"
 trap 'rm -f "$tmp_index"' EXIT
 cp "$git_dir/index" "$tmp_index" 2>/dev/null || true
-GIT_INDEX_FILE="$tmp_index" git -C "$repo" add -A >/dev/null 2>&1
+GIT_INDEX_FILE="$tmp_index" git -C "$repo" add -u >/dev/null 2>&1
 tree="$(GIT_INDEX_FILE="$tmp_index" git -C "$repo" write-tree)"
 
 if [ -f "$state" ]; then
