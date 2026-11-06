@@ -40,6 +40,12 @@ var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
 // MaxDescription is the longest room or item description the validator accepts without a warning.
 const MaxDescription = 1500
 
+// MaxFeatures is the most features one room may have, and MaxFeatureName the longest name or alias.
+const (
+	MaxFeatures    = 24
+	MaxFeatureName = 40
+)
+
 // File is one content file as written by an author.
 type File struct {
 	StartRoom string          `yaml:"start_room"`
@@ -63,6 +69,16 @@ type Room struct {
 	// Items lie on the floor when the room is first created: item key to quantity.
 	Items    map[string]int `yaml:"items"`
 	Spawners []Spawner      `yaml:"spawners"`
+	// Features are scenery to EXAMINE: key to its names and its text.
+	Features map[string]Feature `yaml:"features"`
+}
+
+// Feature is something in a room that cannot be picked up but can be looked at. The first
+// name is what it is called ("first clock"); the others are aliases a player may type.
+type Feature struct {
+	Names    []string `yaml:"names"`
+	Examine  string   `yaml:"examine"`
+	Unlisted bool     `yaml:"unlisted"` // left out of the "You notice" line: examinable, but for the player to find
 }
 
 // Spawner keeps up to Count of an NPC in its room, adding one every TickMS.
@@ -376,6 +392,55 @@ func (w *World) Validate(res *Result) {
 				res.warnf(f, ep, "one-way: %q has no %s exit back to %q", to, opposite[dir], key)
 			} else if back != key {
 				res.warnf(f, ep, "%q's %s exit goes to %q, not back to %q", to, opposite[dir], back, key)
+			}
+		}
+		if len(r.Features) > MaxFeatures {
+			res.errorf(f, p+".features", "%d features; at most %d per room", len(r.Features), MaxFeatures)
+		}
+		taken := map[string]string{} // upper-cased name or alias -> feature key
+		floor := map[string]bool{}
+		for ik := range r.Items {
+			if it, ok := w.Items[ik]; ok {
+				floor[strings.ToUpper(strings.TrimSpace(it.Name))] = true
+			}
+		}
+		for _, fk := range sortedKeys(r.Features) {
+			ft := r.Features[fk]
+			fp := p + ".features." + fk
+			if !keyPattern.MatchString(fk) {
+				res.errorf(f, fp, "key must be lower case letters, digits and dashes, starting with a letter or digit, at most 40 characters")
+			}
+			if len(ft.Names) == 0 {
+				res.errorf(f, fp+".names", "a feature needs at least one name (the first is what it is called, the rest are aliases)")
+			}
+			for i, n := range ft.Names {
+				np := fmt.Sprintf("%s.names[%d]", fp, i)
+				name := strings.ToUpper(strings.TrimSpace(n))
+				switch {
+				case name == "":
+					res.errorf(f, np, "a name cannot be empty")
+					continue
+				case len(name) > MaxFeatureName:
+					res.errorf(f, np, "%q is over %d characters", n, MaxFeatureName)
+				}
+				// Features may share an alias ("clock" for two clocks): EXAMINE then asks which. What they are
+				// called (the first name) must differ, or the question could not be answered.
+				if i == 0 {
+					if other, dup := taken[name]; dup && other != fk {
+						res.errorf(f, np, "%q is also what feature %q is called in this room; the first name of each feature must differ", n, other)
+					}
+					taken[name] = fk
+				}
+				if floor[name] {
+					res.warnf(f, np, "%q is also the name of an item lying in this room; EXAMINE would be ambiguous", n)
+				}
+			}
+			ex := strings.TrimSpace(ft.Examine)
+			if ex == "" {
+				res.errorf(f, fp+".examine", "a feature needs examine text")
+			}
+			if len(ex) > MaxDescription {
+				res.warnf(f, fp+".examine", "text is %d characters; over %d reads badly on a phone", len(ex), MaxDescription)
 			}
 		}
 		for _, ik := range sortedKeys(r.Items) {

@@ -636,6 +636,8 @@ func (ms *MudServer) processAliases(cn string, args string) (string, string) {
 		arguments = "DOWN"
 	case "L":
 		command_name = "LOOK"
+	case "X":
+		command_name = "EXAMINE"
 	case "I", "INV":
 		command_name = "INVENTORY"
 	}

@@ -2,6 +2,7 @@ package worldfile
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -215,5 +216,75 @@ func TestRunExitCodesAndOutput(t *testing.T) {
 	empty := t.TempDir()
 	if code, out := run(empty); code != 2 || !strings.Contains(out, "no .yaml") {
 		t.Errorf("empty directory: %d %q", code, out)
+	}
+}
+
+func TestFeaturesAreChecked(t *testing.T) {
+	good := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", `    exits: {N: yard}
+    features:
+      clock:
+        names: [first clock, clock 1]
+        examine: A tall clock.
+      clock-two:
+        names: [second clock, clock 2]
+        examine: Another clock.
+        unlisted: true
+`, 1)})
+	if len(good.Errors) != 0 || len(good.Warnings) != 0 {
+		t.Fatalf("good features: errors %v warnings %v", good.Errors, good.Warnings)
+	}
+
+	res := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", `    exits: {N: yard}
+    items: {key: 1}
+    features:
+      Bad_Key:
+        names: [odd]
+        examine: x
+      nameless:
+        examine: x
+      blank:
+        names: ["  "]
+        examine: x
+      long:
+        names: ["`+strings.Repeat("a", 41)+`"]
+        examine: x
+      one:
+        names: [lever, KEY]
+        examine: x
+      two:
+        names: [Lever]
+        examine: x
+      silent:
+        names: [mute]
+`, 1) + "items:\n  key: {name: KEY, description: A key.}\n"})
+	for _, want := range []string{
+		"key must be lower case", "needs at least one name", "a name cannot be empty", "over 40 characters",
+		`also what feature "one" is called in this room`, "needs examine text",
+	} {
+		if !has(res.Errors, want) {
+			t.Errorf("missing error containing %q in %v", want, res.Errors)
+		}
+	}
+	// Two clocks may share the alias "clock"; EXAMINE asks which.
+	shared := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", `    exits: {N: yard}
+    features:
+      a: {names: [first clock, clock], examine: x}
+      b: {names: [second clock, clock], examine: x}
+`, 1)})
+	if len(shared.Errors) != 0 {
+		t.Errorf("a shared alias is an error: %v", shared.Errors)
+	}
+	if !has(res.Warnings, `also the name of an item lying in this room`) {
+		t.Errorf("a feature named like a floor item should warn: %v", res.Warnings)
+	}
+
+	var many strings.Builder
+	many.WriteString("    features:\n")
+	for i := 0; i <= MaxFeatures; i++ {
+		fmt.Fprintf(&many, "      f%d: {names: [thing %d], examine: x}\n", i, i)
+	}
+	tooMany := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", "    exits: {N: yard}\n"+many.String(), 1)})
+	if !has(tooMany.Errors, "at most 24 per room") {
+		t.Errorf("too many features: %v", tooMany.Errors)
 	}
 }

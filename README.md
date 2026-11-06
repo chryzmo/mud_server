@@ -18,6 +18,12 @@ warnings (one-way exits, rooms unreachable from the start), and exits 1 on error
 draws), every room with its description, exits, floor items and spawners in the order a player would meet them, and the
 item and NPC tables, with any validation problems listed first. The content repository's CI publishes it for review.
 
+A room may list `features`: scenery (a clock, a banner) with a list of names (the first is what it is called, the rest are aliases)
+and the text `EXAMINE` shows; `unlisted: true` keeps one out of LOOK's "You notice: ..." line so players have to find it. `EXAMINE <thing>`
+(`X`, or `LOOK AT <thing>`) looks at a feature, an item in the room or the pack, a player or a monster; names match whole or by a unique
+prefix of three letters or more, and when several fit the server asks which (`EXAMINE MY <item>` looks only in the pack). Features
+are stored with the room (`room.featuresjson`) and are shared by its crowd copies.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners

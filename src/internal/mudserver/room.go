@@ -1,6 +1,7 @@
 package mudserver
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -26,6 +27,7 @@ type Room struct {
 	BaddieMap   map[string]*BaddieNPC
 	Inventory   *Inventory
 	ExitJSON    string
+	Features    []Feature // scenery to EXAMINE (examine.go); shared by a room's copies
 	dirty       bool // contents changed since the last save; see persist.go
 
 	// Copies of a room (see crowd.go). A clone has no database row: it is never
@@ -52,6 +54,7 @@ type RoomDB struct {
 	Description      string
 	ExitJSON         string
 	InventoryIDSlice map[string]int32
+	FeaturesJSON     string
 }
 
 type RoomExits struct {
@@ -100,6 +103,12 @@ func (r *Room) LookDescription() string {
 	desc.WriteString("'\n")
 	desc.WriteString(r.Description)
 	desc.WriteByte('\n')
+
+	if listed := r.listedFeatures(); len(listed) > 0 {
+		desc.WriteString("\nYou notice: ")
+		desc.WriteString(strings.Join(listed, ", "))
+		desc.WriteString(".\n")
+	}
 
 	if len(r.BaddieMap) > 0 {
 		desc.WriteString("\nThe monsters here are:\n")
@@ -198,9 +207,9 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 
 	switch roomid.(type) {
 	case string:
-		query = "SELECT id,name,description,exitjson,inventoryidslice FROM room WHERE name=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson FROM room WHERE name=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,name,description,exitjson,inventoryidslice FROM room WHERE id=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson FROM room WHERE id=$1"
 	default:
 		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
 	}
@@ -228,6 +237,10 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 			ExitMap:     make(map[string]*Room),
 			BaddieMap:   make(map[string]*BaddieNPC),
 			ExitJSON:    ret.ExitJSON,
+		}
+		if err := json.Unmarshal([]byte(ret.FeaturesJSON), &room.Features); err != nil {
+			fmt.Printf("Room %d: features unreadable (%v); the room has none\n", ret.ID, err)
+			room.Features = nil
 		}
 
 		for iid := range ret.InventoryIDSlice {

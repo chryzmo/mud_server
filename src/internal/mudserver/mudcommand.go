@@ -57,9 +57,22 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 
 	// LOOK
 	c_look := MudCommand{
-		description: "Describe your current room, its exits, monsters, and other players.",
+		description: "Describe your current room, its exits, monsters, and other players.  LOOK AT <thing> looks closely at something.",
 		action: func(player *MudPlayer, arguments string) int {
+			if strings.TrimSpace(arguments) != "" {
+				player.examine(arguments)
+				return muddata.MUD_OK
+			}
 			player.SendLook()
+			return muddata.MUD_OK
+		},
+	}
+
+	// EXAMINE
+	c_examine := MudCommand{
+		description: "Look closely at something: an object, an item, a player or a monster.  Usage: EXAMINE <thing>  (X for short; EXAMINE MY <item> looks in your pack)",
+		action: func(player *MudPlayer, arguments string) int {
+			player.examine(arguments)
 			return muddata.MUD_OK
 		},
 	}
@@ -384,6 +397,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	// Load commands into CommandList
 	cList["SAY"] = &c_say
 	cList["LOOK"] = &c_look
+	cList["EXAMINE"] = &c_examine
 	cList["MOVE"] = &c_move
 	cList["GET"] = &c_get
 	cList["DROP"] = &c_drop
