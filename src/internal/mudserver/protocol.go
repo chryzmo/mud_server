@@ -61,6 +61,7 @@ const (
 	codeRestarting      = "restarting"
 	codeAtCapacity      = "at_capacity"
 	codeBadToken        = "bad_token"
+	codeReplaced        = "replaced" // error: another connection took this character over
 	codeBadRecovery     = "bad_recovery"
 	codeRecoveryLocked  = "recovery_locked"
 )
@@ -74,8 +75,17 @@ type inbound struct {
 	Password string  `json:"password"`
 	Name     string  `json:"name"`     // join
 	Token    string  `json:"token"`    // resume
-	Received uint64  `json:"received"` // resume: counted frames the client has processed
+	Received *uint64 `json:"received"` // resume: counted frames the client has processed; absent means it remembers none
 	Code     string  `json:"code"`     // recover: the recovery code
+}
+
+// receivedCount is the resume count, or noFramesSeen if the client sent none (a
+// freshly loaded page): it gets a gap and a fresh look, not stale replayed frames.
+func (in *inbound) receivedCount() uint64 {
+	if in.Received == nil {
+		return noFramesSeen
+	}
+	return *in.Received
 }
 
 // Outbound messages. Each struct is one frame; T is the type.

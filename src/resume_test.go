@@ -451,3 +451,59 @@ func TestPasswordPlayersStillLeaveImmediately(t *testing.T) {
 	pw.UnderlyingConn().Close()
 	watcher.until(func(typ string, m map[string]any) bool { return typ == "leave" && m["who"] == "Passworded" })
 }
+
+// A freshly loaded page has no frame count to send. Leaving `received` out means
+// "I remember nothing": a gap and a fresh look, never old chatter replayed into a
+// blank page (which is what a missing field used to mean: received = 0).
+func TestResumeWithoutReceivedIsAGapNotAReplay(t *testing.T) {
+	wsURL, _ := startTestServerWithConfig(t, graceConfig(5000, 50))
+	watcher := joinGuest(t, wsURL, "Watcher")
+	page := joinGuest(t, wsURL, "Page")
+	watcher.until(func(typ string, m map[string]any) bool { return typ == "arrive" && m["who"] == "Page" })
+
+	page.drop()
+	send(t, watcher.conn, "SAY stale")
+	watcher.until(func(typ string, m map[string]any) bool { return typ == "text" && strings.Contains(m["text"].(string), `You say: "stale"`) })
+
+	conn := dial(t, wsURL)
+	expect(t, conn, "Welcome to the MUD!")
+	writeRaw(t, conn, fmt.Sprintf(`{"t":"resume","token":%q}`, page.token))
+	auth := expectMessage(t, conn, "auth")
+	if auth["ok"] != true || auth["resumed"] != true || auth["gap"] != true || auth["replayed"] != nil {
+		t.Fatalf("resume without received = %v, want resumed with a gap and nothing replayed", auth)
+	}
+	// What follows is a fresh look and stats, not the stale say.
+	for _, want := range []string{"text", "room", "stats"} {
+		m := expectMessage(t, conn, want)
+		if want == "text" && strings.Contains(m["text"].(string), "stale") {
+			t.Errorf("stale frame replayed to a page that remembers nothing: %v", m)
+		}
+	}
+}
+
+// A connection that is taken over is told why before it is closed, so a client
+// can stop instead of reconnecting and fighting for the character.
+func TestReplacedConnectionIsToldWhy(t *testing.T) {
+	wsURL, ms := startTestServerWithConfig(t, graceConfig(5000, 50))
+	phone := joinGuest(t, wsURL, "Phone")
+
+	old := phone.conn
+	phone.reconnect() // a second tab resumes while the first is still connected
+	waitForClose(t, ms, "replaced", 1)
+
+	old.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for {
+		_, raw, err := old.ReadMessage()
+		if err != nil {
+			t.Fatal("the replaced connection closed without an error frame saying why")
+		}
+		var m map[string]any
+		json.Unmarshal(raw, &m)
+		if m["t"] == "error" {
+			if m["code"] != "replaced" {
+				t.Fatalf("error = %v, want code replaced", m)
+			}
+			return
+		}
+	}
+}

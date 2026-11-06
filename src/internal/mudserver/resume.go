@@ -113,6 +113,9 @@ func (ms *MudServer) expireDormant(now time.Time) {
 // connection) a new session, and sends it what it missed. Loop only.
 func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64, fresh welcome) {
 	if old := player.Session; old != nil && old != session {
+		// Say why before closing, so that client stops instead of reconnecting and
+		// fighting for the character. A dead connection never reads it; that is fine.
+		old.sendError(codeReplaced, "This character was opened on another device or tab.")
 		old.CloseWith(closeReplaced)
 	}
 	player.Session = session
