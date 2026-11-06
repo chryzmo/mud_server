@@ -14,6 +14,10 @@ The world (rooms, items, NPCs, areas) can be described in YAML files; the format
 (unknown fields, bad keys, exits to missing rooms, items or NPCs that do not exist, a missing start room) and
 warnings (one-way exits, rooms unreachable from the start), and exits 1 on errors (or on warnings with `-strict`).
 
+`go run ./src -render-world DIR` prints a readable Markdown overview of the world instead: a map (a Mermaid diagram, which GitHub
+draws), every room with its description, exits, floor items and spawners in the order a player would meet them, and the
+item and NPC tables, with any validation problems listed first. The content repository's CI publishes it for review.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners
