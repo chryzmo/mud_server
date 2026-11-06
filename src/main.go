@@ -27,6 +27,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-validate-world" {
 		os.Exit(worldfile.Run(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "-render-world" {
+		os.Exit(worldfile.RunRender(os.Args[2:], os.Stdout, os.Stderr))
+	}
 
 	serverinstance := mudserver.CreateMudServer()
 

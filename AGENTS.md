@@ -45,7 +45,8 @@ stage files by name anyway.
 - `src/cmd/mudbot/`: opt-in websocket load client; `src/internal/mudbot/` holds its runner
   and test-account seeder. See README.md for local usage and measurement limitations.
 - `src/internal/worldfile/` and `world-sample/`: the world content format (YAML: rooms, items, NPCs) and its
-  validator, `mud_server -validate-world [-strict] DIR` (no database, no server). `world-sample/` is the small
+  validator, `mud_server -validate-world [-strict] DIR` (no database, no server), and `-render-world DIR` (a Markdown
+  overview with a Mermaid map, for review). `world-sample/` is the small
   public sample used by tests and `scripts/test.sh`; the real world lives in the private `mud_content` repository
   (plans/event-systems.md). Keys are lower-case words and dashes, global per kind. `mudserver/content.go` applies it at startup
   when `World.ContentDir` (env `MUD_WORLD_DIR`) is set: upsert by `contentkey`, adopting same-name rows, never resetting
