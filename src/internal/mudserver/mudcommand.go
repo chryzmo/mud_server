@@ -167,6 +167,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 					player.Location.dirty = true
 				}
 				player.dirty = true // saved in the next batch (persist.go)
+				player.Location.roomChanged()
 			}
 
 			return muddata.MUD_OK
@@ -231,6 +232,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				player.Inventory.RemoveItem(i)
 				player.dirty = true
 				player.Location.dirty = true
+				player.Location.roomChanged()
 			}
 
 			return muddata.MUD_OK

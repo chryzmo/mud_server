@@ -100,7 +100,7 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 | `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `kicked` (a GM removed the character for a break, said before the close; do not reconnect by itself; resume, recover and login are then refused with `auth` code `kicked` until the break ends), `unknown_command`, `restarting`, `internal` |
 | `text` | `text` | prose, with ANSI colour codes the client styles per line |
 | `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
-| `room`, `stats`, `inventory` | name and exits, vitals, listing | state for the UI |
+| `room`, `stats`, `inventory` | name, exits, and what is here (`locked` exits, `things` with their `verbs`, `people`, `items`); vitals; listing | state for the UI; sent again when an item moves or a gate opens |
 
 **Frame counting.** Every frame except `hello`, `auth` and `error` is *counted*, by the server as it
 queues it and by the client as it processes it. After a drop the client sends its count in `resume`;

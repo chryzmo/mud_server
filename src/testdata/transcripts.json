@@ -45,6 +45,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -149,6 +155,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -210,6 +222,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -360,6 +378,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -509,6 +533,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -572,6 +602,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -672,6 +708,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -735,6 +777,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -796,6 +844,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -972,6 +1026,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -1070,6 +1130,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -1129,6 +1195,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -1247,6 +1319,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -1414,6 +1492,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -1482,6 +1566,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"
@@ -1585,6 +1675,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -1668,6 +1764,12 @@
                 "exits": [
                   "N"
                 ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
                 "name": "Start Room",
                 "t": "room"
               }
@@ -1729,6 +1831,12 @@
               "recv": {
                 "exits": [
                   "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
                 ],
                 "name": "Start Room",
                 "t": "room"

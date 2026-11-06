@@ -156,6 +156,11 @@ type (
 		T     string   `json:"t"`
 		Name  string   `json:"name"`
 		Exits []string `json:"exits"`
+		// Added by the structured frame; all optional, so an old client ignores them.
+		Locked []string    `json:"locked,omitempty"`
+		People []roomThing `json:"people,omitempty"`
+		Things []roomThing `json:"things,omitempty"`
+		Items  []roomItem  `json:"items,omitempty"`
 	}
 	inventoryMsg struct {
 		T    string `json:"t"`
@@ -243,7 +248,7 @@ func (mp *MudPlayer) SendStatUpdate() {
 func (mp *MudPlayer) SendLook() {
 	room := mp.Location
 	mp.SendMessage(room.lookDescription(mp))
-	mp.sendFrame(encode(roomMsg{T: msgRoom, Name: room.Name, Exits: mp.usableExits()}))
+	mp.sendRoomFrame()
 }
 
 // RefuseUnlessProtocol checks that the client negotiated Subprotocol. If not it
