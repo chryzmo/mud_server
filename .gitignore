@@ -13,5 +13,9 @@ Thumbs.db
 # directory-only pattern would not match.
 plans
 
+# The private world content (mud_content), checked out here by the deploy workflow and baked into
+# the server image. Never commit it: this repository is public.
+/world/
+
 # Local deploy settings (host IP etc.)
 deploy/deploy.local.env

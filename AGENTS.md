@@ -152,6 +152,10 @@ passes on a many-core machine will fail on `main` and block the deploy.
 - `deploy/deploy.sh` refuses uncommitted changes, runs both repos' `scripts/test.sh`, builds the
   images locally, ships only images the host lacks, keeps the previous images for `rollback`, and
   restarts only what changed. `deploy/deploy.sh status` is read-only.
+- The world content (private `mud_content`) is checked out into `world/` by the Deploy workflow (token: `CONTENT_READ_TOKEN`,
+  `production` environment of each calling repo) and baked into the server image, which validates it at build time.
+  `world/` is gitignored and must never be committed here: this repository is public. A deploy whose server does not
+  answer within 60 s is rolled back (the images it changed) by `deploy.sh`.
 - Base images in `deploy/Containerfile.*` are pinned by digest and built with `--timestamp 0` so
   unchanged images keep their IDs and aren't re-uploaded. Change a pin deliberately.
 - The `admin` user has sudo, for maintenance. Production runs as rootless Podman under the

@@ -12,6 +12,9 @@ on:
       frontend_ref:
         type: string
         default: main
+      content_ref:
+        type: string
+        default: main
       action:
         type: string
         default: deploy
@@ -44,6 +47,28 @@ jobs:
           repository: chryzmo/mud_frontend
           ref: ${{ inputs.frontend_ref || 'main' }}
           path: mud_frontend
+      # The world content is private (mud_content). It goes into mud_server/world, where the server image
+      # build copies and validates it. Not needed to roll back, so an expired token cannot block a rollback.
+      - name: World content
+        if: ${{ (inputs.action || 'deploy') == 'deploy' }}
+        env:
+          CONTENT_READ_TOKEN: ${{ secrets.CONTENT_READ_TOKEN }}
+        run: |
+          if [ -z "$CONTENT_READ_TOKEN" ]; then
+            echo "::error::CONTENT_READ_TOKEN is not set in the production environment of this repository"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        if: ${{ (inputs.action || 'deploy') == 'deploy' }}
+        with:
+          repository: chryzmo/mud_content
+          ref: ${{ inputs.content_ref || 'main' }}
+          path: mud_server/world
+          token: ${{ secrets.CONTENT_READ_TOKEN }}
+          persist-credentials: false
+      - name: Keep the content's git history out of the image
+        if: ${{ (inputs.action || 'deploy') == 'deploy' }}
+        run: rm -rf mud_server/world/.git
       - uses: actions/setup-node@v7
         with:
           node-version: "24"

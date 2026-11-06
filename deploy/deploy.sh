@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy to the Droplet: build images locally, ship them, restart the stack.
 #
-#   deploy/deploy.sh             deploy the current commits of mud_server and ../mud_frontend
+#   deploy/deploy.sh             deploy the current commits of mud_server and ../mud_frontend, with the
+#                                world content checked out in ./world (the CI deploy puts mud_content there)
 #   deploy/deploy.sh rollback    switch back to the previously deployed images
 #   deploy/deploy.sh status      show service status and recent game server logs
 #
@@ -12,6 +13,7 @@
 #   ACME_EMAIL       Let's Encrypt contact; only needed on the first deploy, to
 #                    create ~/mud/caddy.env on the host. Kept out of git.
 #   ALLOW_DIRTY=1    deploy even with uncommitted changes (tags the images -dirty)
+#   (A deploy that does not come up healthy is rolled back by itself, for the images it changed.)
 #   SKIP_TESTS=1     don't run the test suites (CI sets this: its test job already passed);
 #                    the frontend is still built
 #
@@ -28,6 +30,17 @@ frontend="$(cd ../mud_frontend && pwd)"
 images=(mud-db mud-server mud-caddy)
 
 remote() { ssh -o BatchMode=yes "$host" "$@"; }
+
+# healthy reports whether the game server answers inside the pod, waiting up to $1 seconds.
+healthy() {
+	for _ in $(seq 1 "$1"); do
+		if [ "$(remote 'podman exec mud-caddy wget -qO- http://127.0.0.1:8080/ 2>/dev/null')" = "Welcome!" ]; then
+			return 0
+		fi
+		sleep 1
+	done
+	return 1
+}
 
 take_lock() {
 	remote 'mkdir -p ~/mud
@@ -87,6 +100,10 @@ if [ "${SKIP_TESTS:-}" = 1 ]; then
 else
 	scripts/test.sh > /dev/null
 	"$frontend/scripts/test.sh" > /dev/null # also builds $frontend/dist
+fi
+if [ -z "$(find world -maxdepth 4 \( -name '*.yaml' -o -name '*.yml' \) -print -quit 2> /dev/null)" ]; then
+	echo "deploy: world/ has no content files. Check out the mud_content repository into $PWD/world (the CI deploy does)." >&2
+	exit 1
 fi
 tag="$(git rev-parse --short HEAD)-$(git -C "$frontend" rev-parse --short HEAD)$suffix"
 
@@ -161,13 +178,37 @@ for img in "${images[@]}"; do
 done
 
 echo "== Health check"
-for _ in $(seq 1 30); do
-	if [ "$(remote 'podman exec mud-caddy wget -qO- http://127.0.0.1:8080/ 2>/dev/null')" = "Welcome!" ]; then
-		echo "   game server answering inside the pod"
-		break
+if healthy 60; then
+	echo "   game server answering inside the pod"
+else
+	echo "deploy: the game server did not come up on $tag" >&2
+	remote 'journalctl --user -u mud-server -n 30 --no-pager -o cat' >&2 || true
+	if [ -n "$changed" ]; then
+		echo "deploy: rolling back what this deploy changed: $(tr '\n' ' ' <<< "$changed")" >&2
+		remote "set -e
+			for img in $(tr '\n' ' ' <<< "$changed"); do
+				if podman image exists localhost/\$img:previous; then
+					podman tag localhost/\$img:previous localhost/\$img:current
+				fi
+			done"
+		db_restarted=""
+		for img in "${images[@]}"; do
+			if grep -qx "$img" <<< "$changed"; then
+				if [ "$img" = mud-server ] && [ -n "$db_restarted" ]; then
+					continue
+				fi
+				remote "systemctl --user restart $img"
+				[ "$img" = mud-db ] && db_restarted=1
+			fi
+		done
+		if healthy 60; then
+			echo "deploy: the previous images are serving again" >&2
+		else
+			echo "deploy: the rollback did not come up either; check the host (deploy/deploy.sh status)" >&2
+		fi
 	fi
-	sleep 1
-done
+	exit 1
+fi
 if curl -fsS -o /dev/null --max-time 10 "https://$domain/"; then
 	echo "   https://$domain/ is up"
 else
