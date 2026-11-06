@@ -91,6 +91,13 @@ script there.
   `scripts/test.sh` when a turn changed the repo and sends failures back to you. Other agents:
   run it yourself before finishing.
 
+- **Protocol changes regenerate the wire transcripts.** `TestWireTranscripts` (`src/transcripts_test.go`)
+  plays a reference client through join, resume, gap, replaced, recover, idle and the limits against the real
+  server and compares the frames with `src/testdata/transcripts.json`. After an intended change run
+  `UPDATE_TRANSCRIPTS=1 go test ./src -run TestWireTranscripts`, then `scripts/check-transcripts.sh --update`
+  to copy it to `../mud_frontend/src/net/testdata/transcripts.json`, and change the client's parser and tests
+  in the same coordinated pair of PRs. `scripts/check-transcripts.sh` fails if the copies differ.
+
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
