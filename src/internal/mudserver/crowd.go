@@ -223,6 +223,7 @@ func (w *World) cloneArea(area *Area) int {
 			Inventory:   orig.pristine.copyOf(),
 			ExitJSON:    orig.ExitJSON,
 			Features:    orig.Features,
+			People:      orig.People,
 			pristine:    orig.pristine,
 			TemplateID:  tid,
 			clone:       true,

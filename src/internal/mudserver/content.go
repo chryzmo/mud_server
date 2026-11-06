@@ -161,8 +161,19 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 			features = append(features, Feature{Key: fk, Names: ft.Names, Examine: strings.TrimSpace(ft.Examine), Unlisted: ft.Unlisted})
 		}
 		featuresJSON, _ := json.Marshal(features)
-		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4, featuresjson=$5 WHERE id=$1`,
-			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON), string(featuresJSON)); err != nil {
+		people := make([]Person, 0, len(r.People))
+		for _, pk := range sortedKeys(r.People) {
+			pe := r.People[pk]
+			person := Person{Key: pk, Names: pe.Names, Examine: strings.TrimSpace(pe.Examine), Greeting: strings.TrimSpace(pe.Greeting), Shrug: strings.TrimSpace(pe.Shrug)}
+			for _, tk := range sortedKeys(pe.Topics) {
+				t := pe.Topics[tk]
+				person.Topics = append(person.Topics, Topic{Key: tk, Keywords: t.Keywords, Say: strings.TrimSpace(t.Say)})
+			}
+			people = append(people, person)
+		}
+		peopleJSON, _ := json.Marshal(people)
+		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4, featuresjson=$5, peoplejson=$6 WHERE id=$1`,
+			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON), string(featuresJSON), string(peopleJSON)); err != nil {
 			return nil, fmt.Errorf("room %s: %w", key, err)
 		}
 	}

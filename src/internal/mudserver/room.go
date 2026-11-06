@@ -28,6 +28,7 @@ type Room struct {
 	Inventory   *Inventory
 	ExitJSON    string
 	Features    []Feature // scenery to EXAMINE (examine.go); shared by a room's copies
+	People      []Person  // friendly characters (people.go); shared by a room's copies
 	dirty       bool // contents changed since the last save; see persist.go
 
 	// Copies of a room (see crowd.go). A clone has no database row: it is never
@@ -55,6 +56,7 @@ type RoomDB struct {
 	ExitJSON         string
 	InventoryIDSlice map[string]int32
 	FeaturesJSON     string
+	PeopleJSON       string
 }
 
 type RoomExits struct {
@@ -108,6 +110,11 @@ func (r *Room) LookDescription() string {
 		desc.WriteString("\nYou notice: ")
 		desc.WriteString(strings.Join(listed, ", "))
 		desc.WriteString(".\n")
+	}
+	if people := r.peopleNames(); len(people) > 0 {
+		desc.WriteString("\nAlso here: ")
+		desc.WriteString(strings.Join(people, ", "))
+		desc.WriteString(". (TALK to them.)\n")
 	}
 
 	if len(r.BaddieMap) > 0 {
@@ -207,9 +214,9 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 
 	switch roomid.(type) {
 	case string:
-		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson FROM room WHERE name=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson FROM room WHERE name=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson FROM room WHERE id=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson FROM room WHERE id=$1"
 	default:
 		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
 	}
@@ -241,6 +248,10 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 		if err := json.Unmarshal([]byte(ret.FeaturesJSON), &room.Features); err != nil {
 			fmt.Printf("Room %d: features unreadable (%v); the room has none\n", ret.ID, err)
 			room.Features = nil
+		}
+		if err := json.Unmarshal([]byte(ret.PeopleJSON), &room.People); err != nil {
+			fmt.Printf("Room %d: people unreadable (%v); the room has none\n", ret.ID, err)
+			room.People = nil
 		}
 
 		for iid := range ret.InventoryIDSlice {

@@ -288,3 +288,72 @@ func TestFeaturesAreChecked(t *testing.T) {
 		t.Errorf("too many features: %v", tooMany.Errors)
 	}
 }
+
+const porterPeople = `    people:
+      porter:
+        names: [Porter Bellweather, porter, bellweather]
+        examine: A very tall porter.
+        greeting: "Mind your head."
+        shrug: "He shrugs."
+        topics:
+          ticket: {keywords: [ticket, claim], say: "Hook 42 is empty."}
+          map: {keywords: [map], say: "Take this."}
+`
+
+func TestPeopleAreChecked(t *testing.T) {
+	good := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", "    exits: {N: yard}\n"+porterPeople, 1)})
+	if len(good.Errors) != 0 || len(good.Warnings) != 0 {
+		t.Fatalf("good people: errors %v warnings %v", good.Errors, good.Warnings)
+	}
+
+	res := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", `    exits: {N: yard}
+    features:
+      statue: {names: [Marble Statue], examine: x}
+    people:
+      Bad_Key: {names: [odd], examine: x, greeting: x}
+      nameless: {examine: x, greeting: x}
+      blankname: {names: ["  "], examine: x, greeting: x}
+      mute: {names: [Mute One], greeting: x}
+      silent: {names: [Silent One], examine: x}
+      twin: {names: [marble statue], examine: x, greeting: x}
+      chatty:
+        names: [Chatty]
+        examine: x
+        greeting: x
+        topics:
+          Bad_Topic: {keywords: [one], say: x}
+          wordless: {say: x}
+          blank: {keywords: ["  "], say: x}
+          mutetopic: {keywords: [quiet]}
+          first: {keywords: [shared], say: x}
+          second: {keywords: [SHARED], say: x}
+`, 1)})
+	for _, want := range []string{
+		"key must be lower case", "needs at least one name", "a name cannot be empty", "needs examine text", "needs greeting text",
+		`also what "statue" is called in this room`, "needs at least one keyword", "a keyword must be 1 to 40",
+		"needs something to say", `also a keyword of topic "first"`,
+	} {
+		if !has(res.Errors, want) {
+			t.Errorf("missing error containing %q in %v", want, res.Errors)
+		}
+	}
+
+	var many strings.Builder
+	many.WriteString("    people:\n")
+	for i := 0; i <= MaxPeople; i++ {
+		fmt.Fprintf(&many, "      p%d: {names: [person %d], examine: x, greeting: x}\n", i, i)
+	}
+	tooMany := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", "    exits: {N: yard}\n"+many.String(), 1)})
+	if !has(tooMany.Errors, "at most 8 per room") {
+		t.Errorf("too many people: %v", tooMany.Errors)
+	}
+	var topics strings.Builder
+	topics.WriteString("    people:\n      chatty:\n        names: [Chatty]\n        examine: x\n        greeting: x\n        topics:\n")
+	for i := 0; i <= MaxTopics; i++ {
+		fmt.Fprintf(&topics, "          t%d: {keywords: [word%d], say: x}\n", i, i)
+	}
+	tooManyTopics := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", "    exits: {N: yard}\n"+topics.String(), 1)})
+	if !has(tooManyTopics.Errors, "at most 12 per person") {
+		t.Errorf("too many topics: %v", tooManyTopics.Errors)
+	}
+}

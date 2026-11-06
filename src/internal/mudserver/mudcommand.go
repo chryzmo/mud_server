@@ -68,6 +68,22 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 		},
 	}
 
+	// TALK and ASK
+	c_talk := MudCommand{
+		description: "Talk to a friendly character.  Usage: TALK <person>  (just TALK if there is only one)",
+		action: func(player *MudPlayer, arguments string) int {
+			player.talk(arguments)
+			return muddata.MUD_OK
+		},
+	}
+	c_ask := MudCommand{
+		description: "Ask a friendly character about something.  Usage: ASK <person> ABOUT <topic>",
+		action: func(player *MudPlayer, arguments string) int {
+			player.ask(arguments)
+			return muddata.MUD_OK
+		},
+	}
+
 	// EXAMINE
 	c_examine := MudCommand{
 		description: "Look closely at something: an object, an item, a player or a monster.  Usage: EXAMINE <thing>  (X for short; EXAMINE MY <item> looks in your pack)",
@@ -398,6 +414,8 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["SAY"] = &c_say
 	cList["LOOK"] = &c_look
 	cList["EXAMINE"] = &c_examine
+	cList["TALK"] = &c_talk
+	cList["ASK"] = &c_ask
 	cList["MOVE"] = &c_move
 	cList["GET"] = &c_get
 	cList["DROP"] = &c_drop
