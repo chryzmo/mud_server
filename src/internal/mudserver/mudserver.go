@@ -34,6 +34,7 @@ the loop too; see persist.go.
 type MudServer struct {
 	players       map[string]*MudPlayer // online players by name; loop-owned
 	joinsLocked   atomic.Bool           // GM LOCK: no new guests (players already in can reconnect)
+	kicks         kickList              // GM KICK: characters on a break; has its own lock
 	offLoopWG     sync.WaitGroup        // database writes started by GM commands, away from the loop
 	events        chan func()
 	World         *World
@@ -545,6 +546,9 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 // login runs on the connection's reader goroutine, like join. Password accounts
 // are only for game masters, added to the database by hand; players are guests.
 func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
+	if ms.refuseIfKicked(player.Session, username) {
+		return false
+	}
 	online, saved := ms.isOnline(username)
 	if online {
 		player.SendAuth(false, codeNameOnline, "That user is already logged in.")

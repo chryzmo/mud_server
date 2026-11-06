@@ -168,6 +168,9 @@ func (ms *MudServer) resume(shell *MudPlayer, session *Session, token string, re
 		session.sendAuth(false, codeBadToken, "That resume token isn't valid.")
 		return nil
 	}
+	if ms.refuseIfKicked(session, username) {
+		return nil
+	}
 	online, saved := ms.isOnline(username)
 	if online {
 		session.sendAuth(false, codeFailed, "That character is busy. Please try again in a moment.")
