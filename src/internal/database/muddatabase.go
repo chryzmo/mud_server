@@ -65,6 +65,17 @@ func (db MudDatabase) EnsureSchema() error {
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS recoveryhash text NOT NULL DEFAULT ''",
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS lastseen timestamptz NOT NULL DEFAULT now()",
 		"CREATE INDEX IF NOT EXISTS player_resumetoken_idx ON player (resumetokenhash) WHERE resumetokenhash <> ''",
+		// World content (plans/event-systems.md): rooms, items, NPC templates and spawners that come
+		// from content files are matched by a stable key, so a deploy updates them in place. NULL
+		// means the row predates content or is not managed by it.
+		"ALTER TABLE room ADD COLUMN IF NOT EXISTS contentkey text",
+		"ALTER TABLE item ADD COLUMN IF NOT EXISTS contentkey text",
+		"ALTER TABLE baddienpc_generic ADD COLUMN IF NOT EXISTS contentkey text",
+		"ALTER TABLE baddiespawner ADD COLUMN IF NOT EXISTS contentkey text",
+		"CREATE UNIQUE INDEX IF NOT EXISTS room_contentkey_key ON room (contentkey) WHERE contentkey IS NOT NULL",
+		"CREATE UNIQUE INDEX IF NOT EXISTS item_contentkey_key ON item (contentkey) WHERE contentkey IS NOT NULL",
+		"CREATE UNIQUE INDEX IF NOT EXISTS baddienpc_contentkey_key ON baddienpc_generic (contentkey) WHERE contentkey IS NOT NULL",
+		"CREATE UNIQUE INDEX IF NOT EXISTS baddiespawner_contentkey_key ON baddiespawner (contentkey) WHERE contentkey IS NOT NULL",
 		// Names are unique ignoring case. Last, because it fails if an older
 		// database already holds two names that differ only in case.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",

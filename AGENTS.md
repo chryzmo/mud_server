@@ -47,8 +47,9 @@ stage files by name anyway.
 - `src/internal/worldfile/` and `world-sample/`: the world content format (YAML: rooms, items, NPCs) and its
   validator, `mud_server -validate-world [-strict] DIR` (no database, no server). `world-sample/` is the small
   public sample used by tests and `scripts/test.sh`; the real world lives in the private `mud_content` repository
-  (plans/event-systems.md). Keys are lower-case words and dashes, global per kind. Applying content to the
-  database is a later step; today the server still seeds from `src/sql`.
+  (plans/event-systems.md). Keys are lower-case words and dashes, global per kind. `mudserver/content.go` applies it at startup
+  when `World.ContentDir` (env `MUD_WORLD_DIR`) is set: upsert by `contentkey`, adopting same-name rows, never resetting
+  runtime state; the world then loads only content rooms and takes its start room and areas from the content.
 - `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
   rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.
   The wire protocol (`protocol.go`) and connections (`session.go`, `closestats.go`). Guests and their

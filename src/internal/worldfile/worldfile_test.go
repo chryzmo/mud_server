@@ -157,6 +157,24 @@ npcs:
 	}
 }
 
+func TestAreasAreChecked(t *testing.T) {
+	res := validate(t, map[string]string{"w.yaml": twoRooms + `
+areas:
+  start: {rooms: [hall, yard]}
+  empty: {rooms: []}
+  clash: {rooms: [yard, nowhere]}
+`})
+	for _, want := range []string{`area needs at least one room`, `"nowhere" is not a room`, `room "yard" is already in area "clash"`} {
+		if !has(res.Errors, want) {
+			t.Errorf("missing error containing %q in %v", want, res.Errors)
+		}
+	}
+	ok := validate(t, map[string]string{"w.yaml": twoRooms + "areas:\n  start: {rooms: [hall, yard]}\n"})
+	if len(ok.Errors) != 0 {
+		t.Errorf("a good area is an error: %v", ok.Errors)
+	}
+}
+
 func TestSpawnerSettingsAreChecked(t *testing.T) {
 	res := validate(t, map[string]string{"w.yaml": strings.Replace(twoRooms, "    exits: {N: yard}\n", `    exits: {N: yard}
     spawners: [{npc: orc, count: 0, tick_ms: 100}]

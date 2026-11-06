@@ -14,8 +14,8 @@ clones that are never saved. Everything here runs on the game loop, and
 RoomMap is loop-owned once copies exist: connection readers must not read it.
 */
 
-// defaultStartRoomID is where a new player starts and where a saved location
-// that no longer exists falls back to.
+// defaultStartRoomID is the start room of a world seeded from src/sql. A world
+// built from content files names its own (World.startRoomID).
 const defaultStartRoomID int32 = 1
 
 const (
@@ -102,7 +102,7 @@ func (w *World) templateRoom(id int32) *Room {
 	if room := w.RoomMap[id]; room != nil && !room.clone {
 		return room
 	}
-	return w.RoomMap[defaultStartRoomID]
+	return w.RoomMap[w.startRoomID]
 }
 
 // place picks the room a player should arrive in for a saved room ID. See
@@ -125,8 +125,8 @@ func (w *World) placeNear(templateID int32, preferred int) (*Room, bool) {
 	}
 	area := w.areas[start.ID]
 	if area == nil {
-		if w.atHardCap(start) && start.ID != defaultStartRoomID {
-			return w.placeNear(defaultStartRoomID, -1)
+		if w.atHardCap(start) && start.ID != w.startRoomID {
+			return w.placeNear(w.startRoomID, -1)
 		}
 		return start, true
 	}
@@ -161,8 +161,8 @@ func (w *World) canAdmit(templateID int32) bool {
 	}
 	area := w.areas[start.ID]
 	if area == nil {
-		if w.atHardCap(start) && start.ID != defaultStartRoomID {
-			return w.canAdmit(defaultStartRoomID)
+		if w.atHardCap(start) && start.ID != w.startRoomID {
+			return w.canAdmit(w.startRoomID)
 		}
 		return true
 	}

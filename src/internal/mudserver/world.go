@@ -21,6 +21,10 @@ type World struct {
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 
+	// Where new players start, and where a saved location that no longer exists falls
+	// back to. Set when the world is built and never changed, so connection readers may read it.
+	startRoomID int32
+
 	// Area copies; see crowd.go. Loop only.
 	areas      map[int32]*Area // template room ID -> its area
 	nextRoomID int32           // next ID for a cloned room
@@ -29,14 +33,23 @@ type World struct {
 	maxCopies  int
 }
 
-func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig) *World {
+// createWorld loads the world from the database. With content (rooms defined by
+// content files) only those rooms are loaded, the start room and the areas come from
+// the content, and the config's id-based Areas are ignored; without it the world is
+// whatever the database holds, as seeded by src/sql.
+func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *contentResult) *World {
 	w := &World{
 		RoomMap:          make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
+		startRoomID:      defaultStartRoomID,
+	}
+	if content != nil {
+		w.startRoomID = content.startRoomID
+		crowd.Areas = content.areas
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking
-	roomIDList := w.RetrieveListofRoomIDsFromDB(db)
+	roomIDList := w.RetrieveListofRoomIDsFromDB(db, content != nil)
 	for _, id := range roomIDList {
 		r := Room{}
 		w.RoomMap[id] = r.FetchFromDB(db, id)
@@ -112,8 +125,11 @@ func (w *World) LoadAndLinkRoomBaddieSpawners(db *muddatabase.MudDatabase, room 
 	}
 }
 
-func (w World) RetrieveListofRoomIDsFromDB(db *muddatabase.MudDatabase) []int32 {
+func (w World) RetrieveListofRoomIDsFromDB(db *muddatabase.MudDatabase, contentOnly bool) []int32 {
 	query := "SELECT id FROM room"
+	if contentOnly {
+		query += " WHERE contentkey IS NOT NULL"
+	}
 	var err error
 
 	rows, err := db.Connection.Query(db.Context, query)

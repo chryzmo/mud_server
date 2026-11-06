@@ -80,12 +80,12 @@ type PlayerStartStats struct {
 
 // CreateMudPlayer starts a new player who has not yet been placed in a room:
 // admission does that, on the game loop.
-func CreateMudPlayer(session *Session, stats PlayerStartStats) *MudPlayer {
+func CreateMudPlayer(session *Session, stats PlayerStartStats, startRoomID int32) *MudPlayer {
 	return &MudPlayer{
 		Session:       session,
 		TimeConnected: time.Now(),
-		savedRoomID:   defaultStartRoomID,
-		savedSpawnID:  defaultStartRoomID,
+		savedRoomID:   startRoomID,
+		savedSpawnID:  startRoomID,
 		Inventory:     CreateInventory(),
 		Equipment:     NewEquipmentSlots(),
 		AttackPower:   stats.Attack,

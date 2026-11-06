@@ -119,10 +119,19 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		fmt.Println("Schema update failed (continuing): " + err.Error())
 	}
 
+	var content *contentResult
+	if c.World.ContentDir != "" {
+		var err error
+		if content, err = loadContent(&db, c.World.ContentDir, func(line string) { fmt.Println(line) }); err != nil {
+			db.Connection.Close()
+			return nil, err
+		}
+	}
+
 	server := &MudServer{
 		players:       make(map[string]*MudPlayer),
 		events:        make(chan func(), 4096),
-		World:         createWorld(&db, c.Crowd),
+		World:         createWorld(&db, c.Crowd, content),
 		Configuration: c,
 		DB:            db,
 		saves:         make(chan saveBatch, 1),
@@ -290,7 +299,7 @@ func (ms *MudServer) AddConnection(ws_conn *websocket.Conn, clientIP netip.Addr)
 		Attack:  ms.Configuration.Game.PlayerStartAttack,
 		Defense: ms.Configuration.Game.PlayerStartDefense,
 	}
-	mc := CreateMudPlayer(session, stats)
+	mc := CreateMudPlayer(session, stats, ms.World.startRoomID) // fixed when the world is built; safe to read here
 
 	ms.sessionsMu.Lock()
 	ms.sessions[session] = struct{}{}

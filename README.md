@@ -8,11 +8,20 @@ are in `AGENTS.md`; the working plans live in a local, gitignored `plans/` folde
 
 ## World content
 
-The world (rooms, items, NPCs) is described in YAML files; the format and its checks are in `src/internal/worldfile`.
-`world-sample/` is a small example. Check a directory with `go run ./src -validate-world [-strict] DIR`: it reads every
-`.yaml`/`.yml` file under `DIR`, reports errors (unknown fields, bad keys, exits to missing rooms, items or NPCs that
-do not exist, a missing start room) and warnings (one-way exits, rooms unreachable from the start), and exits 1 on errors
-(or on warnings with `-strict`). The server does not load these files yet; it still seeds from `src/sql`.
+The world (rooms, items, NPCs, areas) can be described in YAML files; the format and its checks are in
+`src/internal/worldfile`, and `world-sample/` is a small example. Check a directory with
+`go run ./src -validate-world [-strict] DIR`: it reads every `.yaml`/`.yml` file under `DIR`, reports errors
+(unknown fields, bad keys, exits to missing rooms, items or NPCs that do not exist, a missing start room) and
+warnings (one-way exits, rooms unreachable from the start), and exits 1 on errors (or on warnings with `-strict`).
+
+Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
+it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
+Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners
+in place and never changes an id. The first time, a row with no key and the same name is adopted, so a database seeded
+from `src/sql` is taken over without moving players or inventories. Items on a room's floor are placed when the room is
+created and never reset. Content removed from the files is not deleted: it just leaves the world, and a player saved
+in a room that left starts at the start room. With no `World.ContentDir` the world is whatever the database holds, as
+before. The real world lives in the private `mud_content` repository.
 
 ## Local development
 
@@ -87,6 +96,7 @@ start on an invalid `TrustedProxies` list.
 | `Connection.JoinPerSecond`, `JoinBurst` | 1000, 5000 | one bucket for every join, resume, recover and login; `-1` for no limit |
 | `Connection.MaxJoinsPerMinutePerIP` | 0 (off) | optional per-address ceiling; a flood breaker, not a fairness rule |
 | `Connection.IdleTimeoutMS` | 1800000 | a guest with no command this long is disconnected; `-1` never |
+| `World.ContentDir` | none | directory of world YAML files applied at startup (env `MUD_WORLD_DIR`); empty means the world comes from the database as seeded |
 | `Database.*` | see file | connection settings, `MaxConnections` (10), `StartupWaitSeconds` (30) |
 | `Game.*` | see file | tick length and a new player's starting stats |
 | `Crowd.SoftCap`, `HardCap`, `MaxCopies` | 50, 60, 200 | arrivals fill a copy of an area up to the soft cap; movement into a room is refused at the hard cap |
