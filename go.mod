@@ -7,6 +7,7 @@ require github.com/gorilla/websocket v1.5.3
 require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	golang.org/x/sync v0.8.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

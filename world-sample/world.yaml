@@ -1,0 +1,76 @@
+# A tiny sample world for development, the tests and CI. The real world lives in the
+# private mud_content repository; this one mirrors the three rooms of the SQL seed.
+# Check a directory with:  mud_server -validate-world world-sample
+start_room: start-room
+
+rooms:
+  start-room:
+    name: Start Room
+    description: You find yourself in a generic looking room.  There is a door to the North.
+    exits: {N: balcony}
+    items: {key: 1}
+
+  balcony:
+    name: Balcony
+    description: You are at a balcony overlooking the woods.  There is a door to the East and to the South.
+    exits: {S: start-room, E: arena}
+
+  arena:
+    name: Arena
+    description: You are in the arena.  There is a door to the West.
+    exits: {W: balcony}
+    spawners:
+      - {npc: orc, count: 1, tick_ms: 5000}
+
+items:
+  key:
+    name: KEY
+    description: A generic looking key.
+  gold:
+    name: GOLD
+    description: Gold coin used for currency.
+  iron-sword:
+    name: IRON SWORD
+    description: A plain but sturdy iron sword.
+    equipment: {slot: weapon, attack: 5}
+  wooden-shield:
+    name: WOODEN SHIELD
+    description: A round shield of banded wood.
+    equipment: {slot: shield, defense: 4}
+  leather-cap:
+    name: LEATHER CAP
+    description: A snug leather cap.
+    equipment: {slot: helmet, defense: 2}
+  leather-armor:
+    name: LEATHER ARMOR
+    description: A jerkin of boiled leather.
+    equipment: {slot: chest, defense: 5, max_hp: 5}
+  leather-leggings:
+    name: LEATHER LEGGINGS
+    description: Supple leather leggings.
+    equipment: {slot: legs, defense: 3}
+  leather-gloves:
+    name: LEATHER GLOVES
+    description: Worn leather gloves.
+    equipment: {slot: hands, attack: 2, defense: 1}
+  copper-ring:
+    name: COPPER RING
+    description: A thin copper band that hums faintly.
+    equipment: {slot: ring, max_mp: 5}
+  silver-pendant:
+    name: SILVER PENDANT
+    description: A small silver pendant on a chain.
+    equipment: {slot: neck, defense: 1, max_hp: 2}
+
+npcs:
+  orc:
+    race: ORC
+    hp: 5
+    mp: 1
+    attack: 0
+    accuracy: 0
+    defense: 0
+    combat_tick_ms: 5000
+    behavior: orc
+    loot_gold_min: 0
+    loot_gold_max: 5

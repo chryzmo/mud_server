@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	mudserver "mud_server/src/internal/mudserver"
+	"mud_server/src/internal/worldfile"
 )
 
 var upgrader = websocket.Upgrader{
@@ -22,6 +23,11 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
+	// A check for content authors and CI: no database, no server.
+	if len(os.Args) > 1 && os.Args[1] == "-validate-world" {
+		os.Exit(worldfile.Run(os.Args[2:], os.Stdout, os.Stderr))
+	}
+
 	serverinstance := mudserver.CreateMudServer()
 
 	http.HandleFunc("/", homePage)
