@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 
 	mudserver "mud_server/src/internal/mudserver"
 )
@@ -151,10 +152,10 @@ func dial(t *testing.T, wsURL string) *websocket.Conn {
 }
 
 // wireLine turns a line a player would type into a client message:
-// /REGISTER and /LOGIN become register and login messages, everything else a cmd.
+// /LOGIN becomes a login message, everything else a cmd.
 func wireLine(line string) []byte {
 	verb, rest, _ := strings.Cut(line, " ")
-	if verb == "/REGISTER" || verb == "/LOGIN" {
+	if verb == "/LOGIN" {
 		username, password, _ := strings.Cut(rest, " ")
 		return wireFrame(strings.ToLower(verb[1:]), map[string]string{"username": username, "password": password})
 	}
@@ -262,13 +263,13 @@ func expect(t *testing.T, conn *websocket.Conn, want string) string {
 	}
 }
 
-func TestRegisterLookAndMove(t *testing.T) {
+func TestLoginLookAndMove(t *testing.T) {
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 
 	expect(t, conn, "Welcome to the MUD!")
-	send(t, conn, "/REGISTER tester secret")
-	expect(t, conn, "Account created! Welcome, tester.")
+	loginNew(t, conn, "tester")
+	expect(t, conn, "Welcome back, tester!")
 	expect(t, conn, "You are in 'Start Room'")
 	expect(t, conn, "STATUPDATE:hp=20,maxhp=20")
 
@@ -288,7 +289,7 @@ func TestCommandsRequireLogin(t *testing.T) {
 
 	expect(t, conn, "Welcome to the MUD!")
 	send(t, conn, "LOOK")
-	expect(t, conn, "Please log in or register first.")
+	expect(t, conn, "Please join first.")
 }
 
 func TestLoginRestoresSavedLocation(t *testing.T) {
@@ -296,7 +297,7 @@ func TestLoginRestoresSavedLocation(t *testing.T) {
 
 	first := dial(t, wsURL)
 	expect(t, first, "Welcome to the MUD!")
-	send(t, first, "/REGISTER walker secret")
+	loginNew(t, first, "walker")
 	expect(t, first, "You are in 'Start Room'")
 	send(t, first, "MOVE N")
 	expect(t, first, "You are in 'Balcony'")
@@ -312,11 +313,7 @@ func TestLoginRestoresSavedLocation(t *testing.T) {
 func TestLoginRejectsWrongPassword(t *testing.T) {
 	wsURL := startTestServer(t)
 
-	first := dial(t, wsURL)
-	expect(t, first, "Welcome to the MUD!")
-	send(t, first, "/REGISTER guarded secret")
-	expect(t, first, "Account created!")
-	first.Close()
+	createAccount(t, "guarded", "secret")
 
 	_, msg := loginWhenFree(t, wsURL, "guarded", "wrong")
 	if !strings.Contains(msg, "Incorrect password.") {
@@ -345,12 +342,35 @@ func loginWhenFree(t *testing.T, wsURL, name, password string) (*websocket.Conn,
 }
 
 // register connects a new player and waits until they're standing in the start room.
-func register(t *testing.T, wsURL, name string) *websocket.Conn {
+// createAccount adds a password account straight to the database: the server has no
+// register message (players are guests), only login for accounts added by hand.
+func createAccount(t *testing.T, name, password string) {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	execSQL(t, testDatabaseURL(t), fmt.Sprintf(
+		`INSERT INTO player (username,passwordhash,inventoryidslice,equipmentslots,attackpower,defense,hp,maxhp,mp,maxmp,roomid,spawnlocationid)
+		 VALUES (%s,%s,'{}','{}',5,10,20,20,10,10,1,1)`, sqlQuote(name), sqlQuote(string(hash))))
+}
+
+func sqlQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+
+// loginNew creates the account "name" (password "secret") and sends its /LOGIN on conn.
+func loginNew(t *testing.T, conn *websocket.Conn, name string) {
+	t.Helper()
+	createAccount(t, name, "secret")
+	send(t, conn, "/LOGIN "+name+" secret")
+}
+
+// passwordPlayer connects as a new password player and waits until they are in the Start Room.
+func passwordPlayer(t *testing.T, wsURL, name string) *websocket.Conn {
 	t.Helper()
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
-	send(t, conn, "/REGISTER "+name+" secret")
-	expect(t, conn, "Account created! Welcome, "+name+".")
+	loginNew(t, conn, name)
+	expect(t, conn, "Welcome back, "+name+"!")
 	expect(t, conn, "You are in 'Start Room'")
 	return conn
 }

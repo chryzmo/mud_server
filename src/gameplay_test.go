@@ -36,8 +36,8 @@ func expectWithin(conn *websocket.Conn, want string, wait time.Duration) (string
 
 func TestPlayersSeeEachOther(t *testing.T) {
 	wsURL := startTestServer(t)
-	alice := register(t, wsURL, "alice")
-	bob := register(t, wsURL, "bob")
+	alice := passwordPlayer(t, wsURL, "alice")
+	bob := passwordPlayer(t, wsURL, "bob")
 
 	expect(t, alice, "bob\x1b[0m has appeared in the room.")
 
@@ -51,8 +51,8 @@ func TestPlayersSeeEachOther(t *testing.T) {
 
 func TestWhisper(t *testing.T) {
 	wsURL := startTestServer(t)
-	alice := register(t, wsURL, "alice")
-	bob := register(t, wsURL, "bob")
+	alice := passwordPlayer(t, wsURL, "alice")
+	bob := passwordPlayer(t, wsURL, "bob")
 
 	// Bob moves away: whispers reach any online player, not just the room.
 	send(t, bob, "MOVE N")
@@ -68,7 +68,7 @@ func TestWhisper(t *testing.T) {
 
 func TestGetDropInventory(t *testing.T) {
 	wsURL := startTestServer(t)
-	conn := register(t, wsURL, "carrier")
+	conn := passwordPlayer(t, wsURL, "carrier")
 
 	send(t, conn, "INVENTORY")
 	expect(t, conn, "Your inventory is empty.")
@@ -95,7 +95,7 @@ func TestInventorySurvivesRelogin(t *testing.T) {
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
-	send(t, conn, "/REGISTER hoarder secret")
+	loginNew(t, conn, "hoarder")
 	expect(t, conn, "You are in 'Start Room'")
 	send(t, conn, "GET KEY")
 	expect(t, conn, "You pick up KEY.")
@@ -112,7 +112,7 @@ func TestInventorySurvivesRelogin(t *testing.T) {
 func TestEquipmentChangesStats(t *testing.T) {
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE room SET inventoryidslice = json_build_object('i1', 1, 'i' || (SELECT id FROM item WHERE name = 'IRON SWORD'), 1) WHERE id = 1`)
-	conn := register(t, wsURL, "knight")
+	conn := passwordPlayer(t, wsURL, "knight")
 
 	send(t, conn, "GET IRON SWORD")
 	expect(t, conn, "You pick up IRON SWORD.")
@@ -160,7 +160,7 @@ func TestCombatPlayerKillsNPC(t *testing.T) {
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 0, attackaccuracy = 0, defense = 0, hp = 5`)
-	conn := register(t, wsURL, "hero")
+	conn := passwordPlayer(t, wsURL, "hero")
 
 	send(t, conn, "MOVE N")
 	expect(t, conn, "You are in 'Balcony'")
@@ -192,7 +192,7 @@ func TestCombatNPCKillsPlayer(t *testing.T) {
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 25, attackaccuracy = 100`)
-	conn := register(t, wsURL, "victim")
+	conn := passwordPlayer(t, wsURL, "victim")
 
 	send(t, conn, "MOVE N")
 	expect(t, conn, "You are in 'Balcony'")
@@ -208,7 +208,7 @@ func TestCombatNPCKillsPlayer(t *testing.T) {
 
 func TestShutdownSavesAndDisconnects(t *testing.T) {
 	wsURL, si := startTestServerWith(t)
-	conn := register(t, wsURL, "saver")
+	conn := passwordPlayer(t, wsURL, "saver")
 	send(t, conn, "MOVE N")
 	expect(t, conn, "You are in 'Balcony'")
 

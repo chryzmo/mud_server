@@ -23,7 +23,7 @@ func (g *guest) awaitIdleError() time.Time {
 
 func TestIdleGuestIsToldThenGoesDormantThenLeaves(t *testing.T) {
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(500, 700))
-	watcher := reader(register(t, wsURL, "Watcher")) // a password account is never idle-kicked
+	watcher := reader(passwordPlayer(t, wsURL, "Watcher")) // a password account is never idle-kicked
 	idler := joinGuest(t, wsURL, "Idler")
 	await(t, watcher, "Idler\x1b[0m has appeared in the room.")
 
@@ -95,7 +95,7 @@ func TestResumingAfterAnIdleKickRestartsTheClock(t *testing.T) {
 
 func TestPasswordPlayersAreNeverIdleKicked(t *testing.T) {
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(300, 5000))
-	gm := register(t, wsURL, "Gamemaster")
+	gm := passwordPlayer(t, wsURL, "Gamemaster")
 	time.Sleep(1500 * time.Millisecond)
 	send(t, gm, "LOOK")
 	expect(t, gm, "You are in 'Start Room'")

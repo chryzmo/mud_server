@@ -193,7 +193,7 @@ func TestASuccessfulRecoveryClearsTheFailureCount(t *testing.T) {
 func TestRecoveryAnswersLeakNothingAboutWhichNamesExist(t *testing.T) {
 	wsURL := startTestServer(t)
 	joinGuest(t, wsURL, "Realguest")
-	register(t, wsURL, "Passworded") // a password account has no recovery code
+	passwordPlayer(t, wsURL, "Passworded") // a password account has no recovery code
 
 	_, want := recoverAs(t, wsURL, "Realguest", "AAAA-BBBB-CCCC")
 	for name, who := range map[string]string{"unknown": "Nobodyatall", "password account": "Passworded", "seeded account": "c"} {

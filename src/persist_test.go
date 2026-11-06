@@ -60,7 +60,7 @@ func is(want string) func(string) bool { return func(v string) bool { return v =
 // still online: nothing waits for a disconnect or the hourly save any more.
 func TestChangesSavedWithinInterval(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(100))
-	conn := register(t, wsURL, "keeper")
+	conn := passwordPlayer(t, wsURL, "keeper")
 
 	send(t, conn, "GET KEY")
 	expect(t, conn, "You pick up KEY.")
@@ -76,7 +76,7 @@ func TestChangesSavedWithinInterval(t *testing.T) {
 // after a restart unless the player happened to disconnect.
 func TestDropIsSaved(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(100))
-	conn := register(t, wsURL, "keeper")
+	conn := passwordPlayer(t, wsURL, "keeper")
 
 	send(t, conn, "GET KEY")
 	expect(t, conn, "You pick up KEY.")
@@ -92,7 +92,7 @@ func TestDropIsSaved(t *testing.T) {
 // disconnect. The periodic interval is far too long to be what saved it.
 func TestReloginSeesStateSavedAtDisconnect(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(600000))
-	conn := register(t, wsURL, "keeper")
+	conn := passwordPlayer(t, wsURL, "keeper")
 	send(t, conn, "GET KEY")
 	expect(t, conn, "You pick up KEY.")
 	send(t, conn, "MOVE N")
@@ -112,7 +112,7 @@ func TestReloginSeesStateSavedAtDisconnect(t *testing.T) {
 // flushed yet.
 func TestShutdownSavesRooms(t *testing.T) {
 	wsURL, si := startTestServerWithConfig(t, saveEvery(600000))
-	conn := register(t, wsURL, "keeper")
+	conn := passwordPlayer(t, wsURL, "keeper")
 	send(t, conn, "GET KEY")
 	expect(t, conn, "You pick up KEY.")
 	if hasKey(queryString(t, playerInventory)) {

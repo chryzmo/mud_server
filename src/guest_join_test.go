@@ -101,18 +101,11 @@ func TestJoinNamesAreUniqueIgnoringCase(t *testing.T) {
 	if _, auth := joinAs(t, wsURL, "Ann"); auth["ok"] != true {
 		t.Fatalf("first join = %v", auth)
 	}
-	register(t, wsURL, "Pat") // a password account
+	passwordPlayer(t, wsURL, "Pat") // a password account
 	for _, name := range []string{"Ann", "ann", "ANN", "Pat", "PAT", "pAt"} {
 		if _, auth := joinAs(t, wsURL, name); auth["code"] != "name_taken" || auth["ok"] != false {
 			t.Errorf("join %q = %v, want name_taken", name, auth)
 		}
-	}
-	// Password registration obeys the same rule.
-	reg := dial(t, wsURL)
-	expect(t, reg, "Welcome to the MUD!")
-	writeRaw(t, reg, `{"t":"register","username":"ANN","password":"secret"}`)
-	if auth := expectMessage(t, reg, "auth"); auth["ok"] != false {
-		t.Errorf("registering ANN after guest Ann = %v, want a refusal", auth)
 	}
 	if n := queryString(t, "SELECT count(*)::text FROM player WHERE lower(username)='ann'"); n != "1" {
 		t.Errorf("rows named ann = %s, want 1", n)

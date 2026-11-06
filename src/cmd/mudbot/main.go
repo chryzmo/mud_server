@@ -43,7 +43,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags.DurationVar(&c.JoinTimeout, "join-timeout", 2*time.Minute, "total admission time budget")
 	flags.IntVar(&c.LoginWorkers, "login-workers", 8, "concurrent logins")
 	flags.StringVar(&c.Prefix, "prefix", "loadbot", "account prefix; names append a five-digit zero-based index")
-	flags.BoolVar(&c.Register, "register", false, "register instead of login; creates persistent accounts and incurs normal bcrypt cost")
 	flags.BoolVar(&c.AllowRemote, "allow-remote", false, "explicitly allow a non-loopback target; requires operator authorization")
 	if err := flags.Parse(args); err != nil {
 		return err

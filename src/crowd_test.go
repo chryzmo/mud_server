@@ -34,9 +34,9 @@ func lookText(t *testing.T, conn *websocket.Conn) string {
 
 func TestCrowdSpreadsPlayersAcrossCopies(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(2, 10))
-	ann := register(t, wsURL, "ann")
-	bob := register(t, wsURL, "bob")
-	cyd := register(t, wsURL, "cyd") // copy 0 is at the soft cap of 2
+	ann := passwordPlayer(t, wsURL, "ann")
+	bob := passwordPlayer(t, wsURL, "bob")
+	cyd := passwordPlayer(t, wsURL, "cyd") // copy 0 is at the soft cap of 2
 
 	// ann and bob share a room; cyd is alone in another copy of the same room.
 	if look := lookText(t, ann); !strings.Contains(look, "bob") || strings.Contains(look, "cyd") {
@@ -67,7 +67,7 @@ func TestCrowdSpreadsPlayersAcrossCopies(t *testing.T) {
 whispered:
 
 	// Fill first: the next arrival joins cyd's copy (1 of 2), not a fresh one.
-	dee := register(t, wsURL, "dee")
+	dee := passwordPlayer(t, wsURL, "dee")
 	if look := lookText(t, dee); !strings.Contains(look, "cyd") || strings.Contains(look, "ann") {
 		t.Errorf("dee sees:\n%s\nwant cyd's copy", look)
 	}
@@ -76,8 +76,8 @@ whispered:
 
 func TestCopiesAreNeverSavedAndPlayersSaveTheirTemplate(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(1, 10))
-	register(t, wsURL, "first")
-	second := register(t, wsURL, "second") // in a clone
+	passwordPlayer(t, wsURL, "first")
+	second := passwordPlayer(t, wsURL, "second") // in a clone
 	send(t, second, "MOVE N")
 	expect(t, second, "You are in 'Balcony'")
 	second.Close()
@@ -98,17 +98,13 @@ func TestCopiesAreNeverSavedAndPlayersSaveTheirTemplate(t *testing.T) {
 
 func TestAtCapacityRefusesNewcomersUntilSomeoneLeaves(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(1, 1))
-	ann := register(t, wsURL, "ann")
+	ann := passwordPlayer(t, wsURL, "ann")
 
+	createAccount(t, "late", "secret")
 	late := dial(t, wsURL)
 	expect(t, late, "Welcome to the MUD!")
-	writeRaw(t, late, `{"t":"register","username":"late","password":"secret"}`)
-	refused := expectMessage(t, late, "auth")
-	if refused["ok"] != false || refused["code"] != "at_capacity" || !strings.Contains(refused["message"].(string), "account was created") {
-		t.Errorf("register at capacity = %v", refused)
-	}
 
-	// The account exists but nobody was placed; logging in is refused the same way.
+	// With the world full, logging in is refused.
 	writeRaw(t, late, `{"t":"login","username":"late","password":"secret"}`)
 	if again := expectMessage(t, late, "auth"); again["code"] != "at_capacity" {
 		t.Errorf("login at capacity = %v", again)
@@ -132,6 +128,9 @@ func TestAtCapacityRefusesNewcomersUntilSomeoneLeaves(t *testing.T) {
 func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(3, 100))
 	const players = 30
+	for i := 0; i < players; i++ {
+		createAccount(t, fmt.Sprintf("crowd%02d", i), "secret")
+	}
 	var wg sync.WaitGroup
 	errs := make(chan error, players)
 	for i := 0; i < players; i++ {
@@ -144,7 +143,7 @@ func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
 				return
 			}
 			defer conn.Close()
-			conn.WriteMessage(websocket.TextMessage, wireLine(fmt.Sprintf("/REGISTER crowd%02d secret", i)))
+			conn.WriteMessage(websocket.TextMessage, wireLine(fmt.Sprintf("/LOGIN crowd%02d secret", i)))
 			deadline := time.Now().Add(10 * time.Second)
 			for {
 				conn.SetReadDeadline(deadline)
@@ -168,8 +167,8 @@ func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
 
 func TestCrowdedRoomRefusesMovesOverTheWire(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, crowdConfigCaps(5, 1, 10))
-	ann := register(t, wsURL, "ann")
-	bob := register(t, wsURL, "bob") // placement fills copy 0 up to the soft cap of 5
+	ann := passwordPlayer(t, wsURL, "ann")
+	bob := passwordPlayer(t, wsURL, "bob") // placement fills copy 0 up to the soft cap of 5
 
 	send(t, ann, "MOVE N")
 	expect(t, ann, "You are in 'Balcony'")

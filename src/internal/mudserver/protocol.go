@@ -18,12 +18,11 @@ const Subprotocol = "mud.v1"
 
 // Client-to-server message types.
 const (
-	msgCmd      = "cmd"
-	msgRegister = "register"
-	msgLogin    = "login"
-	msgJoin     = "join"
-	msgResume   = "resume"
-	msgRecover  = "recover"
+	msgCmd     = "cmd"
+	msgLogin   = "login"
+	msgJoin    = "join"
+	msgResume  = "resume"
+	msgRecover = "recover"
 )
 
 // Server-to-client message types.
@@ -208,7 +207,7 @@ func (mp *MudPlayer) SendWhisper(who, text string, out bool) error {
 	return mp.sendFrame(encode(whisperMsg{T: msgWhisper, Who: who, Text: text, Out: out}))
 }
 
-// SendAuth answers a register or login attempt.
+// SendAuth answers a login attempt (join, resume and recover have their own replies).
 func (mp *MudPlayer) SendAuth(ok bool, code, message string) error {
 	return mp.Session.Send(encode(authMsg{T: msgAuth, OK: ok, Code: code, Message: message}))
 }

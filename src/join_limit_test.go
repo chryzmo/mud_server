@@ -64,7 +64,7 @@ func TestJoinLimitRefusesPastTheBurstWithoutCreatingAnything(t *testing.T) {
 
 // The limit protects every way in, before any database work: a resume with a bad
 // token gets rate_limited, not bad_token, once the bucket is spent.
-func TestJoinLimitCoversResumeRecoverLoginAndRegister(t *testing.T) {
+func TestJoinLimitCoversResumeRecoverAndLogin(t *testing.T) {
 	wsURL, _ := startTestServerWithConfig(t, joinLimit(1, 2))
 	tryJoin(t, wsURL, "Spender1")
 	tryJoin(t, wsURL, "Spender2") // the bucket is now empty
@@ -73,7 +73,6 @@ func TestJoinLimitCoversResumeRecoverLoginAndRegister(t *testing.T) {
 		"resume":   `{"t":"resume","token":"` + fmt.Sprintf("%043d", 7) + `","received":0}`,
 		"recover":  `{"t":"recover","name":"Spender1","code":"AAAA-BBBB-CCCC"}`,
 		"login":    `{"t":"login","username":"c","password":"x"}`,
-		"register": `{"t":"register","username":"Newcomer","password":"secret"}`,
 	} {
 		conn := dial(t, wsURL)
 		expect(t, conn, "Welcome to the MUD!")

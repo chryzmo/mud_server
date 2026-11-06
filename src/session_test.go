@@ -89,11 +89,11 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 
 	stalled := dialWithTinyReceiveBuffer(t, wsURL)
 	expect(t, stalled, "Welcome to the MUD!")
-	send(t, stalled, "/REGISTER stalled secret")
+	loginNew(t, stalled, "stalled")
 	expect(t, stalled, "You are in 'Start Room'")
 	// From here on the stalled client never reads again.
 
-	active := register(t, wsURL, "active")
+	active := passwordPlayer(t, wsURL, "active")
 	activeIn := reader(active)
 
 	// Every SAY is also sent to the stalled client: about 8 MB in all, far more
@@ -163,12 +163,12 @@ func TestUnresponsiveClientIsDisconnected(t *testing.T) {
 		c.Connection.PingIntervalMS = 100
 		c.Connection.PongTimeoutMS = 500
 	})
-	watcher := reader(register(t, wsURL, "watcher"))
+	watcher := reader(passwordPlayer(t, wsURL, "watcher"))
 
 	silent := dial(t, wsURL)
 	silent.SetPingHandler(func(string) error { return nil }) // never answer
 	expect(t, silent, "Welcome to the MUD!")
-	send(t, silent, "/REGISTER silent secret")
+	loginNew(t, silent, "silent")
 	expect(t, silent, "You are in 'Start Room'")
 	await(t, watcher, "silent\x1b[0m has appeared in the room.")
 
@@ -191,12 +191,12 @@ func TestUnresponsiveClientIsDisconnected(t *testing.T) {
 func TestSessionCloseReasonsForClientDisconnects(t *testing.T) {
 	wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
 
-	polite := register(t, wsURL, "polite")
+	polite := passwordPlayer(t, wsURL, "polite")
 	polite.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
 	polite.Close()
 	waitForClose(t, ms, "client_closed", 1)
 
-	vanishing := register(t, wsURL, "vanishing")
+	vanishing := passwordPlayer(t, wsURL, "vanishing")
 	vanishing.UnderlyingConn().Close() // no close frame
 	counts := waitForClose(t, ms, "read_error", 1)
 

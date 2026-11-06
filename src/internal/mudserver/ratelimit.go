@@ -10,7 +10,7 @@ import (
 
 /*
 The join limit (plans/guest-sessions.md): one token bucket shared by every
-connection, spent by join, resume, recover, login and register before any
+connection, spent by join, resume, recover and login before any
 database work. It is abuse protection, not a fairness rule: it does not look at
 who is asking (venue WiFi and carrier NAT put many players behind one address),
 and its burst is sized so a whole event's reconnect storm passes at once.
@@ -92,7 +92,7 @@ func (l *joinLimiter) allow() (ok bool, retryAfter time.Duration) {
 }
 
 // allowJoin is called by a connection's reader before it does any work for a
-// join, resume, recover, login or register. If the limit is spent it tells the
+// join, resume, recover or login. If the limit is spent it tells the
 // client when to come back and returns false.
 func (ms *MudServer) allowJoin(session *Session) bool {
 	// The per-address ceiling comes first, so a flooding address cannot spend

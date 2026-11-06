@@ -107,7 +107,7 @@ Integration tests (`src/main_test.go`) run a real server and talk to it over a w
 drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
 comes back. Helpers: `startTestServerWithConfig` (build a `Configuration` in the test; defaults apply),
-`register`/`send`/`expect` for a password player with text-style assertions (`flatten` renders frames the
+`passwordPlayer`/`createAccount`/`send`/`expect` for a password player with text-style assertions (`flatten` renders frames the
 way a player once saw them), `joinGuest` and its `guest` type (`resume_test.go`: a reference client that
 counts frames, drops, reconnects and resumes), `readMessage`/`expectMessage` for exact frames, and
 `waitForClose` for session-close reasons. A gorilla connection that hits a read timeout is dead, so wait
@@ -178,7 +178,7 @@ passes on a many-core machine will fail on `main` and block the deploy.
   checked once per connection. Send through `SendMessage`/`SendAuth`/`SendError`/`SendLook`/etc., never
   raw bytes. Fan-out and chatter use typed events (`say`, `arrive`, `leave`, `whisper`), not coloured
   text; encode once (`encodeSay`, `BroadcastFrame`) and queue the same slice to everyone.
-- `ProcessInput` (one goroutine per connection) handles `join`, `resume`, `recover`, `login` and `register`
+- `ProcessInput` (one goroutine per connection) handles `join`, `resume`, `recover` and `login`
   itself (database lookups and bcrypt stay off the loop), then `admit` or `attach` puts the player in the
   world on the loop. After that it queues each command with `enqueue`, and what happens to the player
   (dormant for a guest, removed otherwise) when the connection ends.
@@ -203,7 +203,7 @@ passes on a many-core machine will fail on `main` and block the deploy.
   error and is closed (reason `idle`), then goes through the normal dormant grace period. Activity is commands,
   admission and resume, not keepalives; password accounts are never kicked. A client should treat `idle` as
   "wait for a tap" and not reconnect by itself, or it holds the slot again.
-- Join limit (`ratelimit.go`): one token bucket for every join, resume, recover, login and register, checked by
+- Join limit (`ratelimit.go`): one token bucket for every join, resume, recover and login, checked by
   the reader before any database work (`MudServer.allowJoin`; requests that do no work, such as one from
   someone already in the game or with a missing field, do not spend it). It does not look at who is asking:
   venue WiFi and carrier NAT put many players behind one address. Refusals are `error rate_limited` with a

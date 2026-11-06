@@ -82,7 +82,7 @@ func normaliseRecovery(code string) string {
 	return strings.NewReplacer("-", "", " ", "").Replace(code)
 }
 
-// join runs on the connection's reader goroutine, like register. It creates a
+// join runs on the connection's reader goroutine, like login. It creates a
 // guest, places them, and tells them their token and recovery code.
 func (ms *MudServer) join(player *MudPlayer, name string) bool {
 	if code, reason := ms.names.check(name); code != "" {

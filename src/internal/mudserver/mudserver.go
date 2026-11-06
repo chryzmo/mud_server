@@ -58,7 +58,7 @@ type MudServer struct {
 	dormant map[*MudPlayer]time.Time
 
 	recoveries *recoveryGuard // wrong recovery codes per name; used by readers, has its own lock
-	joinLimit  *joinLimiter   // one bucket for every join/resume/recover/login/register; has its own lock
+	joinLimit  *joinLimiter   // one bucket for every join/resume/recover/login; has its own lock
 	ipLimit    *ipLimiter     // optional per-address ceiling on the same requests; nil = off
 	proxies    *proxyTrust    // which peers may report a client address; see clientip.go
 
@@ -322,7 +322,7 @@ func (ms *MudServer) isOnline(username string) (online bool, saved <-chan struct
 	return online, saved
 }
 
-// admit places a player who has just registered or logged in into the world,
+// admit places a player who has just logged in into the world,
 // on the game loop, in the copy of their saved room that has space (see
 // World.place). It returns "" when they are in, codeAtCapacity if every copy
 // is full and no more can open, and codeNameOnline if the name is already
@@ -397,7 +397,7 @@ func (ms *MudServer) getCommand(commandname string) (*MudCommand, int) {
 
 /*
 ProcessInput is a connection's reader goroutine. Until the player is admitted it
-handles join, resume and login (and register) itself; after that it queues each
+handles join, resume, recover and login itself; after that it queues each
 command on the game loop. When the connection ends, it queues what happens to the
 player (a guest goes dormant; anyone else is removed).
 
@@ -447,7 +447,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				continue
 			}
 			if !admitted {
-				session.sendAuth(false, codeNotLoggedIn, "Please log in or register first.")
+				session.sendAuth(false, codeNotLoggedIn, "Please join first.")
 				continue
 			}
 			messagefields := strings.Fields(*in.Line)
@@ -499,7 +499,7 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 				player = recovered
 				admitted = true
 			}
-		case msgRegister, msgLogin:
+		case msgLogin:
 			if in.Username == "" || in.Password == "" {
 				session.sendAuth(false, codeBadRequest, "A "+in.T+" needs a username and a password.")
 				continue
@@ -515,61 +515,15 @@ func (ms *MudServer) ProcessInput(player *MudPlayer) {
 			if !ms.allowJoin(session) {
 				continue
 			}
-			if in.T == msgRegister {
-				admitted = ms.register(player, in.Username, in.Password)
-			} else {
-				admitted = ms.login(player, in.Username, in.Password)
-			}
+			admitted = ms.login(player, in.Username, in.Password)
 		default:
 			session.sendError(codeBadRequest, "Unknown message type "+strconv.Quote(in.T)+".")
 		}
 	}
 }
 
-// register runs on the connection's reader goroutine; the player isn't in the
-// world yet, so the reader owns it until admit succeeds.
-func (ms *MudServer) register(player *MudPlayer, username, password string) bool {
-	if online, _ := ms.isOnline(username); online {
-		player.SendAuth(false, codeNameOnline, "That username is already online.")
-		return false
-	}
-	if player.CountUsernameFromDB(&ms.DB, username) > 0 {
-		player.SendAuth(false, codeNameTaken, "That username is already taken.")
-		return false
-	}
-
-	player.Username = username
-	if err := player.SetPassword(password); err != nil {
-		fmt.Println("SetPassword error: " + err.Error())
-		player.SendAuth(false, codeFailed, "Registration failed. Please try again.")
-		player.Username = ""
-		return false
-	}
-	if err := player.InsertIntoDB(&ms.DB); err != nil {
-		player.Username = ""
-		if errors.Is(err, errUsernameTaken) {
-			// Someone registered the same name between the check and the insert.
-			player.SendAuth(false, codeNameTaken, "That username is already taken.")
-		} else {
-			fmt.Println("Register insert error: " + err.Error())
-			player.SendAuth(false, codeFailed, "Registration failed. Please try again.")
-		}
-		return false
-	}
-
-	if refusal := ms.admit(player, welcome{message: "Account created! Welcome, " + username + "."}); refusal != "" {
-		if refusal == codeAtCapacity {
-			player.SendAuth(false, refusal, "Your account was created, but the event is at capacity right now. Log in again in a moment.")
-		} else {
-			player.SendAuth(false, refusal, "That username is already online.")
-		}
-		player.Username = ""
-		return false
-	}
-	return true
-}
-
-// login runs on the connection's reader goroutine, like register.
+// login runs on the connection's reader goroutine, like join. Password accounts
+// are only for game masters, added to the database by hand; players are guests.
 func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 	online, saved := ms.isOnline(username)
 	if online {
@@ -585,7 +539,7 @@ func (ms *MudServer) login(player *MudPlayer, username, password string) bool {
 		}
 	}
 	if player.CountUsernameFromDB(&ms.DB, username) == 0 {
-		player.SendAuth(false, codeUnknownUser, "Unknown username. Register to create an account.")
+		player.SendAuth(false, codeUnknownUser, "Unknown username.")
 		return false
 	}
 

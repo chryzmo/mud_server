@@ -34,12 +34,12 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 | `resume` | `token`, `received` | reattach after a drop; `received` is how many counted frames the client has processed; leave it out (a freshly loaded page) and you get a gap and a fresh look |
 | `recover` | `name`, `code` | take a character back with the recovery code; issues a new token and code |
 | `cmd` | `line` | a game command, such as `MOVE N` or `SAY hello` |
-| `login`, `register` | `username`, `password` | password accounts (GMs); `register` goes away once the new client ships |
+| `login` | `username`, `password` | password accounts, for game masters added to the database by hand. There is no `register`: players are guests (`join`), and a `register` frame gets `bad_request` |
 
 | Server sends | Fields | Meaning |
 |---|---|---|
 | `hello` | `message` | greeting on connect |
-| `auth` | `ok`, `code`, `message`, and for success `token`, `recovery`, `resumed`, `gap`, `replayed`, `base` | answer to join, resume, recover, login, register |
+| `auth` | `ok`, `code`, `message`, and for success `token`, `recovery`, `resumed`, `gap`, `replayed`, `base` | answer to join, resume, recover, login |
 | `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `unknown_command`, `restarting`, `internal` |
 | `text` | `text` | prose, with ANSI colour codes the client styles per line |
 | `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
@@ -76,7 +76,7 @@ start on an invalid `TrustedProxies` list.
 | `Connection.ResumeGraceMS` | 90000 | how long a dropped guest stays in the world |
 | `Connection.ReplayFrames` | 100 | counted frames kept per guest for replay (clamped under the queue size) |
 | `Connection.RecoveryLockMS` | 900000 | a name refuses recovery this long after 5 wrong codes |
-| `Connection.JoinPerSecond`, `JoinBurst` | 1000, 5000 | one bucket for every join, resume, recover, login and register; `-1` for no limit |
+| `Connection.JoinPerSecond`, `JoinBurst` | 1000, 5000 | one bucket for every join, resume, recover and login; `-1` for no limit |
 | `Connection.MaxJoinsPerMinutePerIP` | 0 (off) | optional per-address ceiling; a flood breaker, not a fairness rule |
 | `Connection.IdleTimeoutMS` | 1800000 | a guest with no command this long is disconnected; `-1` never |
 | `Database.*` | see file | connection settings, `MaxConnections` (10), `StartupWaitSeconds` (30) |
@@ -89,7 +89,7 @@ The server logs session-close totals by reason (`queue_full`, `write_error`, `re
 
 ## Bot client and local load testing
 
-`src/cmd/mudbot` uses the public websocket protocol (JSON frames, subprotocol `mud.v1`): login (or optional registration),
+`src/cmd/mudbot` uses the public websocket protocol (JSON frames, subprotocol `mud.v1`): login with seeded accounts,
 MOVE, SAY, ATTACK, and WHISPER. It continuously reads every connection. The ordinary
 `scripts/test.sh` suite includes 200 bots playing for 10 seconds under `-race`.
 
@@ -127,8 +127,7 @@ export MUD_BOT_DATABASE_URL='postgres://mud:mud@127.0.0.1:5432/mud_load'
 `seed -reset` creates `mud_load` if missing and replaces its schema using `src/sql`.
 It refuses non-loopback hosts, other database names and connection query overrides.
 Fixture accounts share a bcrypt-cost-4 hash; normal login still verifies it. This measures
-steady-state gameplay, **not production-cost login/reconnect storms**. `-register` instead
-creates real accounts with normal hashing, and requires a fresh prefix on subsequent runs.
+steady-state gameplay, **not production-cost login/reconnect storms**.
 Supply passwords only through `MUD_BOT_PASSWORD`, not command-line flags. `-prefix` defaults
 to `loadbot`; account names append a zero-based five-digit index.
 
