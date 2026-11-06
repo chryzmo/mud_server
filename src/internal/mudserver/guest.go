@@ -85,6 +85,13 @@ func normaliseRecovery(code string) string {
 // join runs on the connection's reader goroutine, like login. It creates a
 // guest, places them, and tells them their token and recovery code.
 func (ms *MudServer) join(player *MudPlayer, name string) bool {
+	// The reader's own session. Once the guest is admitted a resume may hand the player to a newer
+	// connection, so player.Session must not be read again on this goroutine.
+	session := player.Session
+	if ms.joinsLocked.Load() {
+		player.SendAuth(false, codeJoinsLocked, "ConQuest is closed to new visitors for a little while. Please try again soon.")
+		return false
+	}
 	if code, reason := ms.names.check(name); code != "" {
 		player.SendAuth(false, code, reason)
 		return false
@@ -131,6 +138,6 @@ func (ms *MudServer) join(player *MudPlayer, name string) bool {
 		}
 		return false
 	}
-	ms.logIP(player.Session, "Guest joined: %s", name)
+	ms.logIP(session, "Guest joined: %s", name)
 	return true
 }

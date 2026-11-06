@@ -14,6 +14,7 @@ import (
 type MudCommand struct {
 	description string
 	action      func(player *MudPlayer, arguments string) int
+	gmOnly      bool // only for game masters: anyone else gets "Unknown command.", and HELP does not list it
 }
 
 // GenerateCommandList builds the command table. findPlayer looks up an online
@@ -29,6 +30,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 
 			if msg == "" {
 				player.SendMessage("You stand in silence.")
+				return muddata.MUD_OK
+			}
+
+			if player.refuseIfMuted(time.Now()) {
 				return muddata.MUD_OK
 			}
 
@@ -85,6 +90,9 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 		description: "Send a private message to any online player.  Usage: WHISPER <player> <message>",
 		action: func(player *MudPlayer, arguments string) int {
 			// WHISPER <target> <message>
+			if player.refuseIfMuted(time.Now()) {
+				return muddata.MUD_OK
+			}
 			words := strings.Split(arguments, " ")
 			target := words[0]
 			message := strings.Join(words[1:], " ")
@@ -350,7 +358,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 		action: func(player *MudPlayer, arguments string) int {
 			// Collect and sort command names for a stable, readable listing.
 			names := make([]string, 0, len(cList))
-			for name := range cList {
+			for name, c := range cList {
+				if c.gmOnly && !player.gm {
+					continue
+				}
 				names = append(names, name)
 			}
 			// Simple insertion sort — command list is small.

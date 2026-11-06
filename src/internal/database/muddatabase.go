@@ -76,6 +76,11 @@ func (db MudDatabase) EnsureSchema() error {
 		"CREATE UNIQUE INDEX IF NOT EXISTS item_contentkey_key ON item (contentkey) WHERE contentkey IS NOT NULL",
 		"CREATE UNIQUE INDEX IF NOT EXISTS baddienpc_contentkey_key ON baddienpc_generic (contentkey) WHERE contentkey IS NOT NULL",
 		"CREATE UNIQUE INDEX IF NOT EXISTS baddiespawner_contentkey_key ON baddiespawner (contentkey) WHERE contentkey IS NOT NULL",
+		// The game master (plans/event-systems.md section 2): a flag on password accounts, a mute that
+		// survives a restart, and an audit trail of every GM command.
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS gm boolean NOT NULL DEFAULT false",
+		"ALTER TABLE player ADD COLUMN IF NOT EXISTS muteduntil timestamptz",
+		"CREATE TABLE IF NOT EXISTS gm_audit (id bigserial PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), gm text NOT NULL, command text NOT NULL, args text NOT NULL DEFAULT '', result text NOT NULL DEFAULT '')",
 		// Names are unique ignoring case. Last, because it fails if an older
 		// database already holds two names that differ only in case.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",
