@@ -9,16 +9,29 @@ rooms:
     description: You find yourself in a generic looking room.  There is a door to the North.
     exits: {N: balcony}
     items: {key: 1}
+    features:
+      sign:
+        names: [wooden sign, sign, notice]
+        examine: "A hand-painted sign nailed beside the door: WELCOME. EXAMINE things to learn more about them."
 
   balcony:
     name: Balcony
     description: You are at a balcony overlooking the woods.  There is a door to the East and to the South.
     exits: {S: start-room, E: arena}
+    features:
+      railing:
+        names: [stone railing, railing, balustrade]
+        examine: "The stone is cool and worn smooth by a great many elbows."
 
   arena:
     name: Arena
     description: You are in the arena.  There is a door to the West.
     exits: {W: balcony}
+    features:
+      sand:
+        names: [arena sand, sand]
+        unlisted: true
+        examine: "The sand is raked into a pattern that almost looks like a map."
     spawners:
       - {npc: orc, count: 1, tick_ms: 5000}
 

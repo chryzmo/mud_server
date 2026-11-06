@@ -222,6 +222,7 @@ func (w *World) cloneArea(area *Area) int {
 			BaddieMap:   make(map[string]*BaddieNPC),
 			Inventory:   orig.pristine.copyOf(),
 			ExitJSON:    orig.ExitJSON,
+			Features:    orig.Features,
 			pristine:    orig.pristine,
 			TemplateID:  tid,
 			clone:       true,

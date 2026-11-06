@@ -78,6 +78,18 @@ func Render(w *World, res *Result) string {
 		} else {
 			b.WriteString("**Exits:** none\n\n")
 		}
+		if len(r.Features) > 0 {
+			b.WriteString("**To examine:**\n\n")
+			for _, fk := range sortedKeys(r.Features) {
+				ft := r.Features[fk]
+				label := strings.Join(ft.Names, " / ")
+				if ft.Unlisted {
+					label += " (not listed)"
+				}
+				fmt.Fprintf(&b, "- *%s*: %s\n", md(label), md(strings.Join(strings.Fields(ft.Examine), " ")))
+			}
+			b.WriteString("\n")
+		}
 		if len(r.Items) > 0 {
 			var parts []string
 			for _, ik := range sortedKeys(r.Items) {

@@ -155,8 +155,14 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 			exits[dir] = roomIDs[to]
 		}
 		exitJSON, _ := json.Marshal(exits)
-		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4 WHERE id=$1`,
-			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON)); err != nil {
+		features := make([]Feature, 0, len(r.Features))
+		for _, fk := range sortedKeys(r.Features) {
+			ft := r.Features[fk]
+			features = append(features, Feature{Key: fk, Names: ft.Names, Examine: strings.TrimSpace(ft.Examine), Unlisted: ft.Unlisted})
+		}
+		featuresJSON, _ := json.Marshal(features)
+		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4, featuresjson=$5 WHERE id=$1`,
+			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON), string(featuresJSON)); err != nil {
 			return nil, fmt.Errorf("room %s: %w", key, err)
 		}
 	}

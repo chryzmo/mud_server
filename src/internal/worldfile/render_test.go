@@ -34,6 +34,8 @@ func TestRenderTheSampleWorld(t *testing.T) {
 		"`start-room` · start room · area start · 0 steps from the start",
 		"> You find yourself in a generic looking room.  There is a door to the North.",
 		"**Exits:** N → Balcony (`balcony`)",
+		"**To examine:**\n\n- *wooden sign / sign / notice*: A hand-painted sign nailed beside the door",
+		"- *arena sand / sand (not listed)*: The sand is raked into a pattern",
 		"**On the floor:** KEY ×1",
 		"**Spawns:** ORC, up to 1, one every 5 s",
 		"| IRON SWORD | `iron-sword` | weapon | attack +5 |",

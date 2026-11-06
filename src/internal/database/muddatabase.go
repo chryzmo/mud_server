@@ -81,6 +81,8 @@ func (db MudDatabase) EnsureSchema() error {
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS gm boolean NOT NULL DEFAULT false",
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS muteduntil timestamptz",
 		"CREATE TABLE IF NOT EXISTS gm_audit (id bigserial PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), gm text NOT NULL, command text NOT NULL, args text NOT NULL DEFAULT '', result text NOT NULL DEFAULT '')",
+		// Things in a room that can be examined (plans/interactive-world.md); JSON, written by the content loader.
+		"ALTER TABLE room ADD COLUMN IF NOT EXISTS featuresjson text NOT NULL DEFAULT '[]'",
 		// Names are unique ignoring case. Last, because it fails if an older
 		// database already holds two names that differ only in case.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",
