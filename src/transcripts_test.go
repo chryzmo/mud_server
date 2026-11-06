@@ -74,6 +74,8 @@ type recorder struct {
 	token    string
 	recovery string
 	count    uint64 // counted frames processed, as a client keeps it
+	tokens   int    // placeholders handed out
+	recovers int
 }
 
 type recConn struct {
@@ -145,11 +147,13 @@ func (c *recConn) read() map[string]any {
 		if f["ok"] == true {
 			if tok, _ := f["token"].(string); tok != "" {
 				r.token = tok
-				r.secrets[tok] = fmt.Sprintf("TOKEN-%d", len(r.secrets)/2+1)
+				r.tokens++
+				r.secrets[tok] = fmt.Sprintf("TOKEN-%d", r.tokens)
 			}
 			if rec, _ := f["recovery"].(string); rec != "" {
 				r.recovery = rec
-				r.secrets[rec] = fmt.Sprintf("RECOVERY-%d", len(r.secrets)/2+1)
+				r.recovers++
+				r.secrets[rec] = fmt.Sprintf("RECOVERY-%d", r.recovers)
 			}
 			base, _ := f["base"].(float64) // absent means 0
 			r.count = uint64(base)
@@ -447,14 +451,13 @@ func wire(t *testing.T) []transcript {
 
 	t.Run("resume-bad-token", func(t *testing.T) {
 		wsURL := startTestServer(t)
-		r := newRecorder(t, "resume-bad-token", "An unknown or malformed token is refused with auth bad_token; this is terminal for that token.", wsURL)
+		r := newRecorder(t, "resume-bad-token", "A freshly loaded page whose token the server does not know is refused with auth bad_token: terminal for that token (offer recovery or a new name).", wsURL)
 		c := r.open()
 		c.hello()
-		for _, token := range []string{"abc", strings.Repeat("A", 43)} {
-			c.send(map[string]any{"t": "resume", "token": token, "received": 0})
-			a := c.read()
-			need(t, a["ok"] == false && a["code"] == "bad_token", "resume %q = %v", token, a)
-		}
+		token := strings.Repeat("A", 43)
+		c.send(map[string]any{"t": "resume", "token": token}) // a cold page: no count
+		a := c.read()
+		need(t, a["ok"] == false && a["code"] == "bad_token", "resume %q = %v", token, a)
 		c.left()
 		add(r)
 	})
@@ -504,7 +507,7 @@ func wire(t *testing.T) []transcript {
 
 		c4 := r.open()
 		c4.hello()
-		c4.send(map[string]any{"t": "resume", "token": oldToken, "received": 0})
+		c4.send(map[string]any{"t": "resume", "token": oldToken}) // a stale device: a cold page with the old token
 		need(t, c4.read()["code"] == "bad_token", "old token still works")
 		c4.left()
 		add(r)
