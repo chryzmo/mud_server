@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -32,6 +33,7 @@ database writes are done off the loop.
 const (
 	codeJoinsLocked     = "joins_locked"
 	defaultMute         = 15 * time.Minute
+	defaultKick         = 10 * time.Minute
 	maxMute             = 24 * time.Hour
 	gmWhoLimit          = 40
 	minGMPasswordLength = 12
@@ -69,6 +71,7 @@ const gmUsage = `GM commands:
   GM TELEPORT <name>         go to a player
   GM TELEPORT ROOM <text>    go to the room whose name starts with text
   GM SUMMON <name>           bring a player to you
+  GM KICK <name> [minutes]   remove a character for a break (default 10, at most 1440); they cannot return until it ends
   GM ANNOUNCE <text>         tell everyone
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
 
@@ -243,6 +246,38 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		gm.SendMessage(target.Username + " is here.")
 		return "summoned " + target.Username
 
+	case "KICK":
+		if len(args) == 0 {
+			gm.SendMessage("Usage: GM KICK <name> [minutes]")
+			return "usage"
+		}
+		target := ms.findPlayerFold(args[0])
+		if target == nil {
+			gm.SendMessage("No one called " + args[0] + " is here.")
+			return "not found"
+		}
+		if target.gm {
+			gm.SendMessage("A GM cannot be kicked.")
+			return "refused"
+		}
+		d := defaultKick
+		if len(args) > 1 {
+			m, err := strconv.Atoi(args[1])
+			if err != nil || m < 1 {
+				gm.SendMessage("Minutes must be a whole number from 1 to 1440.")
+				return "usage"
+			}
+			d = min(time.Duration(m)*time.Minute, maxMute)
+		}
+		minutes := int(d / time.Minute)
+		ms.kicks.set(target.Username, now.Add(d))
+		// Say why before closing, so the client stops instead of reconnecting (as with idle and replaced).
+		target.Session.sendError(codeKicked, fmt.Sprintf("A GM asked you to take a break for %d minutes. You can come back after that.", minutes))
+		target.Session.CloseWith(closeKicked)
+		ms.disconnect(target) // out of the world now, saved; their token still works once the break is over
+		gm.SendMessage(fmt.Sprintf("%s is out for %d minutes.", target.Username, minutes))
+		return fmt.Sprintf("kicked %s %dm", target.Username, minutes)
+
 	case "ANNOUNCE":
 		if text == "" {
 			gm.SendMessage("Usage: GM ANNOUNCE <text>")
@@ -269,6 +304,49 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 	}
 	gm.SendMessage("Unknown GM command. " + gmUsage)
 	return ""
+}
+
+// kickList remembers which characters are on a break after GM KICK, by lower-cased name.
+// Connection readers check it (resume, recover, login), so it has its own lock.
+type kickList struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+func (k *kickList) set(name string, until time.Time) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.until == nil {
+		k.until = make(map[string]time.Time)
+	}
+	now := time.Now()
+	for n, t := range k.until {
+		if !t.After(now) {
+			delete(k.until, n)
+		}
+	}
+	k.until[strings.ToLower(name)] = until
+}
+
+// remaining is how much of the break is left for name; zero if none.
+func (k *kickList) remaining(name string, now time.Time) time.Duration {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if t := k.until[strings.ToLower(name)]; t.After(now) {
+		return t.Sub(now)
+	}
+	return 0
+}
+
+// refuseIfKicked tells a kicked character's connection they are on a break, and reports
+// whether it refused. Reader goroutines call it before doing any database work for them.
+func (ms *MudServer) refuseIfKicked(session *Session, name string) bool {
+	d := ms.kicks.remaining(name, time.Now())
+	if d <= 0 {
+		return false
+	}
+	session.sendAuth(false, codeKicked, fmt.Sprintf("A GM asked this character to take a break. Please try again in about %d minutes.", int((d+time.Minute-1)/time.Minute)))
+	return true
 }
 
 // findPlayerFold finds an online player by name, ignoring case. Loop only.

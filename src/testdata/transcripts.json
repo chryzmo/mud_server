@@ -1446,6 +1446,108 @@
       ]
     },
     {
+      "scenario": "kicked",
+      "about": "A GM removes the character for a while: the client is told kicked and closed and must not reconnect by itself; a page reloaded during the break is refused with auth kicked (terminal for now, the token stays).",
+      "connections": [
+        {
+          "events": [
+            {
+              "recv": {
+                "message": "Welcome to the MUD!\nJoin with a name to play.\n",
+                "t": "hello"
+              }
+            },
+            {
+              "send": {
+                "name": "Alice",
+                "t": "join"
+              }
+            },
+            {
+              "recv": {
+                "message": "Welcome, Alice!",
+                "ok": true,
+                "recovery": "RECOVERY-1",
+                "t": "auth",
+                "token": "TOKEN-1"
+              }
+            },
+            {
+              "recv": {
+                "t": "text",
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+              }
+            },
+            {
+              "recv": {
+                "exits": [
+                  "N"
+                ],
+                "name": "Start Room",
+                "t": "room"
+              }
+            },
+            {
+              "recv": {
+                "atk": 5,
+                "atkbonus": 0,
+                "def": 10,
+                "defbonus": 0,
+                "hp": 20,
+                "maxhp": 20,
+                "maxmp": 10,
+                "mp": 10,
+                "t": "stats"
+              }
+            },
+            {
+              "recv": {
+                "t": "arrive",
+                "who": "boss"
+              }
+            },
+            {
+              "recv": {
+                "code": "kicked",
+                "message": "A GM asked you to take a break for 10 minutes. You can come back after that.",
+                "t": "error"
+              }
+            },
+            {
+              "end": "server_closed"
+            }
+          ]
+        },
+        {
+          "events": [
+            {
+              "recv": {
+                "message": "Welcome to the MUD!\nJoin with a name to play.\n",
+                "t": "hello"
+              }
+            },
+            {
+              "send": {
+                "t": "resume",
+                "token": "TOKEN-1"
+              }
+            },
+            {
+              "recv": {
+                "code": "kicked",
+                "message": "A GM asked this character to take a break. Please try again in about 10 minutes.",
+                "ok": false,
+                "t": "auth"
+              }
+            },
+            {
+              "end": "open"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "scenario": "server-restarting",
       "about": "A shutting-down server says restarting and closes: the client reconnects with jitter (it is not terminal).",
       "connections": [
