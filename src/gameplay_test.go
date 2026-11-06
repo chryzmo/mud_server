@@ -168,17 +168,23 @@ func TestCombatPlayerKillsNPC(t *testing.T) {
 	name := waitForNPC(t, conn)
 
 	// Defense 0 means almost every swing hits, and one hit kills. A miss sends
-	// nothing, so swing again until the kill.
+	// nothing, so keep swinging from a second goroutine while this one reads: a
+	// websocket is dead after a read timeout, so the reader cannot give up and
+	// retry. Only this goroutine's reads and the swinger's writes touch conn.
+	swinging := make(chan struct{})
+	defer close(swinging)
 	send(t, conn, "ATTACK "+name)
-	for i := 0; ; i++ {
-		if _, ok := expectWithin(conn, "You kill "+name+"!", 500*time.Millisecond); ok {
-			break
+	go func() {
+		for {
+			select {
+			case <-swinging:
+				return
+			case <-time.After(150 * time.Millisecond):
+				conn.WriteMessage(websocket.TextMessage, wireLine("ATTACK"))
+			}
 		}
-		if i == 10 {
-			t.Fatalf("didn't kill %s after 10 swings", name)
-		}
-		send(t, conn, "ATTACK")
-	}
+	}()
+	expect(t, conn, "You kill "+name+"!")
 	expect(t, conn, "You receive")
 }
 
