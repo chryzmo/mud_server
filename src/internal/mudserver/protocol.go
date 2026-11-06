@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -243,13 +242,8 @@ func (mp *MudPlayer) SendStatUpdate() {
 // SendLook describes the player's room: the text, then the room's name and exits.
 func (mp *MudPlayer) SendLook() {
 	room := mp.Location
-	mp.SendMessage(room.LookDescription())
-	exits := make([]string, 0, len(room.ExitMap))
-	for dir := range room.ExitMap {
-		exits = append(exits, dir)
-	}
-	sort.Strings(exits)
-	mp.sendFrame(encode(roomMsg{T: msgRoom, Name: room.Name, Exits: exits}))
+	mp.SendMessage(room.lookDescription(mp))
+	mp.sendFrame(encode(roomMsg{T: msgRoom, Name: room.Name, Exits: mp.usableExits()}))
 }
 
 // RefuseUnlessProtocol checks that the client negotiated Subprotocol. If not it

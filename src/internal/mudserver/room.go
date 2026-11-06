@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	muddatabase "mud_server/src/internal/database"
 	mudutils "mud_server/src/internal/mudutils"
+	"mud_server/src/internal/worldfile"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,6 +30,10 @@ type Room struct {
 	ExitJSON    string
 	Features    []Feature // scenery to EXAMINE (examine.go); shared by a room's copies
 	People      []Person  // friendly characters (people.go); shared by a room's copies
+	Key         string    // the content key ("" for a room that is not from content); a copy has its template's
+	Rules       []worldfile.Rule // what happens when players act here (rules.go); shared by copies
+	Gates       map[string]*gateLink // exits that need opening; each copy has its own links
+	holds       map[string]time.Time // keys held here for a while (pressure plates); per copy, loop-owned
 	dirty       bool // contents changed since the last save; see persist.go
 
 	// Copies of a room (see crowd.go). A clone has no database row: it is never
@@ -57,6 +62,9 @@ type RoomDB struct {
 	InventoryIDSlice map[string]int32
 	FeaturesJSON     string
 	PeopleJSON       string
+	ContentKey       *string
+	RulesJSON        string
+	GatesJSON        string
 }
 
 type RoomExits struct {
@@ -95,7 +103,10 @@ func (r *Room) BroadcastFrame(frame []byte, senderusername string) {
 	}
 }
 
-func (r *Room) LookDescription() string {
+func (r *Room) LookDescription() string { return r.lookDescription(nil) }
+
+// lookDescription is the room as a viewer sees it: with a viewer, gates opened for them are exits and sealed ones are named.
+func (r *Room) lookDescription(viewer *MudPlayer) string {
 	// Append each section once rather than copying the growing player list
 	// for every occupant. The room's map iteration order remains unchanged.
 	var desc strings.Builder
@@ -138,14 +149,24 @@ func (r *Room) LookDescription() string {
 		desc.WriteString(r.Inventory.ListAsString(false))
 	}
 
-	if len(r.ExitMap) > 0 {
-		exits := make([]string, 0, len(r.ExitMap))
-		for dir := range r.ExitMap {
-			exits = append(exits, dir)
-		}
-		sort.Strings(exits)
+	exits := make([]string, 0, len(r.ExitMap))
+	for dir := range r.ExitMap {
+		exits = append(exits, dir)
+	}
+	var sealed []string
+	if viewer != nil {
+		exits = viewer.usableExits()
+		sealed = viewer.sealedExits()
+	}
+	sort.Strings(exits)
+	if len(exits) > 0 {
 		desc.WriteString("\nExits: [")
 		desc.WriteString(strings.Join(exits, "] ["))
+		desc.WriteString("]\n")
+	}
+	if len(sealed) > 0 {
+		desc.WriteString("Sealed: [")
+		desc.WriteString(strings.Join(sealed, "] ["))
 		desc.WriteString("]\n")
 	}
 
@@ -214,9 +235,9 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 
 	switch roomid.(type) {
 	case string:
-		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson FROM room WHERE name=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson,contentkey,rulesjson,gatesjson FROM room WHERE name=$1"
 	case int, int8, int32, int64:
-		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson FROM room WHERE id=$1"
+		query = "SELECT id,name,description,exitjson,inventoryidslice,featuresjson,peoplejson,contentkey,rulesjson,gatesjson FROM room WHERE id=$1"
 	default:
 		err = errors.New("Room.FetchFromDB invalid ID.  ID must be string|int32")
 	}
@@ -252,6 +273,23 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 		if err := json.Unmarshal([]byte(ret.PeopleJSON), &room.People); err != nil {
 			fmt.Printf("Room %d: people unreadable (%v); the room has none\n", ret.ID, err)
 			room.People = nil
+		}
+		if ret.ContentKey != nil {
+			room.Key = *ret.ContentKey
+		}
+		if err := json.Unmarshal([]byte(ret.RulesJSON), &room.Rules); err != nil {
+			fmt.Printf("Room %d: rules unreadable (%v); the room has none\n", ret.ID, err)
+			room.Rules = nil
+		}
+		var gates map[string]worldfile.Gate
+		if err := json.Unmarshal([]byte(ret.GatesJSON), &gates); err != nil {
+			fmt.Printf("Room %d: gates unreadable (%v); the room has none\n", ret.ID, err)
+		}
+		for key, g := range gates {
+			if room.Gates == nil {
+				room.Gates = map[string]*gateLink{}
+			}
+			room.Gates[key] = &gateLink{Key: key, Dir: g.Exit.Dir, ToKey: g.Exit.To, Mode: g.Mode, Message: g.Message}
 		}
 
 		for iid := range ret.InventoryIDSlice {

@@ -92,7 +92,7 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 			return nil, fmt.Errorf("item %s: %w", key, err)
 		}
 		itemIDs[key] = id
-		if _, err := tx.Exec(ctx, `UPDATE item SET name=$2, description=$3, persistent=$4 WHERE id=$1`, id, it.Name, it.Description, it.Persistent); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE item SET name=$2, description=$3, persistent=$4, bound=$5 WHERE id=$1`, id, it.Name, it.Description, it.Persistent, it.Bound); err != nil {
 			return nil, fmt.Errorf("item %s: %w", key, err)
 		}
 		if e := it.Equipment; e != nil {
@@ -172,8 +172,18 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 			people = append(people, person)
 		}
 		peopleJSON, _ := json.Marshal(people)
-		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4, featuresjson=$5, peoplejson=$6 WHERE id=$1`,
-			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON), string(featuresJSON), string(peopleJSON)); err != nil {
+		rules := r.Rules
+		if rules == nil {
+			rules = []worldfile.Rule{}
+		}
+		rulesJSON, _ := json.Marshal(rules)
+		gates := r.Gates
+		if gates == nil {
+			gates = map[string]worldfile.Gate{}
+		}
+		gatesJSON, _ := json.Marshal(gates)
+		if _, err := tx.Exec(ctx, `UPDATE room SET name=$2, description=$3, exitjson=$4, featuresjson=$5, peoplejson=$6, rulesjson=$7, gatesjson=$8 WHERE id=$1`,
+			roomIDs[key], r.Name, strings.TrimSpace(r.Description), string(exitJSON), string(featuresJSON), string(peopleJSON), string(rulesJSON), string(gatesJSON)); err != nil {
 			return nil, fmt.Errorf("room %s: %w", key, err)
 		}
 	}

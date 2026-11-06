@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS player_state; -- puzzle state is keyed by player id, and ids start again when the seed is reloaded
 DROP TABLE IF EXISTS player;
 
 CREATE TABLE IF NOT EXISTS player

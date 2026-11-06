@@ -21,6 +21,9 @@ type World struct {
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 
+	roomsByKey map[string]*Room // content rooms by key (the originals)
+	itemsByKey map[string]*Item // content items by key: templates for what rules give
+
 	// Where new players start, and where a saved location that no longer exists falls
 	// back to. Set when the world is built and never changed, so connection readers may read it.
 	startRoomID int32
@@ -64,9 +67,44 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		w.LoadAndLinkRoomBaddieSpawners(db, room)
 	}
 
+	w.indexContent(db)
 	w.configureAreas(crowd)
 
 	return w
+}
+
+// indexContent builds the key lookups rules need and links each gate to the room it leads to.
+func (w *World) indexContent(db *muddatabase.MudDatabase) {
+	w.roomsByKey = make(map[string]*Room)
+	for _, room := range w.RoomMap {
+		if room.Key != "" && !room.clone {
+			w.roomsByKey[room.Key] = room
+		}
+	}
+	for _, room := range w.RoomMap {
+		for _, g := range room.Gates {
+			g.To = w.roomsByKey[g.ToKey]
+		}
+	}
+	w.itemsByKey = make(map[string]*Item)
+	rows, err := db.Connection.Query(db.Context, "SELECT id, contentkey FROM item WHERE contentkey IS NOT NULL")
+	if err != nil {
+		fmt.Println("item keys error: " + err.Error())
+		return
+	}
+	type itemKey struct {
+		ID  int32
+		Key string
+	}
+	keys, err := pgx.CollectRows(rows, pgx.RowToStructByPos[itemKey])
+	if err != nil {
+		fmt.Println("item keys error: " + err.Error())
+		return
+	}
+	for _, k := range keys {
+		it := Item{}
+		w.itemsByKey[k.Key] = it.FetchFromDB(db, k.ID)
+	}
 }
 
 // tick advances the world by one step: every room's NPCs act, then every

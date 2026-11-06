@@ -48,6 +48,8 @@ type MudPlayer struct {
 	sent          uint64         // counted frames sent over the player's lifetime in this process
 	replaySize    int            // ring capacity; 0 means no replay
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
+	state         *playerState   // puzzle state (state.go); created on first use
+	stateSink     func(stateWrite) // where its changes are queued; set at admission
 	gm            bool           // a game master (a password account with the gm flag; never a guest); see gm.go
 	mutedUntil    time.Time      // SAY and WHISPER are refused until then; loop-owned
 	SpawnLocation *Room
@@ -163,7 +165,10 @@ func (mp *MudPlayer) MoveRoom(dir string) int {
 		dir = "D"
 	}
 
-	newroom := mp.Location.ExitMap[dir]
+	newroom, refused := mp.exitFor(dir)
+	if refused {
+		return retRoomLocked
+	}
 	if newroom == nil {
 		// Room does not exist
 		retcode = muddata.ERR_ROOM_DNE
@@ -228,6 +233,7 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 		player.guest = ret.Guest
 		player.tokenHash = ret.ResumeTokenHash
 		player.gm = ret.GM && !ret.Guest // a guest is never a GM, whatever the row says
+		player.loadState(db)
 		if ret.MutedUntil != nil {
 			player.mutedUntil = *ret.MutedUntil
 		}

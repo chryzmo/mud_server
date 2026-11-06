@@ -43,6 +43,7 @@ type examineTarget struct {
 	display string
 	names   []string
 	text    string
+	key     string // the content key of a feature, person or item (rules act on keys); "" for others
 }
 
 const minPrefix = 3
@@ -112,18 +113,22 @@ func (mp *MudPlayer) examineTargets(packOnly bool) []examineTarget {
 		if strings.TrimSpace(it.Description) == "" {
 			text = mudutils.ColorString(it.Name, mudutils.COLOR_GREEN) + ": nothing special."
 		}
-		return examineTarget{display: it.Name, names: []string{it.Name}, text: text}
+		key := ""
+		if it.ContentKey != nil {
+			key = *it.ContentKey
+		}
+		return examineTarget{display: it.Name, names: []string{it.Name}, text: text, key: key}
 	}
 	if !packOnly && mp.Location != nil {
 		room := mp.Location
 		for _, f := range room.Features {
 			if len(f.Names) > 0 {
-				out = append(out, examineTarget{display: f.Names[0], names: f.Names, text: f.Examine})
+				out = append(out, examineTarget{display: f.Names[0], names: f.Names, text: mp.fill(f.Examine), key: f.Key})
 			}
 		}
 		for _, pe := range room.People {
 			if len(pe.Names) > 0 {
-				out = append(out, examineTarget{display: pe.Names[0], names: pe.Names, text: pe.Examine})
+				out = append(out, examineTarget{display: pe.Names[0], names: pe.Names, text: mp.fill(pe.Examine), key: pe.Key})
 			}
 		}
 		if room.Inventory != nil {

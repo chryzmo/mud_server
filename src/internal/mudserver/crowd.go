@@ -224,6 +224,8 @@ func (w *World) cloneArea(area *Area) int {
 			ExitJSON:    orig.ExitJSON,
 			Features:    orig.Features,
 			People:      orig.People,
+			Key:         orig.Key,
+			Rules:       orig.Rules,
 			pristine:    orig.pristine,
 			TemplateID:  tid,
 			clone:       true,
@@ -242,6 +244,18 @@ func (w *World) cloneArea(area *Area) int {
 			} else {
 				room.ExitMap[dir] = target
 			}
+		}
+		for key, g := range originals[tid].Gates { // a gate leads to the sibling copy when its target is in the area
+			link := *g
+			if g.To != nil {
+				if sibling := copyOf[g.To.ID]; sibling != nil {
+					link.To = sibling
+				}
+			}
+			if room.Gates == nil {
+				room.Gates = map[string]*gateLink{}
+			}
+			room.Gates[key] = &link
 		}
 	}
 

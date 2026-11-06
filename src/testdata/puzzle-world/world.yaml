@@ -1,0 +1,181 @@
+# The world the rules and gates tests play in (src/puzzle_test.go): counters, sequences, a riddle, gates, a
+# bound token, a person who takes an item, and pressure plates with a solo path.
+start_room: hall
+rooms:
+  hall:
+    name: Hall
+    description: A long hall of clocks and bells.
+    exits: {E: study, N: gallery}
+    features:
+      clock-1:
+        names: [first clock, clock]
+        examine: "The first clock says {clock-1}."
+      clock-2:
+        names: [second clock, clock]
+        examine: "The second clock says {clock-2}."
+      red-bell: {names: [red bell, red], examine: "A small red bell."}
+      blue-bell: {names: [blue bell, blue], examine: "A small blue bell."}
+      fountain: {names: [fountain], examine: "A dry fountain."}
+      rope: {names: [old rope, rope], examine: "A frayed rope."}
+    people:
+      porter:
+        names: [Porter, bellweather]
+        examine: "A tall porter."
+        greeting: "\"Lost something?\""
+    gates:
+      stair:
+        exit: {dir: U, to: tower}
+        mode: hidden
+      trapdoor:
+        exit: {dir: D, to: cellar}
+        mode: locked
+        message: "The trapdoor is shut tight."
+    rules:
+      - id: turn-clock-1
+        on: {verb: TURN, target: clock-1}
+        do:
+          - add: {counter: clock-1, by: 1, wrap: [1, 12]}
+          - say: "The hands creak round to {clock-1} o'clock."
+          - run: check-clocks
+      - id: turn-clock-2
+        on: {verb: TURN, target: clock-2}
+        do:
+          - add: {counter: clock-2, by: 1, wrap: [1, 12]}
+          - say: "The hands creak round to {clock-2} o'clock."
+          - run: check-clocks
+      - id: check-clocks
+        if:
+          - counter: {clock-1: 3}
+          - counter: {clock-2: 3}
+        unless:
+          - flag: clocks-solved
+        do:
+          - set_flag: clocks-solved
+          - say: "Both clocks strike three at once. Above you, stone slides."
+          - open: {gate: stair}
+      - on: {verb: RING, target: red-bell}
+        do:
+          - append: {sequence: bells, value: red}
+          - say: "A bright note."
+          - run: check-bells
+      - on: {verb: RING, target: blue-bell}
+        do:
+          - append: {sequence: bells, value: blue}
+          - say: "A sleepy note."
+          - run: check-bells
+      - id: check-bells
+        if:
+          - sequence: {bells: [red, blue]}
+        do:
+          - give_item: honeycomb
+          - say: "The bees leave a honeycomb."
+          - reset: {sequence: bells}
+          - stop: true
+      - on: {verb: RING, target: fountain}
+        if:
+          - sequence_longer_than: {bells: 2}
+        do:
+          - reset: {sequence: bells}
+      - on: {say: "an echo"}
+        unless:
+          - flag: riddle-solved
+        do:
+          - set_flag: riddle-solved
+          - say: "A bookcase swings aside, revealing a trapdoor."
+          - open: {gate: trapdoor}
+      - on: {enter: true}
+        unless:
+          - flag: seen-hall
+        do:
+          - set_flag: seen-hall
+          - say: "The Hall hums as you arrive."
+      - on: {verb: GIVE, target: porter, with: ticket}
+        do:
+          - take_item: ticket
+          - give_item: brass-key
+          - say: "Porter Bellweather beams and hands you a brass key."
+      - on: {verb: USE, target: fountain, with: brass-key}
+        do:
+          - room_say: "{player} unlocks something in the fountain."
+          - teleport: tower
+      - on: {verb: PULL, target: rope}
+        if:
+          - has_item: honeycomb
+        do:
+          - say: "You feel a draft. The honeycomb hums."
+      - on: {verb: SET, target: fountain, value: "7"}
+        do:
+          - say: "The fountain gurgles seven times."
+  tower:
+    name: Tower
+    description: A round room at the top.
+    exits: {D: hall}
+  cellar:
+    name: Cellar
+    description: A damp cellar.
+    exits: {U: hall}
+  gallery:
+    name: Gallery
+    description: A gallery with a ticket booth.
+    exits: {S: hall}
+    features:
+      booth: {names: [ticket booth, booth], examine: "A booth with a few torn tickets."}
+    rules:
+      - on: {verb: SEARCH, target: booth}
+        unless:
+          - has_item: ticket
+        do:
+          - give_item: ticket
+          - say: "Under a pile of paper you find a claim ticket."
+  study:
+    name: Study
+    description: A study with two heavy plates in the floor.
+    exits: {W: hall}
+    features:
+      plate-a: {names: [left plate, plate], examine: "A heavy stone plate."}
+      plate-b: {names: [right plate, plate], examine: "Another heavy stone plate."}
+      rubble: {names: [rubble], examine: "Loose rubble."}
+    gates:
+      crypt-door:
+        exit: {dir: D, to: crypt}
+        mode: locked
+        message: "The great doors are shut."
+    rules:
+      - on: {verb: SEARCH, target: rubble}
+        unless:
+          - has_item: anvil-weight
+        do:
+          - give_item: anvil-weight
+      - on: {verb: PRESS, target: plate-a}
+        do:
+          - hold: {key: plate-a, seconds: 20}
+          - say: "The left plate sinks and holds."
+          - run: check-plates
+      - on: {verb: PRESS, target: plate-b}
+        do:
+          - hold: {key: plate-b, seconds: 20}
+          - say: "The right plate sinks and holds."
+          - run: check-plates
+      - on: {verb: PUT, target: plate-b, with: anvil-weight}
+        do:
+          - take_item: anvil-weight
+          - hold: {key: plate-b, seconds: 600}
+          - say: "The weight holds the right plate down."
+          - run: check-plates
+      - id: check-plates
+        if:
+          - room_flag: plate-a
+          - room_flag: plate-b
+        do:
+          - room_say: "Both plates hold. The great doors grind open."
+          - open: {gate: crypt-door, for: room}
+  crypt:
+    name: Crypt
+    description: A cold crypt.
+    exits: {U: study}
+items:
+  ticket: {name: TICKET, description: A claim ticket., bound: true}
+  honeycomb: {name: HONEYCOMB, description: A dripping honeycomb., bound: true}
+  anvil-weight: {name: ANVIL WEIGHT, description: A heavy weight., bound: true}
+  brass-key: {name: BRASS KEY, description: A brass key.}
+  gold: {name: GOLD, description: Gold coin used for currency.}

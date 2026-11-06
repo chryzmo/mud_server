@@ -55,6 +55,8 @@ stage files by name anyway.
   runtime state; the world then loads only content rooms and takes its start room and areas from the content.
   Rooms may have `features` (examinable scenery; `mudserver/examine.go`: EXAMINE, aliases, prefixes, ambiguity).
   Rooms may have `people` (friendly characters with greeting and topics; `mudserver/people.go`: TALK and ASK).
+  Rooms may have `rules` and `gates` (puzzles; `mudserver/rules.go`: verbs, conditions, effects, per-player exits) and players carry
+  `state` (flags, counters, sequences, gates; `mudserver/state.go`, persisted through a queue to `player_state`).
 - `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
   rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.
   The wire protocol (`protocol.go`) and connections (`session.go`, `closestats.go`). Guests and their
