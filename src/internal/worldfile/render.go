@@ -237,6 +237,14 @@ func Render(w *World, res *Result) string {
 		}
 		b.WriteString("\n")
 	}
+	if o := w.ResolvedOnboarding(); o != nil {
+		b.WriteString("## Guided first steps\n\nWhat a new player is shown, in order (a step done early is skipped).\n\n")
+		fmt.Fprintf(&b, "- welcome: %s\n", md(o.Welcome))
+		for _, step := range OnboardingSteps {
+			fmt.Fprintf(&b, "- %s: %s\n", step, md(o.Steps[step]))
+		}
+		fmt.Fprintf(&b, "- finish: %s\n\n", md(o.Finish))
+	}
 	return b.String()
 }
 

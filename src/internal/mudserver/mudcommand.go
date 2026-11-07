@@ -58,6 +58,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				}
 			}
 			player.said(msg)
+			player.tourDid("say")
 
 			return muddata.MUD_OK
 		},
@@ -72,6 +73,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				return muddata.MUD_OK
 			}
 			player.SendLook()
+			player.tourDid("look")
 			return muddata.MUD_OK
 		},
 	}
@@ -119,6 +121,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				// Send description of new room
 				player.SendLook()
 				player.entered()
+				player.tourDid("move")
 			}
 
 			return muddata.MUD_OK
@@ -448,6 +451,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["?"] = &c_help
 	registerRuleVerbs(cList)
 	registerGuide(cList)
+	registerTour(cList)
 
 	return cList
 }

@@ -426,7 +426,11 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.applyLevels(false) // repairs a crash between the XP write and the stat save
 		player.SendStatUpdate()
 		player.sendCosmeticsIfAny()
+		fresh := player.tourFresh() // before entered() counts the first room as visited
 		player.entered()
+		if fresh {
+			player.tourStart()
+		}
 	})
 	return refusal
 }

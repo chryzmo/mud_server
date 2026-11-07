@@ -122,3 +122,14 @@ progression:
   levels: [0, 25, 60, 110, 180, 270, 380, 520, 700, 900]
   per_level: {max_hp: 2, attack: 1, defense: 1}
   xp: {room: 10, feature: 5, kill: 5}
+
+# The guided first steps for new players. Every line is optional; "onboarding: {}" uses plain defaults.
+onboarding:
+  welcome: "The keeper of the gate nods. \"Welcome, traveller. Let me show you around.\""
+  steps:
+    look: "\"First, LOOK. It tells you where you stand and which ways lead on.\""
+    move: "\"Now choose an exit and walk it. Try MOVE with a direction, or tap one.\""
+    examine: "\"Look closer at anything that catches your eye: EXAMINE and its name.\""
+    talk: "\"Folk here will talk if you do. Try TALK.\""
+    say: "\"And to speak to the whole room, SAY followed by your words.\""
+  finish: "\"You have the way of it. HELP lists everything, WHO shows who is near, and REPORT tells the staff of any trouble.\""
