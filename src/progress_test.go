@@ -102,7 +102,9 @@ func TestTheLeaderboardRanksPlayersLeavesOutGMsAndObeysHide(t *testing.T) {
 	bob := eventPlayer(t, wsURL, "bob")
 	send(t, alice, "EXAMINE lever")
 	expect(t, alice, "You reach level 2!")
-	waitForStateRows(t, "alice", 3)
+	// Row counts are not enough: the XP row exists from the first room (10) before the feature's
+	// update (15) is written, so wait for the value the board will read.
+	waitForStateValue(t, "alice", "xp", "explore", "15")
 	waitForStateRows(t, "bob", 2)
 	waitForStateRows(t, "boss", 2)
 
