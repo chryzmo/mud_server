@@ -60,6 +60,9 @@ type File struct {
 	Codes     map[string]Code   `yaml:"codes"`
 	// Progression tunes XP and levels; at most one file may set it.
 	Progression *Progression `yaml:"progression"`
+
+	// Onboarding turns on the guided first steps; at most one file may set it.
+	Onboarding *Onboarding `yaml:"onboarding"`
 }
 
 // Area is a set of rooms that copy together when a crowd arrives (see crowd control):
@@ -169,6 +172,7 @@ type World struct {
 	Events      map[string]Event
 	Codes       map[string]Code
 	Progression *Progression
+	Onboarding  *Onboarding
 	source      map[string]string // "room:lobby" -> file it was defined in
 }
 
@@ -308,6 +312,14 @@ func (w *World) merge(file string, f *File, res *Result) {
 		} else {
 			w.Progression = f.Progression
 			w.source["progression"] = file
+		}
+	}
+	if f.Onboarding != nil {
+		if prev, dup := w.source["onboarding"]; dup {
+			res.errorf(file, "onboarding", "onboarding is already set in %s", prev)
+		} else {
+			w.Onboarding = f.Onboarding
+			w.source["onboarding"] = file
 		}
 	}
 	for k, v := range f.Codes {
@@ -643,6 +655,7 @@ func (w *World) Validate(res *Result) {
 	w.validateCodes(res)
 	w.validateProgression(res)
 	w.validateAmbient(res)
+	w.validateOnboarding(res)
 
 	// Rooms a player can never reach from the start are almost always a mistake.
 	if _, ok := w.Rooms[w.StartRoom]; ok {

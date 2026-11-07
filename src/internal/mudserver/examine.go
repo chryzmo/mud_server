@@ -178,6 +178,7 @@ func (mp *MudPlayer) examine(arguments string) {
 	switch {
 	case hit != nil:
 		mp.SendMessage(hit.text)
+		mp.tourDid("examine")
 		if hit.feature && mp.Location != nil {
 			mp.discoverFeature(mp.Location.Key, hit.key)
 		}

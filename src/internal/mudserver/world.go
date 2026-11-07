@@ -25,6 +25,7 @@ type World struct {
 	worldFlags    map[string]bool                          // set for everyone by events or the GM (scheduler.go); loop only
 	ambientBudget commandLimiter                           // every ambient line spends from this (ambient.go); loop only
 	ambientGap    func(lo, hi time.Duration) time.Duration // nil: random; tests fix it
+	onboarding    *worldfile.Onboarding                    // the walkthrough script; nil when the content has none
 	prog          worldfile.Progression                    // XP and level tuning; set when the world is built and never changed
 	guide         *guide                                   // puzzles and regions the content declares; nil without content
 	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
@@ -60,6 +61,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		crowd.Areas = content.areas
 		w.guide = content.guide
 		w.prog = content.progression
+		w.onboarding = content.onboarding
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking

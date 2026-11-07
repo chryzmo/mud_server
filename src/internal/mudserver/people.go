@@ -101,6 +101,7 @@ func (mp *MudPlayer) talk(arguments string) {
 			msg += "\n(You could ask " + p.Names[0] + " about: " + list + ".  ASK <name> ABOUT <topic>)"
 		}
 		mp.SendMessage(msg)
+		mp.tourDid("talk")
 	case len(several) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")
 	default:
