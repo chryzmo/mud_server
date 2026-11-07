@@ -84,6 +84,7 @@ func (mp *MudPlayer) visit(roomKey string) {
 	if roomKey != "" && !mp.st().visited[roomKey] {
 		mp.st().visited[roomKey] = true
 		mp.persistState("visited", roomKey, "1", false)
+		mp.discoverRoom()
 	}
 }
 

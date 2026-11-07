@@ -178,6 +178,9 @@ type (
 		AtkBonus int    `json:"atkbonus"`
 		Def      int    `json:"def"`
 		DefBonus int    `json:"defbonus"`
+		Level    int    `json:"level"`
+		XP       int    `json:"xp"`             // total XP
+		Next     int    `json:"next,omitempty"` // total XP at which the next level starts; absent at the top
 	}
 	roomMsg struct {
 		T     string   `json:"t"`
@@ -280,7 +283,9 @@ func (mp *MudPlayer) SendInventory(text string) error {
 
 // SendStatUpdate pushes the player's current stats for the stats bar.
 func (mp *MudPlayer) SendStatUpdate() {
+	level, xp, next := mp.xpFields()
 	mp.sendFrame(encode(statsMsg{
+		Level: level, XP: xp, Next: next,
 		T: msgStats, HP: mp.HP, MaxHP: mp.EffectiveMaxHP(),
 		MP: mp.MP, MaxMP: mp.EffectiveMaxMP(),
 		Atk: mp.EffectiveAttackPower(), AtkBonus: mp.Equipment.TotalBonusAttackPower(),

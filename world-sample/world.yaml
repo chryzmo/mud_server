@@ -113,3 +113,9 @@ codes:
     color: gold
     badge: star
     message: "A warm light finds you."
+
+# XP and levels. Anything left out takes the default; with no block the defaults apply.
+progression:
+  levels: [0, 25, 60, 110, 180, 270, 380, 520, 700, 900]
+  per_level: {max_hp: 2, attack: 1, defense: 1}
+  xp: {room: 10, feature: 5, kill: 5}
