@@ -45,6 +45,7 @@ type contentResult struct {
 	areas       []AreaConfig // by room ID, for crowd control
 	guide       *guide       // the puzzles and regions, for JOURNAL, HINT and MAP
 	events      []*worldfile.ResolvedEvent
+	codes       map[string]worldfile.Code // sticker codes, by key
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -71,6 +72,7 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	}
 	out.guide = newGuide(w.Puzzles, w.Rooms)
 	out.events = w.ResolveEvents()
+	out.codes = w.Codes
 	log(fmt.Sprintf("World content applied from %s: %d rooms, %d items, %d npcs (%d rows created)", dir, len(w.Rooms), len(w.Items), len(w.NPCs), out.created))
 	return out, nil
 }

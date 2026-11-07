@@ -44,7 +44,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 
-			heard := encodeSay(player.Username, msg)
+			heard := encodeSay(player, msg)
 			for _, target_mp := range player.Location.Players() {
 				if target_mp.Username != player.Username {
 					target_mp.sendFrame(heard)
@@ -133,12 +133,13 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			if target == player.Username {
 				player.SendMessage("Talking to yourself, eh?")
 			} else {
-				player.SendWhisper(target, message, true)
+				targetPlayer := findPlayer(target)
+				player.SendWhisper(target, message, true, targetPlayer)
 
-				if targetPlayer := findPlayer(target); targetPlayer == nil {
+				if targetPlayer == nil {
 					player.SendMessage("Player '" + target + "' is not online.\n")
 				} else {
-					targetPlayer.SendWhisper(player.Username, message, false)
+					targetPlayer.SendWhisper(player.Username, message, false, player)
 				}
 			}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
+	"mud_server/src/internal/worldfile"
 	"net/netip"
 	"os"
 	"strconv"
@@ -38,8 +39,12 @@ type MudServer struct {
 	stateQ        chan stateWrite       // puzzle state changes for the writer (state.go)
 	stateDone     chan struct{}
 	chat          chatState
-	sched         *scheduler // scheduled events (scheduler.go); nil without content
-	offLoopWG     sync.WaitGroup        // database writes started by GM commands, away from the loop
+	codes         map[string]worldfile.Code // sticker codes by key (cosmetics.go)
+	codeByHash    map[string]string         // a code's HMAC -> its key
+	codeSecret    string                    // MUD_CODE_SECRET: the HMAC key; without it no code redeems
+	redeemBucket  commandLimiter            // every REDEEM attempt on the server spends from this
+	sched         *scheduler                // scheduled events (scheduler.go); nil without content
+	offLoopWG     sync.WaitGroup            // database writes started by GM commands, away from the loop
 	events        chan func()
 	World         *World
 	Commands      map[string]*MudCommand
@@ -170,6 +175,12 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	server.Commands["GM"] = server.gmCommand()
 	server.Commands["EVENTS"] = server.eventsCommand()
 	registerChat(server, server.Commands)
+	registerCosmetics(server, server.Commands)
+	server.codeSecret = codeSecretFromEnv()
+	if content != nil {
+		server.codes = content.codes
+		server.codeByHash = codeIndex(content.codes)
+	}
 	server.World.worldFlags = loadWorldFlags(&server.DB)
 	if content != nil {
 		server.sched = newScheduler(server, content.events, &server.DB)
@@ -399,10 +410,11 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		}
 		player.Location.AddPlayer(player)
 		player.SendWelcome(hello)
-		player.Location.BroadcastFrame(encodeArrive(player.Username, ""), player.Username)
+		player.Location.BroadcastFrame(encodeArrive(player, ""), player.Username)
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
 		player.SendStatUpdate()
+		player.sendCosmeticsIfAny()
 		player.entered()
 	})
 	return refusal
@@ -425,7 +437,7 @@ func (ms *MudServer) disconnect(player *MudPlayer) {
 	ms.savingNames[player.Username] = l.saved
 	ms.flushDirty() // save them now, not at the next interval
 
-	player.Location.BroadcastFrame(encodeLeave(player.Username, ""), player.Username)
+	player.Location.BroadcastFrame(encodeLeave(player, ""), player.Username)
 	player.Location.RemovePlayer(player.Username)
 	player.Session.Close()
 }

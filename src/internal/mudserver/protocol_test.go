@@ -26,11 +26,13 @@ func TestFrameShapes(t *testing.T) {
 	}{
 		{"text", encodeText("\x1b[1;31mGrak\x1b[0m"), `{"t":"text","text":"\u001b[1;31mGrak\u001b[0m"}`},
 		{"text is not HTML-escaped", encodeText("a <b> & c"), `{"t":"text","text":"a <b> & c"}`},
-		{"say", encodeSay("bob", `hi "there"`), `{"t":"say","who":"bob","text":"hi \"there\""}`},
-		{"arrive from a direction", encodeArrive("bob", "N"), `{"t":"arrive","who":"bob","from":"N"}`},
-		{"arrive from nowhere", encodeArrive("bob", ""), `{"t":"arrive","who":"bob"}`},
-		{"leave toward a direction", encodeLeave("bob", "S"), `{"t":"leave","who":"bob","to":"S"}`},
-		{"leave vanishing", encodeLeave("bob", ""), `{"t":"leave","who":"bob"}`},
+		{"say", encodeSay(&MudPlayer{Username: "bob"}, `hi "there"`), `{"t":"say","who":"bob","text":"hi \"there\""}`},
+		{"arrive from a direction", encodeArrive(&MudPlayer{Username: "bob"}, "N"), `{"t":"arrive","who":"bob","from":"N"}`},
+		{"arrive from nowhere", encodeArrive(&MudPlayer{Username: "bob"}, ""), `{"t":"arrive","who":"bob"}`},
+		{"leave toward a direction", encodeLeave(&MudPlayer{Username: "bob"}, "S"), `{"t":"leave","who":"bob","to":"S"}`},
+		{"leave vanishing", encodeLeave(&MudPlayer{Username: "bob"}, ""), `{"t":"leave","who":"bob"}`},
+		{"say with cosmetics", encodeSay(wearing("bob", "gold", "star"), "hi"), `{"t":"say","who":"bob","text":"hi","color":"gold","badge":"star"}`},
+		{"cosmetics", encode(cosmeticsMsg{T: msgCosmetics, Colors: []string{"gold"}, Badges: []string{}, Color: "gold"}), `{"t":"cosmetics","colors":["gold"],"badges":[],"color":"gold"}`},
 		{"whisper", encode(whisperMsg{T: msgWhisper, Who: "bob", Text: "psst"}), `{"t":"whisper","who":"bob","text":"psst"}`},
 		{"whisper echo", encode(whisperMsg{T: msgWhisper, Who: "bob", Text: "psst", Out: true}), `{"t":"whisper","who":"bob","text":"psst","out":true}`},
 		{"auth ok", encode(authMsg{T: msgAuth, OK: true, Message: "hi"}), `{"t":"auth","ok":true,"message":"hi"}`},
@@ -53,9 +55,9 @@ func TestHotPathFramesStayCompact(t *testing.T) {
 		frame []byte
 		max   int
 	}{
-		{"heard SAY", encodeSay("bot00042", "mudbot hello"), 56},
-		{"arrival", encodeArrive("bot00042", ""), 36},
-		{"departure", encodeLeave("bot00042", "N"), 44},
+		{"heard SAY", encodeSay(&MudPlayer{Username: "bot00042"}, "mudbot hello"), 56},
+		{"arrival", encodeArrive(&MudPlayer{Username: "bot00042"}, ""), 36},
+		{"departure", encodeLeave(&MudPlayer{Username: "bot00042"}, "N"), 44},
 		{"whisper", encode(whisperMsg{T: msgWhisper, Who: "bot00007", Text: "mudbot:b:7:12", Out: true}), 76},
 	} {
 		if len(tc.frame) > tc.max {
@@ -92,4 +94,10 @@ func TestBroadcastQueuesOneSharedFrame(t *testing.T) {
 			t.Errorf("%s was queued a separate copy of the frame", p.Username)
 		}
 	}
+}
+
+func wearing(name, color, badge string) *MudPlayer {
+	p := &MudPlayer{Username: name}
+	p.st().active["color"], p.st().active["badge"] = color, badge
+	return p
 }

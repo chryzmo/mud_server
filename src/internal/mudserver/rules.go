@@ -524,12 +524,12 @@ func relocatePlayer(p *MudPlayer, dest *Room) {
 	}
 	if p.Location != nil {
 		p.Location.RemovePlayer(p.Username)
-		p.Location.BroadcastFrame(encodeLeave(p.Username, ""), p.Username)
+		p.Location.BroadcastFrame(encodeLeave(p, ""), p.Username)
 	}
 	p.NPCTarget = nil
 	p.Location = dest
 	p.rememberCopy()
-	dest.BroadcastFrame(encodeArrive(p.Username, ""), p.Username)
+	dest.BroadcastFrame(encodeArrive(p, ""), p.Username)
 	dest.AddPlayer(p)
 	p.dirty = true
 	p.SendLook()

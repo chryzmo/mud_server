@@ -152,7 +152,8 @@ func (ms *MudServer) globalChat(p *MudPlayer, text string, now time.Time) {
 		return
 	}
 	p.lastChat = now
-	frame := encode(chatMsg{T: msgChat, Who: p.Username, Text: ms.names.mask(text), Ch: channelGlobal, GM: p.gm})
+	color, badge := p.look()
+	frame := encode(chatMsg{T: msgChat, Who: p.Username, Text: ms.names.mask(text), Ch: channelGlobal, GM: p.gm, Color: color, Badge: badge})
 	for _, target := range ms.players {
 		target.sendFrame(frame)
 	}

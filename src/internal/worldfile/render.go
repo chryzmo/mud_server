@@ -196,6 +196,23 @@ func Render(w *World, res *Result) string {
 			b.WriteString("\n")
 		}
 	}
+	if len(w.Codes) > 0 {
+		b.WriteString("## Sticker codes\n\nWhat each code grants (the codes themselves are never shown).\n\n")
+		for _, key := range sortedKeys(w.Codes) {
+			c := w.Codes[key]
+			var parts []string
+			for _, kv := range [][2]string{{"colour", c.Color}, {"badge", c.Badge}, {"item", c.Item}, {"flag", c.Flag}} {
+				if kv[1] != "" {
+					parts = append(parts, kv[0]+" `"+kv[1]+"`")
+				}
+			}
+			if c.Message != "" {
+				parts = append(parts, "message: "+md(c.Message))
+			}
+			fmt.Fprintf(&b, "- `%s`: %s\n", key, strings.Join(parts, "; "))
+		}
+		b.WriteString("\n")
+	}
 	return b.String()
 }
 
