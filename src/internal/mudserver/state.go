@@ -28,12 +28,15 @@ type playerState struct {
 	counters  map[string]int
 	sequences map[string][]string
 	gates     map[string]bool // "room-key/gate-key" opened for this player
+	visited   map[string]bool // content keys of the rooms this player has been in
+	hints     map[string]int  // puzzle key -> the hint tier last shown
 }
 
 func newPlayerState() *playerState {
 	return &playerState{
 		flags: map[string]bool{}, counters: map[string]int{},
 		sequences: map[string][]string{}, gates: map[string]bool{},
+		visited: map[string]bool{}, hints: map[string]int{},
 	}
 }
 
@@ -68,6 +71,14 @@ func (mp *MudPlayer) setFlag(key string) {
 	if !mp.st().flags[key] {
 		mp.st().flags[key] = true
 		mp.persistState("flag", key, "1", false)
+		if mp.world != nil && mp.world.guide != nil {
+			for _, puzzle := range mp.world.guide.byFlag[key] {
+				if p := mp.world.guide.puzzle(puzzle); p != nil && !mp.flag(p.Solved.Flag) {
+					mp.lastPuzzle = puzzle // HINT with no name means the one worked on last
+					break
+				}
+			}
+		}
 	}
 }
 
@@ -148,6 +159,12 @@ func (mp *MudPlayer) loadState(db *muddatabase.MudDatabase) {
 			}
 		case "gate":
 			state.gates[r.Key] = true
+		case "visited":
+			state.visited[r.Key] = true
+		case "hint":
+			if n, err := strconv.Atoi(r.Value); err == nil {
+				state.hints[r.Key] = n
+			}
 		}
 	}
 	mp.state = state

@@ -4,6 +4,7 @@ start_room: hall
 rooms:
   hall:
     name: Hall
+    region: Clock Hall
     description: A long hall of clocks and bells.
     exits: {E: study, N: gallery}
     features:
@@ -108,6 +109,7 @@ rooms:
           - say: "The fountain gurgles seven times."
   tower:
     name: Tower
+    region: Upper Works
     description: A round room at the top.
     exits: {D: hall}
   cellar:
@@ -116,6 +118,7 @@ rooms:
     exits: {U: hall}
   gallery:
     name: Gallery
+    region: Upper Works
     description: A gallery with a ticket booth.
     exits: {S: hall}
     features:
@@ -129,6 +132,7 @@ rooms:
           - say: "Under a pile of paper you find a claim ticket."
   study:
     name: Study
+    region: Upper Works
     description: A study with two heavy plates in the floor.
     exits: {W: hall}
     features:
@@ -179,3 +183,21 @@ items:
   anvil-weight: {name: ANVIL WEIGHT, description: A heavy weight., bound: true}
   brass-key: {name: BRASS KEY, description: A brass key.}
   gold: {name: GOLD, description: Gold coin used for currency.}
+puzzles:
+  clocks:
+    title: The Hall Clocks
+    steps:
+      - {flag: seen-hall, line: "The Hall hums, and two clocks tick out of step."}
+    solved: {flag: clocks-solved, line: "Both clocks struck three together."}
+    hints:
+      - "The clocks can be turned."
+      - "Each clock wants to read the same hour."
+      - "Turn each clock until it says 3."
+  echo:
+    title: The Echo
+    steps:
+      - {flag: clocks-solved, line: "The clocks agree and something stirs."}
+    solved: {flag: riddle-solved, line: "You spoke a word and a bookcase swung aside."}
+    hints:
+      - "Something answers if you speak."
+      - "What does a hall give back?"

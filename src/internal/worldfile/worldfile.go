@@ -50,11 +50,12 @@ const (
 
 // File is one content file as written by an author.
 type File struct {
-	StartRoom string          `yaml:"start_room"`
-	Rooms     map[string]Room `yaml:"rooms"`
-	Items     map[string]Item `yaml:"items"`
-	NPCs      map[string]NPC  `yaml:"npcs"`
-	Areas     map[string]Area `yaml:"areas"`
+	StartRoom string            `yaml:"start_room"`
+	Rooms     map[string]Room   `yaml:"rooms"`
+	Items     map[string]Item   `yaml:"items"`
+	NPCs      map[string]NPC    `yaml:"npcs"`
+	Areas     map[string]Area   `yaml:"areas"`
+	Puzzles   map[string]Puzzle `yaml:"puzzles"`
 }
 
 // Area is a set of rooms that copy together when a crowd arrives (see crowd control):
@@ -78,6 +79,8 @@ type Room struct {
 	// Rules are what happens when a player acts on things here; Gates are exits that rules open.
 	Rules []Rule          `yaml:"rules"`
 	Gates map[string]Gate `yaml:"gates"`
+	// Region groups rooms for MAP ("Atrium", "Clockwork Wing"); rooms without one are "Elsewhere".
+	Region string `yaml:"region"`
 }
 
 // Person is a friendly character: not a monster, never fights, never moves. Everything they
@@ -153,6 +156,7 @@ type World struct {
 	Items     map[string]Item
 	NPCs      map[string]NPC
 	Areas     map[string]Area
+	Puzzles   map[string]Puzzle
 	source    map[string]string // "room:lobby" -> file it was defined in
 }
 
@@ -217,7 +221,7 @@ func Load(dir string) (*World, *Result, error) {
 	}
 	sort.Strings(files)
 
-	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, source: map[string]string{}}
+	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, Puzzles: map[string]Puzzle{}, source: map[string]string{}}
 	res := &Result{}
 	for _, path := range files {
 		rel, _ := filepath.Rel(dir, path)
@@ -269,6 +273,14 @@ func (w *World) merge(file string, f *File, res *Result) {
 		}
 		w.Areas[k] = v
 		w.source["area:"+k] = file
+	}
+	for k, v := range f.Puzzles {
+		if prev, dup := w.source["puzzle:"+k]; dup {
+			res.errorf(file, "puzzles."+k, "duplicate puzzle key (also in %s)", prev)
+			continue
+		}
+		w.Puzzles[k] = v
+		w.source["puzzle:"+k] = file
 	}
 	for k, v := range f.NPCs {
 		if prev, dup := w.source["npc:"+k]; dup {

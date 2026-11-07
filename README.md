@@ -31,6 +31,8 @@ and lists the topics (just `TALK` if there is only one person), and `ASK <person
 
 Rooms may also have `rules` and `gates` (puzzles; see plans in the world design): a rule says `on` a verb (TURN, PULL, PUSH, PRESS, RING, LIGHT, OPEN, SEARCH, READ, USE, GIVE, PUT, THROW, SET), a `say`, or `enter`, with optional `if`/`unless` conditions and a list of `do` effects (flags, counters, sequences, gates, items, text, teleport, `run` of a named rule). The first matching rule runs. A `gate` makes an exit hidden or locked until a rule opens it for the player (or for everyone in the room). Progress is stored per player in the `player_state` table and survives restarts; `bound: true` items are puzzle tokens that cannot be dropped or stacked. `mud_server -validate-world` checks that every flag, gate and token is reachable and `-render-world` summarises rules in plain language.
 
+A top-level `puzzles:` block declares what `JOURNAL` and `HINT` show: for each puzzle a `title`, ordered `steps` (a `flag` a rule sets and the journal `line` it earns), a `solved` flag and line, and up to five `hints` from a nudge to nearly the answer (`HINT` gives the next one each time it is asked; asking twice within two seconds repeats the same hint). A room's optional `region` groups it for `MAP`, which names only the rooms the player has been in. The validator checks that every step flag is set by some rule; `-render-world` lists the puzzles.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners
