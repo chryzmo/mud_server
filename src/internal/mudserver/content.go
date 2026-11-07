@@ -50,6 +50,7 @@ type contentResult struct {
 	onboarding  *worldfile.Onboarding // the guided first steps; nil turns them off
 	ambient     map[string]*roomAmbient // by room key (ambient.go)
 	crowd       map[string]roomCrowd    // capacity settings by room key (stage.go); rooms with none are left out
+	mobs        map[string]mobTraits    // what content says about each monster, by race (mobs.go)
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -79,6 +80,10 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	out.codes = w.Codes
 	out.progression = w.ResolvedProgression()
 	out.ambient = buildAmbient(w)
+	out.mobs = map[string]mobTraits{}
+	for _, n := range w.NPCs {
+		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP}
+	}
 	out.crowd = map[string]roomCrowd{}
 	for key, r := range w.Rooms {
 		if r.Capacity > 0 || r.QuietAt > 0 {

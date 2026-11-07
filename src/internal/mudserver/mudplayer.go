@@ -355,6 +355,7 @@ func (mp *MudPlayer) GetIDFromDB(db *muddatabase.MudDatabase) int32 {
 }
 
 func (mp *MudPlayer) Respawn() {
+	mp.NPCTarget = nil // the fight is over; dying costs nothing else
 	mp.Location.RemovePlayer(mp.Username)
 	mp.HP = mp.MaxHP
 	mp.MP = mp.MaxMP

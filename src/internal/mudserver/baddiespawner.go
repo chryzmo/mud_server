@@ -39,7 +39,12 @@ func (spawner *BaddieSpawner) countBaddiesInRoom (baddierace string) (int) {
 
 // tick spawns an NPC if the spawner's interval has passed and the room is
 // below its count. Called by the game loop on each world tick.
-func (spawner *BaddieSpawner) tick (now time.Time) {
+func (spawner *BaddieSpawner) tick (now time.Time, w *World) {
+	if len(spawner.Location.UserMap) == 0 {
+		// Nobody is here to fight it: wait, and count the interval from when someone arrives.
+		spawner.nextSpawnAt = time.Time{}
+		return
+	}
 	if spawner.nextSpawnAt.IsZero() {
 		// The first spawn comes one interval after startup, as with the old ticker.
 		spawner.nextSpawnAt = now.Add(time.Millisecond * time.Duration(spawner.tickDurationMS))
@@ -49,6 +54,9 @@ func (spawner *BaddieSpawner) tick (now time.Time) {
 	}
 	spawner.nextSpawnAt = now.Add(time.Millisecond * time.Duration(spawner.tickDurationMS))
 	{
+		if w != nil && w.mobCap > 0 && w.liveMobs >= w.mobCap {
+			return // the world is full of monsters
+		}
 		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
 			// Spawn another baddie!
 			newbaddie := &BaddieNPC{
@@ -66,14 +74,21 @@ func (spawner *BaddieSpawner) tick (now time.Time) {
 				nextAttackAt: now.Add(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
 				LootGoldMin: spawner.baddie.LootGoldMin,
 				LootGoldMax: spawner.baddie.LootGoldMax,
+				passive: spawner.baddie.passive,
+				xp: spawner.baddie.xp,
 			}
 
 			if newbaddie.Name == "" {
 				newbaddie.Name = newbaddie.GenerateName()
 			}
 
+			newbaddie.Name = spawner.Location.uniqueMobName(newbaddie.Name)
 			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
+			if w != nil {
+				w.liveMobs++
+			}
 			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
+			spawner.Location.roomChanged()
 		}
 	}
 }

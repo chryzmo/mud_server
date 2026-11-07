@@ -184,10 +184,17 @@ func Render(w *World, res *Result) string {
 		b.WriteString("\n")
 	}
 	if len(w.NPCs) > 0 {
-		b.WriteString("## NPCs\n\n| Race | Key | HP | Attack | Defense | Accuracy | Acts every | Gold |\n|---|---|---|---|---|---|---|---|\n")
+		b.WriteString("## NPCs\n\n| Race | Key | HP | Attack | Defense | Accuracy | Acts every | Gold | Fights | XP |\n|---|---|---|---|---|---|---|---|---|---|\n")
 		for _, key := range sortedKeys(w.NPCs) {
 			n := w.NPCs[key]
-			fmt.Fprintf(&b, "| %s | `%s` | %d | %d | %d | %d | %s | %d-%d |\n", cell(n.Race), key, n.HP, n.Attack, n.Defense, n.Accuracy, seconds(n.CombatTickMS), n.LootGoldMin, n.LootGoldMax)
+			fights, xp := "when attacked", "default"
+			if n.Aggressive {
+				fights = "on sight"
+			}
+			if n.XP > 0 {
+				xp = fmt.Sprint(n.XP)
+			}
+			fmt.Fprintf(&b, "| %s | `%s` | %d | %d | %d | %d | %s | %d-%d | %s | %s |\n", cell(n.Race), key, n.HP, n.Attack, n.Defense, n.Accuracy, seconds(n.CombatTickMS), n.LootGoldMin, n.LootGoldMax, fights, xp)
 		}
 		b.WriteString("\n")
 	}

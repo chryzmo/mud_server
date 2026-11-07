@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	muddatabase "mud_server/src/internal/database"
 	mudutils "mud_server/src/internal/mudutils"
 	"mud_server/src/internal/worldfile"
@@ -212,7 +211,7 @@ func (r *Room) KillNPC(npcname string, attackername string) {
 
 		if attacker != nil {
 			i := Item{}
-			gploot_quantity := rand.Int31n(deadNPC.LootGoldMax-deadNPC.LootGoldMin) + deadNPC.LootGoldMin
+			gploot_quantity := lootGold(deadNPC.LootGoldMin, deadNPC.LootGoldMax)
 			msg := fmt.Sprint("You receive ", gploot_quantity, " gold.\n")
 			attacker.SendMessage(msg)
 			attacker.Inventory.AddItemByQuantity(i.FetchFromDB(r.DB, "GOLD"), gploot_quantity)
