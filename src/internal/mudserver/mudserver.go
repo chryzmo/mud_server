@@ -43,6 +43,8 @@ type MudServer struct {
 	codeByHash    map[string]string         // a code's HMAC -> its key
 	codeSecret    string                    // MUD_CODE_SECRET: the HMAC key; without it no code redeems
 	redeemBucket  commandLimiter            // every REDEEM attempt on the server spends from this
+	recent        []talkLine                // the last lines of talk, for report context (report.go); loop only
+	reportMarks   map[string][]reportMark   // who reported whom lately, for the automatic mute; loop only
 	board         atomic.Pointer[board]     // the published leaderboard snapshot (leaderboard.go); nil until the first
 	sched         *scheduler                // scheduled events (scheduler.go); nil without content
 	offLoopWG     sync.WaitGroup            // database writes started by GM commands, away from the loop
@@ -178,6 +180,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	registerChat(server, server.Commands)
 	registerCosmetics(server, server.Commands)
 	registerProgress(server, server.Commands)
+	registerReport(server, server.Commands)
 	server.codeSecret = codeSecretFromEnv()
 	if content != nil {
 		server.codes = content.codes
@@ -400,6 +403,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.SpawnLocation = ms.World.templateRoom(player.savedSpawnID)
 		player.world = ms.World
 		player.stateSink = ms.queueState
+		player.lineSink = ms.noteLine
 		player.lastActive = time.Now()
 		if player.canResume() {
 			player.replaySize = ms.replayFrames()

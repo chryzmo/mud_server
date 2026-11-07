@@ -80,6 +80,9 @@ func (db MudDatabase) EnsureSchema() error {
 		// survives a restart, and an audit trail of every GM command.
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS gm boolean NOT NULL DEFAULT false",
 		"ALTER TABLE player ADD COLUMN IF NOT EXISTS muteduntil timestamptz",
+		// Player reports (REPORT, GM REPORTS): who reported whom, why, and the talk around it.
+		"CREATE TABLE IF NOT EXISTS report (id bigserial PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), reporter text NOT NULL, target text NOT NULL, reason text NOT NULL DEFAULT '', context text NOT NULL DEFAULT '', open boolean NOT NULL DEFAULT true)",
+		"CREATE INDEX IF NOT EXISTS report_open_idx ON report (id) WHERE open",
 		"CREATE TABLE IF NOT EXISTS gm_audit (id bigserial PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), gm text NOT NULL, command text NOT NULL, args text NOT NULL DEFAULT '', result text NOT NULL DEFAULT '')",
 		// Things in a room that can be examined (plans/interactive-world.md); JSON, written by the content loader.
 		"ALTER TABLE room ADD COLUMN IF NOT EXISTS featuresjson text NOT NULL DEFAULT '[]'",

@@ -77,6 +77,8 @@ const gmUsage = `GM commands:
   GM EVENT START|STOP|SKIP <event>   run one now, end it now, or skip its next time
   GM CHAT OFF|ON             switch global chat off for everyone but GMs, or back on
   GM SLOW [seconds]          slow mode: the least gap between one player's global messages (0 or none turns it off)
+  GM REPORTS [number]        list open player reports, or show one with the talk around it
+  GM REPORTS CLOSE <number|ALL>
   GM HIDE|UNHIDE <name>      keep a name off the leaderboard, or put it back (works for anyone who has played)
   GM FLAG [name [on|off]]    show, set or clear a world flag (events and gates read them)
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
@@ -325,6 +327,9 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		gm.SendMessage(map[bool]string{true: "Global chat is off. GM CHAT ON turns it back on.", false: "Global chat is on."}[ms.chat.off])
 		return "chat " + strings.ToLower(args[0])
 
+	case "REPORTS":
+		return ms.gmReports(gm, args)
+
 	case "HIDE", "UNHIDE":
 		if len(args) != 1 {
 			gm.SendMessage("Usage: GM " + verb + " <name>")
@@ -457,8 +462,13 @@ func (ms *MudServer) relocate(p *MudPlayer, dest *Room) { relocatePlayer(p, dest
 // taken here, on the loop, so the trail is in the order things happened even though the
 // inserts run concurrently.
 func (ms *MudServer) audit(gm *MudPlayer, command, args, result string) {
-	fmt.Printf("GM %s: %s %s -> %s\n", gm.Username, command, args, result)
-	name, at := gm.Username, time.Now()
+	ms.auditAs(gm.Username, command, args, result)
+}
+
+// auditAs is audit for an actor that is not a player: "system" for what the server does by itself.
+func (ms *MudServer) auditAs(name, command, args, result string) {
+	fmt.Printf("GM %s: %s %s -> %s\n", name, command, args, result)
+	at := time.Now()
 	ms.offLoop(func() {
 		if _, err := ms.DB.Connection.Exec(ms.DB.Context,
 			`INSERT INTO gm_audit (at, gm, command, args, result) VALUES ($1, $2, $3, $4, $5)`, at, name, command, args, result); err != nil {
