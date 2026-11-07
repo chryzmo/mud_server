@@ -176,13 +176,13 @@ func (s *Session) writeLoop() {
 	for {
 		select {
 		case message := <-s.out:
-			if !s.write(websocket.TextMessage, message, time.Now().Add(s.settings.WriteTimeout)) {
-				s.CloseWith(closeWriteError)
+			if err := s.writeErr(websocket.TextMessage, message, time.Now().Add(s.settings.WriteTimeout)); err != nil {
+				s.failedWrite(err, closeWriteError)
 				return
 			}
 		case <-ping.C:
-			if !s.write(websocket.PingMessage, nil, time.Now().Add(s.settings.WriteTimeout)) {
-				s.CloseWith(closePingError)
+			if err := s.writeErr(websocket.PingMessage, nil, time.Now().Add(s.settings.WriteTimeout)); err != nil {
+				s.failedWrite(err, closePingError)
 				return
 			}
 		case <-s.closed:
@@ -210,6 +210,28 @@ func (s *Session) flush() {
 }
 
 func (s *Session) write(messageType int, data []byte, deadline time.Time) bool {
+	return s.writeErr(messageType, data, deadline) == nil
+}
+
+func (s *Session) writeErr(messageType int, data []byte, deadline time.Time) error {
 	s.conn.SetWriteDeadline(deadline)
-	return s.conn.WriteMessage(messageType, data) == nil
+	return s.conn.WriteMessage(messageType, data)
+}
+
+// closeReplyWait is how long a failed write waits for the reader to say why the client left.
+const closeReplyWait = time.Second
+
+// failedWrite counts a write that failed, as reason. One failure is not a fault of the connection: when
+// the client sent a close frame, the library has already replied (from the reader) and refuses every
+// later write with ErrCloseSent. The client closed; the reader is about to say so, so wait for it
+// rather than count a write error that merely won the race.
+func (s *Session) failedWrite(err error, reason string) {
+	if errors.Is(err, websocket.ErrCloseSent) {
+		select {
+		case <-s.closed:
+			return
+		case <-time.After(closeReplyWait):
+		}
+	}
+	s.CloseWith(reason)
 }
