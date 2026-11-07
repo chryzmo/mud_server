@@ -29,10 +29,16 @@ type gateLink struct {
 	To      *Room
 	Mode    string // "hidden" or "locked"
 	Message string
+	OpenWhen string // a world flag that opens it for everyone while set
 }
 
 // id is how a player's state names this gate: its room's key and its own.
 func (g *gateLink) id(r *Room) string { return r.Key + "/" + g.Key }
+
+// usable reports whether the gate is open for this player: they opened it, or the world flag it waits for is set.
+func (mp *MudPlayer) gateUsable(g *gateLink, r *Room) bool {
+	return mp.gateOpen(g.id(r)) || (g.OpenWhen != "" && mp.world.worldFlags[g.OpenWhen])
+}
 
 // gateFor is the gate in direction dir, if the room has one.
 func (r *Room) gateFor(dir string) *gateLink {
@@ -58,7 +64,7 @@ func (mp *MudPlayer) exitFor(dir string) (room *Room, refused bool) {
 	if g == nil || g.To == nil {
 		return nil, false
 	}
-	if mp.gateOpen(g.id(r)) {
+	if mp.gateUsable(g, r) {
 		return g.To, false
 	}
 	if g.Mode == "locked" {
@@ -76,7 +82,7 @@ func (mp *MudPlayer) usableExits() []string {
 		out = append(out, dir)
 	}
 	for _, g := range r.Gates {
-		if g.To != nil && mp.gateOpen(g.id(r)) {
+		if g.To != nil && mp.gateUsable(g, r) {
 			if _, plain := r.ExitMap[g.Dir]; !plain {
 				out = append(out, g.Dir)
 			}
@@ -91,7 +97,7 @@ func (mp *MudPlayer) sealedExits() []string {
 	r := mp.Location
 	var out []string
 	for _, g := range r.Gates {
-		if g.Mode == "locked" && g.To != nil && !mp.gateOpen(g.id(r)) {
+		if g.Mode == "locked" && g.To != nil && !mp.gateUsable(g, r) {
 			out = append(out, g.Dir)
 		}
 	}
@@ -135,6 +141,8 @@ func (rr *ruleRun) holdsOne(c worldfile.Condition) bool {
 		return !p.flag(c.NotFlag)
 	case c.HasItem != "":
 		return p.hasItemKey(c.HasItem)
+	case c.WorldFlag != "":
+		return p.world.worldFlags[c.WorldFlag]
 	case c.RoomFlag != "":
 		return rr.room.holds[c.RoomFlag].After(time.Now())
 	case len(c.Counter) > 0:

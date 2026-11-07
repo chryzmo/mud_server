@@ -37,6 +37,7 @@ type MudServer struct {
 	kicks         kickList              // GM KICK: characters on a break; has its own lock
 	stateQ        chan stateWrite       // puzzle state changes for the writer (state.go)
 	stateDone     chan struct{}
+	sched         *scheduler // scheduled events (scheduler.go); nil without content
 	offLoopWG     sync.WaitGroup        // database writes started by GM commands, away from the loop
 	events        chan func()
 	World         *World
@@ -166,6 +167,11 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	server.proxies = proxies
 	server.Commands = GenerateCommandList(&server.DB, server.findPlayer)
 	server.Commands["GM"] = server.gmCommand()
+	server.Commands["EVENTS"] = server.eventsCommand()
+	server.World.worldFlags = loadWorldFlags(&server.DB)
+	if content != nil {
+		server.sched = newScheduler(server, content.events, &server.DB)
+	}
 
 	go server.closes.logPeriodically(server.done, 10*time.Second)
 	go server.saver(server.saves, server.saverDone)
@@ -200,6 +206,9 @@ func (ms *MudServer) run() {
 		case now := <-tick.C:
 			runEvent("world tick", func() {
 				ms.World.tick(now)
+				if ms.sched != nil {
+					ms.sched.tick(now)
+				}
 				ms.expireDormant(now)
 				ms.reclaimIdle(now)
 			})

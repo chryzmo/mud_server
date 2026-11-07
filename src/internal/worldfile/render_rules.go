@@ -34,6 +34,8 @@ func describeCondition(c Condition) string {
 		return "flag " + c.Flag
 	case "not_flag":
 		return "not flag " + c.NotFlag
+	case "world_flag":
+		return "world flag " + c.WorldFlag
 	case "has_item":
 		return "has " + c.HasItem
 	case "room_flag":
@@ -131,6 +133,9 @@ func renderRules(b *strings.Builder, w *World, key string) {
 			line := fmt.Sprintf("- `%s`: %s → %s, %s", gk, g.Exit.Dir, dest, g.Mode)
 			if g.Mode == "locked" {
 				line += fmt.Sprintf(" (%q)", strings.Join(strings.Fields(g.Message), " "))
+			}
+			if g.OpenWhen != "" {
+				line += ", open for everyone while world flag `" + g.OpenWhen + "` is set"
 			}
 			b.WriteString(line + "\n")
 		}

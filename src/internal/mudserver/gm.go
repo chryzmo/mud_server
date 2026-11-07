@@ -73,6 +73,9 @@ const gmUsage = `GM commands:
   GM SUMMON <name>           bring a player to you
   GM KICK <name> [minutes]   remove a character for a break (default 10, at most 1440); they cannot return until it ends
   GM ANNOUNCE <text>         tell everyone
+  GM EVENT                   list the scheduled events and where each is
+  GM EVENT START|STOP|SKIP <event>   run one now, end it now, or skip its next time
+  GM FLAG [name [on|off]]    show, set or clear a world flag (events and gates read them)
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
 
 // gmCommand is the GM command. Loop only, like every command.
@@ -292,6 +295,52 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		}
 		gm.SendMessage(fmt.Sprintf("Announced to %d players.", n))
 		return fmt.Sprintf("announced to %d", n)
+
+	case "EVENT":
+		if ms.sched == nil {
+			gm.SendMessage("This world has no scheduled events.")
+			return ""
+		}
+		if len(args) == 0 {
+			gm.SendMessage(ms.sched.gmList(now))
+			return ""
+		}
+		if len(args) != 2 {
+			gm.SendMessage("Usage: GM EVENT [START|STOP|SKIP <event>]")
+			return "usage"
+		}
+		reply := ms.sched.gmControl(strings.ToUpper(args[0]), strings.ToLower(args[1]), now)
+		gm.SendMessage(reply)
+		return strings.ToLower(args[0]) + " " + args[1] + ": " + reply
+
+	case "FLAG":
+		if len(args) == 0 {
+			var set []string
+			for name := range ms.World.worldFlags {
+				set = append(set, name)
+			}
+			sort.Strings(set)
+			if len(set) == 0 {
+				gm.SendMessage("No world flags are set.")
+			} else {
+				gm.SendMessage("World flags set: " + strings.Join(set, ", "))
+			}
+			return ""
+		}
+		name := strings.ToLower(args[0])
+		if len(args) == 1 {
+			gm.SendMessage(fmt.Sprintf("World flag %s is %s.", name, map[bool]string{true: "set", false: "clear"}[ms.World.worldFlags[name]]))
+			return ""
+		}
+		switch strings.ToLower(args[1]) {
+		case "on", "off":
+			on := strings.ToLower(args[1]) == "on"
+			ms.setWorldFlag(name, on)
+			gm.SendMessage(fmt.Sprintf("World flag %s is now %s.", name, map[bool]string{true: "set", false: "clear"}[on]))
+			return "flag " + name + " " + strings.ToLower(args[1])
+		}
+		gm.SendMessage("Usage: GM FLAG [name [on|off]]")
+		return "usage"
 
 	case "LOCK":
 		ms.joinsLocked.Store(true)

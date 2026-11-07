@@ -289,7 +289,7 @@ func (r *Room) FetchFromDB(db *muddatabase.MudDatabase, roomid interface{}) *Roo
 			if room.Gates == nil {
 				room.Gates = map[string]*gateLink{}
 			}
-			room.Gates[key] = &gateLink{Key: key, Dir: g.Exit.Dir, ToKey: g.Exit.To, Mode: g.Mode, Message: g.Message}
+			room.Gates[key] = &gateLink{Key: key, Dir: g.Exit.Dir, ToKey: g.Exit.To, Mode: g.Mode, Message: g.Message, OpenWhen: g.OpenWhen}
 		}
 
 		for iid := range ret.InventoryIDSlice {

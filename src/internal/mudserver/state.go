@@ -185,9 +185,18 @@ func (ms *MudServer) stateWriter() {
 	defer close(ms.stateDone)
 	for w := range ms.stateQ {
 		var err error
-		if w.remove {
+		switch {
+		case w.kind == "world":
+			if w.remove {
+				_, err = ms.DB.Connection.Exec(ms.DB.Context, `DELETE FROM world_flag WHERE key=$1`, w.key)
+			} else {
+				_, err = ms.DB.Connection.Exec(ms.DB.Context, `INSERT INTO world_flag (key) VALUES ($1) ON CONFLICT DO NOTHING`, w.key)
+			}
+		case w.kind == "event":
+			err = ms.writeEvent(w.key, w.value)
+		case w.remove:
 			_, err = ms.DB.Connection.Exec(ms.DB.Context, `DELETE FROM player_state WHERE player_id=$1 AND kind=$2 AND key=$3`, w.playerID, w.kind, w.key)
-		} else {
+		default:
 			_, err = ms.DB.Connection.Exec(ms.DB.Context,
 				`INSERT INTO player_state (player_id, kind, key, value) VALUES ($1, $2, $3, $4)
 				 ON CONFLICT (player_id, kind, key) DO UPDATE SET value = EXCLUDED.value`, w.playerID, w.kind, w.key, w.value)
