@@ -374,7 +374,11 @@ func (mp *MudPlayer) said(words string) {
 // entered runs every rule for arriving in the room whose conditions hold (they set flags so they run once).
 func (mp *MudPlayer) entered() {
 	room := mp.Location
-	if room == nil || len(room.Rules) == 0 {
+	if room == nil {
+		return
+	}
+	mp.visit(room.Key)
+	if len(room.Rules) == 0 {
 		return
 	}
 	for i := range room.Rules {

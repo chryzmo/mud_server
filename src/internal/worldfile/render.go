@@ -53,6 +53,9 @@ func Render(w *World, res *Result) string {
 		if a, ok := areaOf[key]; ok {
 			meta = append(meta, "area "+a)
 		}
+		if r.Region != "" {
+			meta = append(meta, "region "+md(r.Region))
+		}
 		if d, ok := dist[key]; ok {
 			meta = append(meta, stepsText(d))
 		} else {
@@ -156,6 +159,21 @@ func Render(w *World, res *Result) string {
 			fmt.Fprintf(&b, "| %s | `%s` | %d | %d | %d | %d | %s | %d-%d |\n", cell(n.Race), key, n.HP, n.Attack, n.Defense, n.Accuracy, seconds(n.CombatTickMS), n.LootGoldMin, n.LootGoldMax)
 		}
 		b.WriteString("\n")
+	}
+	if len(w.Puzzles) > 0 {
+		b.WriteString("## Puzzles\n\nWhat JOURNAL and HINT show, in order.\n\n")
+		for _, key := range sortedKeys(w.Puzzles) {
+			p := w.Puzzles[key]
+			fmt.Fprintf(&b, "### %s (`%s`)\n\n", md(p.Title), key)
+			for i, s := range p.Steps {
+				fmt.Fprintf(&b, "%d. %s (flag `%s`)\n", i+1, md(s.Line), s.Flag)
+			}
+			fmt.Fprintf(&b, "\n**Solved:** %s (flag `%s`)\n\n", md(p.Solved.Line), p.Solved.Flag)
+			for i, h := range p.Hints {
+				fmt.Fprintf(&b, "- hint %d: %s\n", i+1, md(h))
+			}
+			b.WriteString("\n")
+		}
 	}
 	return b.String()
 }

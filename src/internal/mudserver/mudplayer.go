@@ -49,6 +49,8 @@ type MudPlayer struct {
 	replaySize    int            // ring capacity; 0 means no replay
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	state         *playerState   // puzzle state (state.go); created on first use
+	lastPuzzle string    // the puzzle whose flag was set last (not saved); HINT with no name uses it
+	lastHint   time.Time // when HINT last answered; loop only
 	stateSink     func(stateWrite) // where its changes are queued; set at admission
 	gm            bool           // a game master (a password account with the gm flag; never a guest); see gm.go
 	mutedUntil    time.Time      // SAY and WHISPER are refused until then; loop-owned

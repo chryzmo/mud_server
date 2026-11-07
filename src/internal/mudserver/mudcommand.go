@@ -436,6 +436,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["HELP"] = &c_help
 	cList["?"] = &c_help
 	registerRuleVerbs(cList)
+	registerGuide(cList)
 
 	return cList
 }

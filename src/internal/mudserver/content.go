@@ -43,6 +43,7 @@ var npcBehaviorIDs = map[string]int32{"orc": 1}
 type contentResult struct {
 	startRoomID int32
 	areas       []AreaConfig // by room ID, for crowd control
+	guide       *guide       // the puzzles and regions, for JOURNAL, HINT and MAP
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -67,6 +68,7 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	if err != nil {
 		return nil, fmt.Errorf("applying world content: %w", err)
 	}
+	out.guide = newGuide(w.Puzzles, w.Rooms)
 	log(fmt.Sprintf("World content applied from %s: %d rooms, %d items, %d npcs (%d rows created)", dir, len(w.Rooms), len(w.Items), len(w.NPCs), out.created))
 	return out, nil
 }

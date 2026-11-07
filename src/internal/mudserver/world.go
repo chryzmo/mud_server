@@ -21,6 +21,7 @@ type World struct {
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 
+	guide      *guide           // puzzles and regions the content declares; nil without content
 	roomsByKey map[string]*Room // content rooms by key (the originals)
 	itemsByKey map[string]*Item // content items by key: templates for what rules give
 
@@ -45,10 +46,12 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		RoomMap:          make(map[int32]*Room),
 		BaddieSpawnerMap: make(map[string]*BaddieSpawner),
 		startRoomID:      defaultStartRoomID,
+		guide:            newGuide(nil, nil), // no puzzles or regions without content
 	}
 	if content != nil {
 		w.startRoomID = content.startRoomID
 		crowd.Areas = content.areas
+		w.guide = content.guide
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking

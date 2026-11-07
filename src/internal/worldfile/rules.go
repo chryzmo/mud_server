@@ -571,6 +571,7 @@ func (w *World) validateRules(res *Result) {
 			res.warnf("", "", "flag %q is tested with not_flag (%s) but no rule ever sets it, so the test is always true", name, facts.notRead[name])
 		}
 	}
+	w.validatePuzzles(res, facts.flagsSet)
 	for _, ik := range sortedKeys(w.Items) {
 		if w.Items[ik].Bound && !facts.gives[ik] {
 			res.errorf(w.source["item:"+ik], "items."+ik, "a bound item is a puzzle token, but no rule gives it")
