@@ -39,6 +39,7 @@ const (
 	msgRoom      = "room"
 	msgInventory = "inventory"
 	msgCosmetics = "cosmetics"
+	msgEvents    = "events"
 	msgError     = "error"
 )
 
@@ -199,6 +200,21 @@ type (
 		Badges []string `json:"badges"`
 		Color  string   `json:"color,omitempty"`
 		Badge  string   `json:"badge,omitempty"`
+	}
+	// eventsMsg is the schedule for the banner: what is on now and what is next, as absolute
+	// times (Unix milliseconds) so the client counts down on its own clock. Hidden events are left out.
+	eventsMsg struct {
+		T    string       `json:"t"`
+		Now  []eventOnNow `json:"now"`
+		Next []eventNext  `json:"next"`
+	}
+	eventOnNow struct {
+		Title string `json:"title"`
+		Ends  int64  `json:"ends"`
+	}
+	eventNext struct {
+		Title string `json:"title"`
+		At    int64  `json:"at"`
 	}
 	inventoryMsg struct {
 		T    string `json:"t"`

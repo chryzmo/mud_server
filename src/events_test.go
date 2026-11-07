@@ -222,3 +222,46 @@ func TestGMFlagOpensTheGateAndSurvivesARestart(t *testing.T) {
 	send(t, again, "GM FLAG con-open")
 	expect(t, again, "World flag con-open is clear.")
 }
+
+func TestPlayersAreSentTheScheduleAtLoginAndWhenItChanges(t *testing.T) {
+	wsURL := eventsServer(t)
+	titles := func(frame map[string]any, key string) string {
+		var out []string
+		for _, e := range frame[key].([]any) {
+			out = append(out, e.(map[string]any)["title"].(string))
+		}
+		return strings.Join(out, ",")
+	}
+
+	alice := dial(t, wsURL)
+	expect(t, alice, "Welcome to the MUD!")
+	loginNew(t, alice, "alice")
+	f := expectMessage(t, alice, "events")
+	for i := 0; i < 5 && titles(f, "now") == ""; i++ { // Old News starts on the first tick, which may follow the login
+		f = expectMessage(t, alice, "events")
+	}
+	if titles(f, "now") != "Old News" || titles(f, "next") != "Grand Opening" { // the hidden secret is left out
+		t.Errorf("at login: now %q next %q", titles(f, "now"), titles(f, "next"))
+	}
+	if ends := f["now"].([]any)[0].(map[string]any)["ends"].(float64); ends < float64(time.Now().UnixMilli()) {
+		t.Errorf("Old News should end in the future, ends = %v", ends)
+	}
+	if at := f["next"].([]any)[0].(map[string]any)["at"].(float64); at < float64(time.Now().UnixMilli()) {
+		t.Errorf("Grand Opening should start in the future, at = %v", at)
+	}
+
+	gm := eventGM(t, wsURL, "warden")
+	send(t, gm, "GM EVENT START opening")
+	f = expectMessage(t, alice, "events") // everyone hears it
+	if titles(f, "now") != "Old News,Grand Opening" && titles(f, "now") != "Grand Opening,Old News" {
+		t.Errorf("after START: now %q", titles(f, "now"))
+	}
+	if titles(f, "next") != "" {
+		t.Errorf("after START: next %q", titles(f, "next"))
+	}
+	send(t, gm, "GM EVENT STOP opening")
+	f = expectMessage(t, alice, "events")
+	if titles(f, "now") != "Old News" {
+		t.Errorf("after STOP: now %q", titles(f, "now"))
+	}
+}
