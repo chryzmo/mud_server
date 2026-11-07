@@ -91,6 +91,9 @@ func (db MudDatabase) EnsureSchema() error {
 		"ALTER TABLE room ADD COLUMN IF NOT EXISTS gatesjson text NOT NULL DEFAULT '{}'",
 		"ALTER TABLE item ADD COLUMN IF NOT EXISTS bound boolean NOT NULL DEFAULT false",
 		"CREATE TABLE IF NOT EXISTS player_state (player_id integer NOT NULL, kind text NOT NULL, key text NOT NULL, value text NOT NULL DEFAULT '', PRIMARY KEY (player_id, kind, key))",
+		// World flags set by events or the GM, and where each scheduled event has got to (plans/event-systems.md section 4).
+		"CREATE TABLE IF NOT EXISTS world_flag (key text PRIMARY KEY)",
+		"CREATE TABLE IF NOT EXISTS event_state (event_key text PRIMARY KEY, occurrence integer NOT NULL, phase text NOT NULL, started_at timestamptz, step integer NOT NULL DEFAULT 0)",
 		// Names are unique ignoring case. Last, because it fails if an older
 		// database already holds two names that differ only in case.
 		"CREATE UNIQUE INDEX IF NOT EXISTS player_username_lower_key ON player (lower(username))",

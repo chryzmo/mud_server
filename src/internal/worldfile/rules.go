@@ -52,8 +52,9 @@ type Condition struct {
 	Flag                 string              `yaml:"flag" json:"flag,omitempty"`
 	NotFlag              string              `yaml:"not_flag" json:"not_flag,omitempty"`
 	HasItem              string              `yaml:"has_item" json:"has_item,omitempty"`
-	RoomFlag             string              `yaml:"room_flag" json:"room_flag,omitempty"` // a held key in this room (see hold)
-	Counter              map[string]int      `yaml:"counter" json:"counter,omitempty"`     // every named counter equals the value
+	RoomFlag             string              `yaml:"room_flag" json:"room_flag,omitempty"`   // a held key in this room (see hold)
+	WorldFlag            string              `yaml:"world_flag" json:"world_flag,omitempty"` // set for everyone by an event or the GM
+	Counter              map[string]int      `yaml:"counter" json:"counter,omitempty"`       // every named counter equals the value
 	CounterAtLeast       map[string]int      `yaml:"counter_at_least" json:"counter_at_least,omitempty"`
 	Sequence             map[string][]string `yaml:"sequence" json:"sequence,omitempty"` // the recorded sequence equals the list
 	SequenceLongerThan   map[string]int      `yaml:"sequence_longer_than" json:"sequence_longer_than,omitempty"`
@@ -124,6 +125,8 @@ type Gate struct {
 	Exit    GateExit `yaml:"exit" json:"exit"`
 	Mode    string   `yaml:"mode" json:"mode"`
 	Message string   `yaml:"message" json:"message,omitempty"`
+	// OpenWhen is a world flag (set by an event) that opens this gate for everyone while it is set.
+	OpenWhen string `yaml:"open_when" json:"open_when,omitempty"`
 }
 
 // GateExit is where a gate leads: a direction and a room key.
@@ -164,6 +167,7 @@ func (c Condition) kind() (name string, n int) {
 	add("not_flag", c.NotFlag != "")
 	add("has_item", c.HasItem != "")
 	add("room_flag", c.RoomFlag != "")
+	add("world_flag", c.WorldFlag != "")
 	add("counter", len(c.Counter) > 0)
 	add("counter_at_least", len(c.CounterAtLeast) > 0)
 	add("sequence", len(c.Sequence) > 0)
@@ -203,6 +207,7 @@ func (e Effect) kind() (name string, n int) {
 type ruleFacts struct {
 	flagsSet, flagsCleared map[string]bool
 	flagsRead, notRead     map[string]string // flag -> a path that reads it
+	worldRead              map[string]string // world flag -> a path that reads it
 	counters               map[string]bool   // counters that are added to or set
 	opens                  map[string]bool   // "room/gate" that some rule opens
 	gives                  map[string]bool   // item keys some rule gives
@@ -214,7 +219,7 @@ func contains2(list []string, s string) bool { return contains(list, strings.ToU
 // validateRules checks every room's rules and gates. res gets the problems.
 func (w *World) validateRules(res *Result) {
 	facts := &ruleFacts{
-		flagsSet: map[string]bool{}, flagsCleared: map[string]bool{}, flagsRead: map[string]string{}, notRead: map[string]string{},
+		flagsSet: map[string]bool{}, flagsCleared: map[string]bool{}, flagsRead: map[string]string{}, notRead: map[string]string{}, worldRead: map[string]string{},
 		counters: map[string]bool{}, opens: map[string]bool{}, gives: map[string]bool{}, ran: map[string]bool{},
 	}
 	file := func(key string) string { return w.source["room:"+key] }
@@ -354,6 +359,10 @@ func (w *World) validateRules(res *Result) {
 					case "flag":
 						if _, seen := facts.flagsRead[c.Flag]; !seen {
 							facts.flagsRead[c.Flag] = f + ": " + cp
+						}
+					case "world_flag":
+						if _, seen := facts.worldRead[c.WorldFlag]; !seen {
+							facts.worldRead[c.WorldFlag] = f + ": " + cp
 						}
 					case "not_flag":
 						if _, seen := facts.notRead[c.NotFlag]; !seen {
@@ -541,8 +550,13 @@ func (w *World) validateRules(res *Result) {
 			default:
 				res.errorf(f, gp+".mode", "mode is hidden or locked")
 			}
-			if !facts.opens[rk+"/"+gk] {
-				// opens is complete only after every room is read, so this is checked below
+			if g.OpenWhen != "" {
+				if !keyPattern.MatchString(g.OpenWhen) {
+					res.errorf(f, gp+".open_when", "a world flag name is lower case words joined by dashes")
+				}
+				if _, seen := facts.worldRead[g.OpenWhen]; !seen {
+					facts.worldRead[g.OpenWhen] = f + ": " + gp + ".open_when"
+				}
 			}
 		}
 	}
@@ -551,7 +565,7 @@ func (w *World) validateRules(res *Result) {
 	for _, rk := range sortedKeys(w.Rooms) {
 		f := file(rk)
 		for _, gk := range sortedKeys(w.Rooms[rk].Gates) {
-			if !facts.opens[rk+"/"+gk] {
+			if !facts.opens[rk+"/"+gk] && w.Rooms[rk].Gates[gk].OpenWhen == "" {
 				res.errorf(f, "rooms."+rk+".gates."+gk, "no rule opens this gate, so no one could ever use it")
 			}
 		}
@@ -572,6 +586,13 @@ func (w *World) validateRules(res *Result) {
 		}
 	}
 	w.validatePuzzles(res, facts.flagsSet)
+	w.validateEvents(res)
+	eventFlags := w.eventFlags()
+	for _, name := range sortedKeys(facts.worldRead) {
+		if !eventFlags[name] {
+			res.errorf("", "", "world flag %q is read (%s) but no event sets it", name, facts.worldRead[name])
+		}
+	}
 	for _, ik := range sortedKeys(w.Items) {
 		if w.Items[ik].Bound && !facts.gives[ik] {
 			res.errorf(w.source["item:"+ik], "items."+ik, "a bound item is a puzzle token, but no rule gives it")

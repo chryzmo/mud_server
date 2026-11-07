@@ -175,6 +175,27 @@ func Render(w *World, res *Result) string {
 			b.WriteString("\n")
 		}
 	}
+	if events := w.ResolveEvents(); len(events) > 0 {
+		b.WriteString("## Events\n\nWhat happens on its own, in time order.\n\n")
+		for _, ev := range events {
+			fmt.Fprintf(&b, "### %s (`%s`)\n\nStarts %s", md(ev.Title), ev.Key, ev.Start.Format("Mon 2006-01-02 15:04 MST"))
+			if ev.Count > 1 {
+				fmt.Fprintf(&b, ", %d times, every %s", ev.Count, ev.Every)
+			}
+			fmt.Fprintf(&b, "; runs %s.", ev.Duration)
+			if ev.Hidden {
+				b.WriteString(" Hidden from EVENTS.")
+			}
+			b.WriteString("\n\n")
+			for _, s := range ev.Steps {
+				fmt.Fprintf(&b, "- +%s: %s\n", s.Offset, describeStep(s))
+			}
+			for _, s := range ev.Finish {
+				fmt.Fprintf(&b, "- when it ends: %s\n", describeStep(s))
+			}
+			b.WriteString("\n")
+		}
+	}
 	return b.String()
 }
 
@@ -330,4 +351,16 @@ func RunRender(args []string, stdout, stderr io.Writer) int {
 	}
 	io.WriteString(stdout, Render(w, res))
 	return 0
+}
+
+func describeStep(s ResolvedStep) string {
+	switch s.Kind {
+	case StepAnnounce:
+		return fmt.Sprintf("announce %q", s.Text)
+	case StepRoomSay:
+		return fmt.Sprintf("tell everyone in `%s` %q", s.Room, s.Text)
+	case StepSetFlag:
+		return "set world flag `" + s.Flag + "`"
+	}
+	return "clear world flag `" + s.Flag + "`"
 }

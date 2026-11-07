@@ -33,6 +33,8 @@ Rooms may also have `rules` and `gates` (puzzles; see plans in the world design)
 
 A top-level `puzzles:` block declares what `JOURNAL` and `HINT` show: for each puzzle a `title`, ordered `steps` (a `flag` a rule sets and the journal `line` it earns), a `solved` flag and line, and up to five `hints` from a nudge to nearly the answer (`HINT` gives the next one each time it is asked; asking twice within two seconds repeats the same hint). A room's optional `region` groups it for `MAP`, which names only the rooms the player has been in. The validator checks that every step flag is set by some rule; `-render-world` lists the puzzles.
 
+A top-level `events:` block schedules things that happen on their own: an event has a `title`, an `at` start ("2027-01-07 12:00 America/New_York", a wall-clock time in a named zone), an optional `repeat` (`every: 24h`, `count: 3`), a `duration`, and timed `steps` that announce to everyone, tell a room something, or set or clear a world flag (`finish` steps run when it ends, by the clock or by `GM EVENT STOP`). A rule may test `world_flag`, and a gate with `open_when: <flag>` is open for everyone while that flag is set, so an event can open a door. Progress is saved: after a restart a running event resumes, a step that was due while the server was down still sets its flags but says nothing, and an occurrence whose window passed is skipped and logged, never played late. `EVENTS` tells players what is on and what is next (events marked `hidden: true` are left out). The validator checks times, zones, rooms and limits and that every world flag a rule or gate reads is set by some event; it does not reject a start time in the past, so a content fix during the con cannot stop the server starting.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners
@@ -60,6 +62,8 @@ hidden staff route, planned) and plays as an ordinary character; password accoun
 | `GM SUMMON <name>` | bring a player to the GM's room |
 | `GM ANNOUNCE <text>` | a `[GM] text` line to every player, once encoded |
 | `GM KICK <name> [minutes]` | remove a character from the world for a break (default 10, at most 1440): the client gets `error kicked` and is closed, and resume, recover and login for that name are refused (`auth` code `kicked`) until it ends; the character and its token are kept. A GM cannot be kicked. The break is in memory (a restart ends it) and is by name, so a determined player can rejoin under another name: `GM LOCK` is the answer to that |
+| `GM EVENT [START\|STOP\|SKIP <event>]` | list the scheduled events and where each is (hidden ones too), or run one now, end it now (its `finish` steps run), or skip its next occurrence |
+| `GM FLAG [name [on\|off]]` | show the world flags, or set or clear one (rules and gates read them) |
 | `GM LOCK` / `GM UNLOCK` | refuse or allow new guests (`auth` code `joins_locked`); players already in can reconnect |
 
 Every use is logged and written to the `gm_audit` table (who, what, arguments, result). More commands (flags, events, kick,
