@@ -179,7 +179,8 @@ func (w *World) canAdmit(templateID int32) bool {
 
 // atHardCap reports whether movement into the room is refused.
 func (w *World) atHardCap(room *Room) bool {
-	return w.hardCap > 0 && len(room.UserMap) >= w.hardCap
+	limit := w.capacity(room)
+	return limit > 0 && len(room.UserMap) >= limit
 }
 
 // resolveMove decides where a player moving from one room into dest actually
@@ -227,6 +228,7 @@ func (w *World) cloneArea(area *Area) int {
 			Key:         orig.Key,
 			Rules:       orig.Rules,
 			ambient:     orig.ambient,
+			crowd:       orig.crowd,
 			pristine:    orig.pristine,
 			TemplateID:  tid,
 			clone:       true,

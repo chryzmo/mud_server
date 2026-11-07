@@ -53,6 +53,13 @@ func Render(w *World, res *Result) string {
 		if a, ok := areaOf[key]; ok {
 			meta = append(meta, "area "+a)
 		}
+		if c := r.ResolvedCrowd(); r.Capacity > 0 || r.QuietAt > 0 {
+			note := fmt.Sprintf("holds %d", max(c.Capacity, 1))
+			if c.Capacity == 0 {
+				note = fmt.Sprintf("holds %d", DefaultHardCap)
+			}
+			meta = append(meta, fmt.Sprintf("%s, quiet from %d", note, c.QuietAt))
+		}
 		if r.Region != "" {
 			meta = append(meta, "region "+md(r.Region))
 		}

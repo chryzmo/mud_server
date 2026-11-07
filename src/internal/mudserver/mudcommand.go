@@ -37,6 +37,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				return muddata.MUD_OK
 			}
 
+			if player.quietRefused(time.Now()) {
+				return muddata.MUD_OK
+			}
+
 			if !player.allowSay(time.Now()) {
 				return muddata.MUD_OK
 			}
@@ -452,6 +456,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	registerRuleVerbs(cList)
 	registerGuide(cList)
 	registerTour(cList)
+	registerStage(cList)
 
 	return cList
 }

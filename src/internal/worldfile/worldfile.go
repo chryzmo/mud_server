@@ -89,6 +89,9 @@ type Room struct {
 	// Rules are what happens when a player acts on things here; Gates are exits that rules open.
 	Rules []Rule          `yaml:"rules"`
 	Gates map[string]Gate `yaml:"gates"`
+	// Capacity is the most players the room holds, and QuietAt the audience at which talk is limited (capacity.go).
+	Capacity int `yaml:"capacity"`
+	QuietAt  int `yaml:"quiet_at"`
 	// Region groups rooms for MAP ("Atrium", "Clockwork Wing"); rooms without one are "Elsewhere".
 	Region string `yaml:"region"`
 }
@@ -656,6 +659,7 @@ func (w *World) Validate(res *Result) {
 	w.validateProgression(res)
 	w.validateAmbient(res)
 	w.validateOnboarding(res)
+	w.validateCapacity(res)
 
 	// Rooms a player can never reach from the start are almost always a mistake.
 	if _, ok := w.Rooms[w.StartRoom]; ok {

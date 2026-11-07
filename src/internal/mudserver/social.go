@@ -82,7 +82,7 @@ outer:
 
 // chatterAllowed is the checks every social and emote passes first: not muted, not too fast.
 func (ms *MudServer) chatterAllowed(p *MudPlayer, now time.Time) bool {
-	return !p.refuseIfMuted(now) && p.allowSay(now)
+	return !p.refuseIfMuted(now) && !p.quietRefused(now) && p.allowSay(now)
 }
 
 // pickInRoom finds a player in the actor's room by name or unique prefix (three letters or more).

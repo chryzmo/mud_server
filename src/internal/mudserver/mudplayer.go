@@ -43,6 +43,8 @@ type MudPlayer struct {
 	recoveryHash  string                        // hash of the recovery code; likewise
 	lastCopy      map[*Area]int                 // the copy of each area the player was last in; loop-owned
 	dormant       bool                          // connection dropped, still in the world for a grace period (see resume.go)
+	lastQuiet     time.Time                     // the last line spoken in a quiet room (stage.go)
+	lastStage     time.Time                     // the last STAGE line
 	lastActive    time.Time                     // the last command, admission or resume; see idle.go
 	ring          [][]byte                      // the last counted frames sent, for replay after a resume
 	sent          uint64                        // counted frames sent over the player's lifetime in this process

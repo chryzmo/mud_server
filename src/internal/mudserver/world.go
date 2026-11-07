@@ -84,6 +84,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 	if content != nil {
 		for _, room := range w.roomsByKey {
 			room.ambient = content.ambient[room.Key]
+			room.crowd = content.crowd[room.Key]
 		}
 	}
 	w.configureAreas(crowd)
