@@ -35,6 +35,8 @@ A top-level `puzzles:` block declares what `JOURNAL` and `HINT` show: for each p
 
 A top-level `events:` block schedules things that happen on their own: an event has a `title`, an `at` start ("2027-01-07 12:00 America/New_York", a wall-clock time in a named zone), an optional `repeat` (`every: 24h`, `count: 3`), a `duration`, and timed `steps` that announce to everyone, tell a room something, or set or clear a world flag (`finish` steps run when it ends, by the clock or by `GM EVENT STOP`). A rule may test `world_flag`, and a gate with `open_when: <flag>` is open for everyone while that flag is set, so an event can open a door. Progress is saved: after a restart a running event resumes, a step that was due while the server was down still sets its flags but says nothing, and an occurrence whose window passed is skipped and logged, never played late. `EVENTS` tells players what is on and what is next (events marked `hidden: true` are left out). The validator checks times, zones, rooms and limits and that every world flag a rule or gate reads is set by some event; it does not reject a start time in the past, so a content fix during the con cannot stop the server starting.
 
+Global chat is limited three ways, all under `Chat` in the config: per player (`PerPlayerSeconds` 5 with a `PlayerBurst` of 3), overall (`OverallPerSecond` 30, excess is dropped with a "busy" notice to the sender), and a wait before a new guest may speak (`GuestMinAgeSeconds` 300; -1 for none; password accounts and GMs never wait). Lines are at most `MaxLength` (200) characters. Words on the blocked list (`blocked_words.txt`, the one that screens names) are masked with `*`, not refused; it catches look-alike digits and separators inside a word (`sh1t`, `s_h_i_t`) but not spaced-out letters. Muted players cannot use it.
+
 Set `World.ContentDir` (or `MUD_WORLD_DIR`) and the server validates the directory at startup, refuses to start if
 it has errors, applies it to the database in one transaction, and builds the world from the rooms it defines.
 Rows are matched by a stable key (`contentkey`), so a deploy updates names, descriptions, exits, stats and spawners
@@ -63,6 +65,8 @@ hidden staff route, planned) and plays as an ordinary character; password accoun
 | `GM ANNOUNCE <text>` | a `[GM] text` line to every player, once encoded |
 | `GM KICK <name> [minutes]` | remove a character from the world for a break (default 10, at most 1440): the client gets `error kicked` and is closed, and resume, recover and login for that name are refused (`auth` code `kicked`) until it ends; the character and its token are kept. A GM cannot be kicked. The break is in memory (a restart ends it) and is by name, so a determined player can rejoin under another name: `GM LOCK` is the answer to that |
 | `GM EVENT [START\|STOP\|SKIP <event>]` | list the scheduled events and where each is (hidden ones too), or run one now, end it now (its `finish` steps run), or skip its next occurrence |
+| `GM CHAT OFF\|ON` | switch global chat off for everyone but GMs, or back on (in memory: a restart turns it on) |
+| `GM SLOW [seconds]` | slow mode: the least gap between one player's global messages (0 or no number turns it off; in memory) |
 | `GM FLAG [name [on\|off]]` | show the world flags, or set or clear one (rules and gates read them) |
 | `GM LOCK` / `GM UNLOCK` | refuse or allow new guests (`auth` code `joins_locked`); players already in can reconnect |
 
@@ -106,6 +110,8 @@ type `t`. `src/internal/mudserver/protocol.go` is the source of truth, with exac
 | `error` | `code`, `message`, `retry_ms` | protocol or server problem; codes include `rate_limited` (wait `retry_ms`; without `retry_ms` it is only a slow-down notice), `idle`, `replaced` (another connection took the character over; do not reconnect by itself), `kicked` (a GM removed the character for a break, said before the close; do not reconnect by itself; resume, recover and login are then refused with `auth` code `kicked` until the break ends), `unknown_command`, `restarting`, `internal` |
 | `text` | `text` | prose, with ANSI colour codes the client styles per line |
 | `say`, `arrive`, `leave`, `whisper` | `who`, `text`, `from`, `to`, `out` | room and whisper events; the client words and colours them |
+| `chat` | `who`, `text`, `ch` (`global`), `gm` | a global chat line (`GLOBAL <text>`, short `G`); the sender gets their own line back the same way, so there is no separate echo. Masked words are already `*` |
+| `announce` | `text`, `from` (`gm` or `event`) | a broadcast from `GM ANNOUNCE` or a scheduled event: show a banner and a log line |
 | `room`, `stats`, `inventory` | name, exits, and what is here (`locked` exits, `things` with their `verbs`, `people`, `items`); vitals; listing | state for the UI; sent again when an item moves or a gate opens |
 
 **Frame counting.** Every frame except `hello`, `auth` and `error` is *counted*, by the server as it

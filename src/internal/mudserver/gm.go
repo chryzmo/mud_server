@@ -75,6 +75,8 @@ const gmUsage = `GM commands:
   GM ANNOUNCE <text>         tell everyone
   GM EVENT                   list the scheduled events and where each is
   GM EVENT START|STOP|SKIP <event>   run one now, end it now, or skip its next time
+  GM CHAT OFF|ON             switch global chat off for everyone but GMs, or back on
+  GM SLOW [seconds]          slow mode: the least gap between one player's global messages (0 or none turns it off)
   GM FLAG [name [on|off]]    show, set or clear a world flag (events and gates read them)
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
 
@@ -286,7 +288,7 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 			gm.SendMessage("Usage: GM ANNOUNCE <text>")
 			return "usage"
 		}
-		frame := encodeText("[GM] " + text)
+		frame := encode(announceMsg{T: msgAnnounce, Text: text, From: "gm"})
 		n := 0
 		for _, p := range ms.players {
 			if p.sendFrame(frame) == nil {
@@ -312,6 +314,33 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		reply := ms.sched.gmControl(strings.ToUpper(args[0]), strings.ToLower(args[1]), now)
 		gm.SendMessage(reply)
 		return strings.ToLower(args[0]) + " " + args[1] + ": " + reply
+
+	case "CHAT":
+		if len(args) != 1 || (strings.ToUpper(args[0]) != "OFF" && strings.ToUpper(args[0]) != "ON") {
+			gm.SendMessage("Usage: GM CHAT OFF|ON")
+			return "usage"
+		}
+		ms.chat.off = strings.ToUpper(args[0]) == "OFF"
+		gm.SendMessage(map[bool]string{true: "Global chat is off. GM CHAT ON turns it back on.", false: "Global chat is on."}[ms.chat.off])
+		return "chat " + strings.ToLower(args[0])
+
+	case "SLOW":
+		seconds := 0
+		if len(args) > 0 {
+			n, err := strconv.Atoi(args[0])
+			if err != nil || n < 0 || n > 600 {
+				gm.SendMessage("Usage: GM SLOW [seconds, 0 to 600]")
+				return "usage"
+			}
+			seconds = n
+		}
+		ms.chat.slow = time.Duration(seconds) * time.Second
+		if seconds == 0 {
+			gm.SendMessage("Slow mode is off.")
+		} else {
+			gm.SendMessage(fmt.Sprintf("Slow mode: one global message per player every %d seconds.", seconds))
+		}
+		return fmt.Sprintf("slow %d", seconds)
 
 	case "FLAG":
 		if len(args) == 0 {

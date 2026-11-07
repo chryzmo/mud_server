@@ -353,6 +353,24 @@ func wire(t *testing.T) []transcript {
 		add(r)
 	})
 
+	t.Run("global-chat", func(t *testing.T) {
+		wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) { c.Chat.GuestMinAgeSeconds = -1 })
+		r := newRecorder(t, "global-chat", "Global chat: the sender hears their own line as a chat frame, other players' lines arrive the same way, whichever room they are in.", wsURL)
+		c := r.open()
+		c.hello()
+		c.join("Alice")
+		bob := joinGuest(t, wsURL, "Bob")
+		c.until(func(f map[string]any) bool { return f["t"] == "arrive" && f["who"] == "Bob" })
+		send(t, bob.conn, "MOVE N")
+		c.until(isT("leave"))
+		c.cmd("GLOBAL hello world")
+		c.until(isT("chat"))
+		send(t, bob.conn, "GLOBAL hi from the balcony")
+		c.until(func(f map[string]any) bool { return f["t"] == "chat" && f["who"] == "Bob" })
+		c.left()
+		add(r)
+	})
+
 	t.Run("resume-replays-missed-frames", func(t *testing.T) {
 		wsURL, _ := startTestServerWithConfig(t, graceConfig(5000, 50))
 		r := newRecorder(t, "resume-replays-missed-frames",

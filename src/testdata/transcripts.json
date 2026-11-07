@@ -341,6 +341,109 @@
       ]
     },
     {
+      "scenario": "global-chat",
+      "about": "Global chat: the sender hears their own line as a chat frame, other players' lines arrive the same way, whichever room they are in.",
+      "connections": [
+        {
+          "events": [
+            {
+              "recv": {
+                "message": "Welcome to the MUD!\nJoin with a name to play.\n",
+                "t": "hello"
+              }
+            },
+            {
+              "send": {
+                "name": "Alice",
+                "t": "join"
+              }
+            },
+            {
+              "recv": {
+                "message": "Welcome, Alice!",
+                "ok": true,
+                "recovery": "RECOVERY-1",
+                "t": "auth",
+                "token": "TOKEN-1"
+              }
+            },
+            {
+              "recv": {
+                "t": "text",
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+              }
+            },
+            {
+              "recv": {
+                "exits": [
+                  "N"
+                ],
+                "items": [
+                  {
+                    "name": "KEY",
+                    "qty": 1
+                  }
+                ],
+                "name": "Start Room",
+                "t": "room"
+              }
+            },
+            {
+              "recv": {
+                "atk": 5,
+                "atkbonus": 0,
+                "def": 10,
+                "defbonus": 0,
+                "hp": 20,
+                "maxhp": 20,
+                "maxmp": 10,
+                "mp": 10,
+                "t": "stats"
+              }
+            },
+            {
+              "recv": {
+                "t": "arrive",
+                "who": "Bob"
+              }
+            },
+            {
+              "recv": {
+                "t": "leave",
+                "to": "N",
+                "who": "Bob"
+              }
+            },
+            {
+              "send": {
+                "line": "GLOBAL hello world",
+                "t": "cmd"
+              }
+            },
+            {
+              "recv": {
+                "ch": "global",
+                "t": "chat",
+                "text": "hello world",
+                "who": "Alice"
+              }
+            },
+            {
+              "recv": {
+                "ch": "global",
+                "t": "chat",
+                "text": "hi from the balcony",
+                "who": "Bob"
+              }
+            },
+            {
+              "end": "open"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "scenario": "resume-replays-missed-frames",
       "about": "A dropped client resumes within the grace period and is replayed what it missed; a second drop and resume stays gap-free (the count did not drift).",
       "connections": [

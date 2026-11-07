@@ -185,7 +185,9 @@ func TestGMAnnounceReachesEveryone(t *testing.T) {
 	send(t, far, "MOVE N")
 	expect(t, far, "You are in 'Balcony'")
 	send(t, gm, "GM ANNOUNCE The feast begins at nine!")
-	expect(t, far, "[GM] The feast begins at nine!")
+	if a := expectMessage(t, far, "announce"); a["text"] != "The feast begins at nine!" || a["from"] != "gm" {
+		t.Errorf("announce = %v", a)
+	}
 	expect(t, gm, "Announced to 2 players.")
 	send(t, gm, "GM ANNOUNCE")
 	expect(t, gm, "Usage: GM ANNOUNCE")

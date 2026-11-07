@@ -29,6 +29,8 @@ const (
 	msgHello     = "hello"
 	msgText      = "text"
 	msgSay       = "say"
+	msgChat      = "chat"
+	msgAnnounce  = "announce"
 	msgArrive    = "arrive"
 	msgLeave     = "leave"
 	msgWhisper   = "whisper"
@@ -92,6 +94,20 @@ type (
 	textMsg struct {
 		T    string `json:"t"`
 		Text string `json:"text"`
+	}
+	// chatMsg is a global chat line; GM marks a game master's.
+	chatMsg struct {
+		T    string `json:"t"`
+		Who  string `json:"who"`
+		Text string `json:"text"`
+		Ch   string `json:"ch"`
+		GM   bool   `json:"gm,omitempty"`
+	}
+	// announceMsg is a broadcast from the GM (From "gm") or an event ("event"): the client shows a banner.
+	announceMsg struct {
+		T    string `json:"t"`
+		Text string `json:"text"`
+		From string `json:"from"`
 	}
 	sayMsg struct {
 		T    string `json:"t"`

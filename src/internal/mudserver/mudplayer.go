@@ -50,6 +50,8 @@ type MudPlayer struct {
 	sayLimiter    commandLimiter // loop-owned; created on first SAY
 	state         *playerState   // puzzle state (state.go); created on first use
 	lastPuzzle string    // the puzzle whose flag was set last (not saved); HINT with no name uses it
+	chatLimiter commandLimiter // this player's global chat bucket; created on first use
+	lastChat    time.Time      // when they last spoke on global chat (slow mode)
 	lastHint   time.Time // when HINT last answered; loop only
 	stateSink     func(stateWrite) // where its changes are queued; set at admission
 	gm            bool           // a game master (a password account with the gm flag; never a guest); see gm.go
