@@ -187,17 +187,37 @@ func TestUnresponsiveClientIsDisconnected(t *testing.T) {
 	waitForClose(t, ms, "read_timeout", 1)
 }
 
+// settle waits until the server has finished writing a new player's welcome. passwordPlayer returns
+// at the first look, while stats and the like are still being written; closing then can make the
+// server's write fail first and be counted as a write_error, a real thing a vanishing client does
+// but not what the close-reason tests are about. A reply to a command means the server has gone quiet.
+func settle(t *testing.T, conn *websocket.Conn) {
+	t.Helper()
+	send(t, conn, "STATS")
+	expect(t, conn, "STATUPDATE")
+}
+
 // A client that says goodbye and one whose connection just vanishes are
 // different reasons, and neither is a server-side drop.
 func TestSessionCloseReasonsForClientDisconnects(t *testing.T) {
 	wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
 
 	polite := passwordPlayer(t, wsURL, "polite")
+	settle(t, polite)
 	polite.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
+	// A polite client waits for the server's close in reply before it drops the connection; closing
+	// at once can make the server's reply fail to write and be counted as a write_error instead.
+	polite.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for {
+		if _, _, err := polite.ReadMessage(); err != nil {
+			break
+		}
+	}
 	polite.Close()
 	waitForClose(t, ms, "client_closed", 1)
 
 	vanishing := passwordPlayer(t, wsURL, "vanishing")
+	settle(t, vanishing)
 	vanishing.UnderlyingConn().Close() // no close frame
 	counts := waitForClose(t, ms, "read_error", 1)
 
