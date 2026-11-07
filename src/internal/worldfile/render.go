@@ -103,8 +103,32 @@ func Render(w *World, res *Result) string {
 					t := pe.Topics[tk]
 					fmt.Fprintf(&b, "  - ask about *%s*: %s\n", md(strings.Join(t.Keywords, " / ")), md(strings.Join(strings.Fields(t.Say), " ")))
 				}
+				for _, l := range pe.Idle {
+					fmt.Fprintf(&b, "  - idle: %s\n", md(strings.TrimSpace(l)))
+				}
 				if strings.TrimSpace(pe.Shrug) != "" {
 					fmt.Fprintf(&b, "  - otherwise: %s\n", md(strings.Join(strings.Fields(pe.Shrug), " ")))
+				}
+			}
+			b.WriteString("\n")
+		}
+		if len(r.Ambient) > 0 || len(r.DayNotes) > 0 {
+			b.WriteString("**Ambient:**\n\n")
+			for _, a := range r.Ambient {
+				when := ""
+				if a.When != nil && a.When.TimeOfDay != "" {
+					when = ", only at " + a.When.TimeOfDay
+				}
+				if len(a.Every) == 2 {
+					fmt.Fprintf(&b, "- every %d-%d s%s:\n", a.Every[0], a.Every[1], when)
+				}
+				for _, l := range a.Lines {
+					fmt.Fprintf(&b, "  - %s\n", md(strings.TrimSpace(l)))
+				}
+			}
+			for _, phase := range TimesOfDay {
+				if note := r.DayNotes[phase]; note != "" {
+					fmt.Fprintf(&b, "- LOOK at %s adds: %s\n", phase, md(note))
 				}
 			}
 			b.WriteString("\n")

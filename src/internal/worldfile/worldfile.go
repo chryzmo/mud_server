@@ -80,6 +80,9 @@ type Room struct {
 	Features map[string]Feature `yaml:"features"`
 	// People are friendly characters to TALK to and ASK: key to the person.
 	People map[string]Person `yaml:"people"`
+	// Ambient lines sent to the room while players are in it, and the notes LOOK adds by time of day (ambient.go).
+	Ambient  []Ambient         `yaml:"ambient"`
+	DayNotes map[string]string `yaml:"day_notes"`
 	// Rules are what happens when a player acts on things here; Gates are exits that rules open.
 	Rules []Rule          `yaml:"rules"`
 	Gates map[string]Gate `yaml:"gates"`
@@ -90,11 +93,13 @@ type Room struct {
 // Person is a friendly character: not a monster, never fights, never moves. Everything they
 // say is written here. The first name is what they are called; the rest are aliases.
 type Person struct {
-	Names    []string         `yaml:"names"`
-	Examine  string           `yaml:"examine"`  // what EXAMINE shows
-	Greeting string           `yaml:"greeting"` // what TALK shows first
-	Shrug    string           `yaml:"shrug"`    // the answer to a topic they do not know (optional)
-	Topics   map[string]Topic `yaml:"topics"`
+	Names     []string         `yaml:"names"`
+	Examine   string           `yaml:"examine"`    // what EXAMINE shows
+	Greeting  string           `yaml:"greeting"`   // what TALK shows first
+	Shrug     string           `yaml:"shrug"`      // the answer to a topic they do not know (optional)
+	Idle      []string         `yaml:"idle"`       // lines they murmur to the room while players are there (optional)
+	IdleEvery []int            `yaml:"idle_every"` // [least, most] seconds between them; default [120, 300]
+	Topics    map[string]Topic `yaml:"topics"`
 }
 
 // Topic is something a person can be asked about. Keywords are what a player may type after
@@ -637,6 +642,7 @@ func (w *World) Validate(res *Result) {
 	w.validateRules(res)
 	w.validateCodes(res)
 	w.validateProgression(res)
+	w.validateAmbient(res)
 
 	// Rooms a player can never reach from the start are almost always a mistake.
 	if _, ok := w.Rooms[w.StartRoom]; ok {

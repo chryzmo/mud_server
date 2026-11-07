@@ -226,6 +226,7 @@ func (w *World) cloneArea(area *Area) int {
 			People:      orig.People,
 			Key:         orig.Key,
 			Rules:       orig.Rules,
+			ambient:     orig.ambient,
 			pristine:    orig.pristine,
 			TemplateID:  tid,
 			clone:       true,
