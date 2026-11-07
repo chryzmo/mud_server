@@ -156,6 +156,18 @@ func waitForNPC(t *testing.T, conn *websocket.Conn) string {
 	}
 }
 
+// swing keeps attacking the current target from a second goroutine until done is closed.
+func swing(conn *websocket.Conn, done <-chan struct{}) {
+	for {
+		select {
+		case <-done:
+			return
+		case <-time.After(150 * time.Millisecond):
+			conn.WriteMessage(websocket.TextMessage, wireLine("ATTACK"))
+		}
+	}
+}
+
 func TestCombatPlayerKillsNPC(t *testing.T) {
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
@@ -174,16 +186,7 @@ func TestCombatPlayerKillsNPC(t *testing.T) {
 	swinging := make(chan struct{})
 	defer close(swinging)
 	send(t, conn, "ATTACK "+name)
-	go func() {
-		for {
-			select {
-			case <-swinging:
-				return
-			case <-time.After(150 * time.Millisecond):
-				conn.WriteMessage(websocket.TextMessage, wireLine("ATTACK"))
-			}
-		}
-	}()
+	go swing(conn, swinging)
 	expect(t, conn, "You kill "+name+"!")
 	expect(t, conn, "You receive")
 }

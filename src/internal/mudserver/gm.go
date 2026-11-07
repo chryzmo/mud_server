@@ -77,6 +77,7 @@ const gmUsage = `GM commands:
   GM EVENT START|STOP|SKIP <event>   run one now, end it now, or skip its next time
   GM CHAT OFF|ON             switch global chat off for everyone but GMs, or back on
   GM SLOW [seconds]          slow mode: the least gap between one player's global messages (0 or none turns it off)
+  GM HIDE|UNHIDE <name>      keep a name off the leaderboard, or put it back (works for anyone who has played)
   GM FLAG [name [on|off]]    show, set or clear a world flag (events and gates read them)
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
 
@@ -323,6 +324,14 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		ms.chat.off = strings.ToUpper(args[0]) == "OFF"
 		gm.SendMessage(map[bool]string{true: "Global chat is off. GM CHAT ON turns it back on.", false: "Global chat is on."}[ms.chat.off])
 		return "chat " + strings.ToLower(args[0])
+
+	case "HIDE", "UNHIDE":
+		if len(args) != 1 {
+			gm.SendMessage("Usage: GM " + verb + " <name>")
+			return "usage"
+		}
+		ms.setBoardHidden(gm, args[0], verb == "HIDE")
+		return strings.ToLower(verb) + " " + args[0]
 
 	case "SLOW":
 		seconds := 0

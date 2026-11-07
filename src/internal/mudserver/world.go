@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
+	"mud_server/src/internal/worldfile"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,10 +22,11 @@ type World struct {
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 
-	worldFlags map[string]bool  // set for everyone by events or the GM (scheduler.go); loop only
-	guide      *guide           // puzzles and regions the content declares; nil without content
-	roomsByKey map[string]*Room // content rooms by key (the originals)
-	itemsByKey map[string]*Item // content items by key: templates for what rules give
+	worldFlags map[string]bool       // set for everyone by events or the GM (scheduler.go); loop only
+	prog       worldfile.Progression // XP and level tuning; set when the world is built and never changed
+	guide      *guide                // puzzles and regions the content declares; nil without content
+	roomsByKey map[string]*Room      // content rooms by key (the originals)
+	itemsByKey map[string]*Item      // content items by key: templates for what rules give
 
 	// Where new players start, and where a saved location that no longer exists falls
 	// back to. Set when the world is built and never changed, so connection readers may read it.
@@ -33,8 +35,8 @@ type World struct {
 	// Area copies; see crowd.go. Loop only.
 	areas      map[int32]*Area // template room ID -> its area
 	nextRoomID int32           // next ID for a cloned room
-	softCap    int // placement fills a copy of a room up to this
-	hardCap    int // movement into a room is refused at this; 0 means no limit
+	softCap    int             // placement fills a copy of a room up to this
+	hardCap    int             // movement into a room is refused at this; 0 means no limit
 	maxCopies  int
 }
 
@@ -49,11 +51,13 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		startRoomID:      defaultStartRoomID,
 		worldFlags:       map[string]bool{},
 		guide:            newGuide(nil, nil), // no puzzles or regions without content
+		prog:             worldfile.DefaultProgression(),
 	}
 	if content != nil {
 		w.startRoomID = content.startRoomID
 		crowd.Areas = content.areas
 		w.guide = content.guide
+		w.prog = content.progression
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking

@@ -105,3 +105,43 @@ codes:
 		t.Error("the overview shows a code hash")
 	}
 }
+
+func TestProgressionKeepsDefaultsForWhatIsLeftOut(t *testing.T) {
+	w, res, err := ValidateDir(write(t, map[string]string{"w.yaml": `
+start_room: a
+rooms: {a: {name: A, description: d}}
+progression:
+  xp: {kill: 0, room: 20}
+`}))
+	if err != nil || len(res.Errors) != 0 {
+		t.Fatalf("err %v %v", err, res.Errors)
+	}
+	p := w.ResolvedProgression()
+	d := DefaultProgression()
+	if p.XP.Kill != 0 || p.XP.Room != 20 || p.XP.Feature != d.XP.Feature || len(p.Levels) != len(d.Levels) || p.PerLevel.MaxHP != d.PerLevel.MaxHP {
+		t.Errorf("progression = %+v", p)
+	}
+	if got := (&World{}).ResolvedProgression(); got.XP.Room != d.XP.Room {
+		t.Errorf("no block should mean defaults, got %+v", got)
+	}
+}
+
+func TestProgressionProblems(t *testing.T) {
+	_, res, _ := ValidateDir(write(t, map[string]string{"w.yaml": `
+start_room: a
+rooms: {a: {name: A, description: d}}
+progression:
+  levels: [5, 5, 4]
+  per_level: {max_hp: -1}
+  xp: {room: 5000}
+`}))
+	var all string
+	for _, p := range res.Errors {
+		all += p.String() + "\n"
+	}
+	for _, want := range []string{"levels[0]", "levels[1]: must be more", "levels[2]", "per_level.max_hp", "xp.room"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing %q in:\n%s", want, all)
+		}
+	}
+}
