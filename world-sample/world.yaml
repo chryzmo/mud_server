@@ -9,6 +9,9 @@ rooms:
     description: You find yourself in a generic looking room.  There is a door to the North.
     exits: {N: balcony}
     items: {key: 1}
+    # Ambient lines reach a room only while players are in it. day_notes (a line per time of day that LOOK adds) work the same way.
+    ambient:
+      - {every: [600, 900], lines: ["Dust turns slowly in a shaft of light.", "Somewhere a door creaks."]}
     features:
       sign:
         names: [wooden sign, sign, notice]

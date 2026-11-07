@@ -22,11 +22,13 @@ type World struct {
 	Spawners         []*BaddieSpawner // every spawner; BaddieSpawnerMap keeps one per race
 	NPCTurnActionMap map[int32]NPCCommand
 
-	worldFlags map[string]bool       // set for everyone by events or the GM (scheduler.go); loop only
-	prog       worldfile.Progression // XP and level tuning; set when the world is built and never changed
-	guide      *guide                // puzzles and regions the content declares; nil without content
-	roomsByKey map[string]*Room      // content rooms by key (the originals)
-	itemsByKey map[string]*Item      // content items by key: templates for what rules give
+	worldFlags    map[string]bool                          // set for everyone by events or the GM (scheduler.go); loop only
+	ambientBudget commandLimiter                           // every ambient line spends from this (ambient.go); loop only
+	ambientGap    func(lo, hi time.Duration) time.Duration // nil: random; tests fix it
+	prog          worldfile.Progression                    // XP and level tuning; set when the world is built and never changed
+	guide         *guide                                   // puzzles and regions the content declares; nil without content
+	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
+	itemsByKey    map[string]*Item                         // content items by key: templates for what rules give
 
 	// Where new players start, and where a saved location that no longer exists falls
 	// back to. Set when the world is built and never changed, so connection readers may read it.
@@ -77,6 +79,11 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 	}
 
 	w.indexContent(db)
+	if content != nil {
+		for _, room := range w.roomsByKey {
+			room.ambient = content.ambient[room.Key]
+		}
+	}
 	w.configureAreas(crowd)
 
 	return w
@@ -121,6 +128,7 @@ func (w *World) indexContent(db *muddatabase.MudDatabase) {
 func (w *World) tick(now time.Time) {
 	for _, room := range w.RoomMap {
 		room.tick(now)
+		w.ambientTick(room, now)
 	}
 	for _, spawner := range w.Spawners {
 		spawner.tick(now)

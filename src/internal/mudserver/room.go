@@ -19,22 +19,24 @@ import (
 // A Room is owned by the game loop: only the loop reads or changes it, so it
 // needs no locks. NPCs act when the loop calls tick on each world tick.
 type Room struct {
-	ID          int32
-	DB          *muddatabase.MudDatabase
-	Name        string
-	Description string
-	ExitMap     map[string]*Room
-	UserMap     map[string]*MudPlayer
-	BaddieMap   map[string]*BaddieNPC
-	Inventory   *Inventory
-	ExitJSON    string
-	Features    []Feature // scenery to EXAMINE (examine.go); shared by a room's copies
-	People      []Person  // friendly characters (people.go); shared by a room's copies
-	Key         string    // the content key ("" for a room that is not from content); a copy has its template's
-	Rules       []worldfile.Rule // what happens when players act here (rules.go); shared by copies
-	Gates       map[string]*gateLink // exits that need opening; each copy has its own links
-	holds       map[string]time.Time // keys held here for a while (pressure plates); per copy, loop-owned
-	dirty       bool // contents changed since the last save; see persist.go
+	ID           int32
+	DB           *muddatabase.MudDatabase
+	Name         string
+	Description  string
+	ExitMap      map[string]*Room
+	UserMap      map[string]*MudPlayer
+	BaddieMap    map[string]*BaddieNPC
+	Inventory    *Inventory
+	ExitJSON     string
+	Features     []Feature            // scenery to EXAMINE (examine.go); shared by a room's copies
+	People       []Person             // friendly characters (people.go); shared by a room's copies
+	Key          string               // the content key ("" for a room that is not from content); a copy has its template's
+	Rules        []worldfile.Rule     // what happens when players act here (rules.go); shared by copies
+	Gates        map[string]*gateLink // exits that need opening; each copy has its own links
+	ambient      *roomAmbient         // ambient lines and day notes from content (ambient.go); shared by copies
+	ambientState *ambientState        // when each ambient entry is next due; per copy, nil while the room is empty
+	holds        map[string]time.Time // keys held here for a while (pressure plates); per copy, loop-owned
+	dirty        bool                 // contents changed since the last save; see persist.go
 
 	// Copies of a room (see crowd.go). A clone has no database row: it is never
 	// saved, and players' saved locations name its template instead.
@@ -116,6 +118,10 @@ func (r *Room) lookDescription(viewer *MudPlayer) string {
 	desc.WriteString("'\n")
 	desc.WriteString(r.Description)
 	desc.WriteByte('\n')
+	if note := r.dayNote(time.Now()); note != "" {
+		desc.WriteString(note)
+		desc.WriteByte('\n')
+	}
 
 	if listed := r.listedFeatures(); len(listed) > 0 {
 		desc.WriteString("\nYou notice: ")
