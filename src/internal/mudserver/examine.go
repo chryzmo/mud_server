@@ -44,6 +44,7 @@ type examineTarget struct {
 	names   []string
 	text    string
 	key     string // the content key of a feature, person or item (rules act on keys); "" for others
+	feature bool   // a room feature: examining one for the first time earns exploration XP
 }
 
 const minPrefix = 3
@@ -123,7 +124,7 @@ func (mp *MudPlayer) examineTargets(packOnly bool) []examineTarget {
 		room := mp.Location
 		for _, f := range room.Features {
 			if len(f.Names) > 0 {
-				out = append(out, examineTarget{display: f.Names[0], names: f.Names, text: mp.fill(f.Examine), key: f.Key})
+				out = append(out, examineTarget{display: f.Names[0], names: f.Names, text: mp.fill(f.Examine), key: f.Key, feature: true})
 			}
 		}
 		for _, pe := range room.People {
@@ -177,6 +178,9 @@ func (mp *MudPlayer) examine(arguments string) {
 	switch {
 	case hit != nil:
 		mp.SendMessage(hit.text)
+		if hit.feature && mp.Location != nil {
+			mp.discoverFeature(mp.Location.Key, hit.key)
+		}
 	case len(several) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")
 	case packOnly:

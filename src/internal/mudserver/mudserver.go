@@ -43,6 +43,7 @@ type MudServer struct {
 	codeByHash    map[string]string         // a code's HMAC -> its key
 	codeSecret    string                    // MUD_CODE_SECRET: the HMAC key; without it no code redeems
 	redeemBucket  commandLimiter            // every REDEEM attempt on the server spends from this
+	board         atomic.Pointer[board]     // the published leaderboard snapshot (leaderboard.go); nil until the first
 	sched         *scheduler                // scheduled events (scheduler.go); nil without content
 	offLoopWG     sync.WaitGroup            // database writes started by GM commands, away from the loop
 	events        chan func()
@@ -176,6 +177,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	server.Commands["EVENTS"] = server.eventsCommand()
 	registerChat(server, server.Commands)
 	registerCosmetics(server, server.Commands)
+	registerProgress(server, server.Commands)
 	server.codeSecret = codeSecretFromEnv()
 	if content != nil {
 		server.codes = content.codes
@@ -189,6 +191,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	go server.closes.logPeriodically(server.done, 10*time.Second)
 	go server.saver(server.saves, server.saverDone)
 	go server.stateWriter()
+	go server.boardLoop(boardInterval)
 	go server.run()
 
 	return server, nil
@@ -413,6 +416,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.Location.BroadcastFrame(encodeArrive(player, ""), player.Username)
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
+		player.applyLevels(false) // repairs a crash between the XP write and the stat save
 		player.SendStatUpdate()
 		player.sendCosmeticsIfAny()
 		player.entered()

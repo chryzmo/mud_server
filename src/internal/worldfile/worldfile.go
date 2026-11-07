@@ -58,6 +58,8 @@ type File struct {
 	Puzzles   map[string]Puzzle `yaml:"puzzles"`
 	Events    map[string]Event  `yaml:"events"`
 	Codes     map[string]Code   `yaml:"codes"`
+	// Progression tunes XP and levels; at most one file may set it.
+	Progression *Progression `yaml:"progression"`
 }
 
 // Area is a set of rooms that copy together when a crowd arrives (see crowd control):
@@ -153,15 +155,16 @@ type NPC struct {
 
 // World is every file merged, with where each key came from.
 type World struct {
-	StartRoom string
-	Rooms     map[string]Room
-	Items     map[string]Item
-	NPCs      map[string]NPC
-	Areas     map[string]Area
-	Puzzles   map[string]Puzzle
-	Events    map[string]Event
-	Codes     map[string]Code
-	source    map[string]string // "room:lobby" -> file it was defined in
+	StartRoom   string
+	Rooms       map[string]Room
+	Items       map[string]Item
+	NPCs        map[string]NPC
+	Areas       map[string]Area
+	Puzzles     map[string]Puzzle
+	Events      map[string]Event
+	Codes       map[string]Code
+	Progression *Progression
+	source      map[string]string // "room:lobby" -> file it was defined in
 }
 
 // Problem is one thing wrong with the content.
@@ -293,6 +296,14 @@ func (w *World) merge(file string, f *File, res *Result) {
 		}
 		w.Events[k] = v
 		w.source["event:"+k] = file
+	}
+	if f.Progression != nil {
+		if prev, dup := w.source["progression"]; dup {
+			res.errorf(file, "progression", "progression is already set in %s", prev)
+		} else {
+			w.Progression = f.Progression
+			w.source["progression"] = file
+		}
 	}
 	for k, v := range f.Codes {
 		if prev, dup := w.source["code:"+k]; dup {
@@ -625,6 +636,7 @@ func (w *World) Validate(res *Result) {
 
 	w.validateRules(res)
 	w.validateCodes(res)
+	w.validateProgression(res)
 
 	// Rooms a player can never reach from the start are almost always a mistake.
 	if _, ok := w.Rooms[w.StartRoom]; ok {

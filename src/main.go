@@ -40,6 +40,7 @@ func main() {
 	serverinstance := mudserver.CreateMudServer()
 
 	http.HandleFunc("/", homePage)
+	http.HandleFunc("/api/leaderboard", serverinstance.LeaderboardHandler)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) { handleConnections(serverinstance, w, r) })
 
 	// CreateMudServer has started the game loop.

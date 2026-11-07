@@ -197,6 +197,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(effAtk)+" points of damage!", player.Username)
 					if player.NPCTarget.HP <= 0 {
 						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
+						player.killedMonster()
 						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
 						player.NPCTarget = nil
 						player.dirty = true // saved in the next batch (persist.go)
