@@ -53,6 +53,8 @@ type MudPlayer struct {
 	chatLimiter   commandLimiter                // this player's global chat bucket; created on first use
 	lastChat      time.Time                     // when they last spoke on global chat (slow mode)
 	redeem        redeemGuard                   // wrong sticker codes; loop only (cosmetics.go)
+	mod           modState                      // automatic moderation record (moderation.go); loop only
+	server        *MudServer                    // set at admission, for the checks a command makes (moderation.go)
 	reports       []time.Time                   // when this player last sent REPORTs (report.go); loop only
 	lineSink      func(where, who, text string) // remembers talk for report context; set at admission
 	lastHint      time.Time                     // when HINT last answered; loop only
@@ -117,6 +119,9 @@ func (mp *MudPlayer) allowSay(now time.Time) bool {
 		mp.sayLimiter = newSayLimiter(mp.Session.settings, now)
 	}
 	allowed, notify := mp.sayLimiter.allow(now)
+	if !allowed && mp.server != nil {
+		mp.server.noteRefused(mp, now)
+	}
 	if notify {
 		mp.SendError(codeRateLimited, "You are talking too fast.")
 	}

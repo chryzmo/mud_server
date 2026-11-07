@@ -41,6 +41,10 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				return muddata.MUD_OK
 			}
 
+			if player.server != nil && player.server.checkRepeat(player, msg, time.Now()) {
+				return muddata.MUD_OK
+			}
+
 			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 

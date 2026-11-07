@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -582,7 +583,7 @@ func (b *stormBot) actions(ctx context.Context) {
 		b.mu.Unlock()
 		if online && conn != nil {
 			conn.SetWriteDeadline(time.Now().Add(b.cfg.Timeout))
-			if conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": lines[sequence%len(lines)]})) == nil {
+			if conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": stormLine(lines[sequence%len(lines)], sequence)})) == nil {
 				b.report.actions.Add(1)
 			}
 		}
@@ -601,4 +602,12 @@ func frameAny(t string, fields map[string]any) []byte {
 		panic(err)
 	}
 	return out
+}
+
+// stormLine makes a SAY unique by its sequence number: the server mutes a message repeated four times a minute.
+func stormLine(line string, sequence int) string {
+	if strings.HasPrefix(line, "SAY ") {
+		return fmt.Sprintf("%s %d", line, sequence)
+	}
+	return line
 }
