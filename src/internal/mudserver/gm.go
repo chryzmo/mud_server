@@ -71,6 +71,8 @@ const gmUsage = `GM commands:
   GM TELEPORT <name>         go to a player
   GM TELEPORT ROOM <text>    go to the room whose name starts with text
   GM SUMMON <name>           bring a player to you
+  GM STAGE <name> ON|OFF     give or take the stage voice (STAGE <text> reaches the whole room)
+  GM RAFFLE [ALL]            draw a guest from your room, or from everyone online
   GM KICK <name> [minutes]   remove a character for a break (default 10, at most 1440); they cannot return until it ends
   GM ANNOUNCE <text>         tell everyone
   GM EVENT                   list the scheduled events and where each is
@@ -386,6 +388,12 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		}
 		gm.SendMessage("Usage: GM FLAG [name [on|off]]")
 		return "usage"
+
+	case "STAGE":
+		return ms.gmStage(gm, args)
+
+	case "RAFFLE":
+		return ms.gmRaffle(gm, args)
 
 	case "LOCK":
 		ms.joinsLocked.Store(true)

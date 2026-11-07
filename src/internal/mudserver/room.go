@@ -35,6 +35,7 @@ type Room struct {
 	Gates        map[string]*gateLink // exits that need opening; each copy has its own links
 	ambient      *roomAmbient         // ambient lines and day notes from content (ambient.go); shared by copies
 	ambientState *ambientState        // when each ambient entry is next due; per copy, nil while the room is empty
+	crowd        roomCrowd            // capacity and quiet threshold from content (stage.go); shared by copies
 	holds        map[string]time.Time // keys held here for a while (pressure plates); per copy, loop-owned
 	dirty        bool                 // contents changed since the last save; see persist.go
 
