@@ -13,7 +13,7 @@ import (
 
 // paddedCmd is an unknown-command message of exactly size bytes.
 func paddedCmd(size int) string {
-	prefix, suffix := `{"t":"cmd","line":"DANCE `, `"}`
+	prefix, suffix := `{"t":"cmd","line":"FROBNICATE `, `"}`
 	return prefix + strings.Repeat("x", size-len(prefix)-len(suffix)) + suffix
 }
 

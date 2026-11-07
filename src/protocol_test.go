@@ -219,7 +219,7 @@ func TestInventoryAndErrorTypes(t *testing.T) {
 	if data := expectMessage(t, conn, "inventory"); !strings.Contains(data["text"].(string), "Your inventory is empty.") {
 		t.Errorf("inventory = %v", data)
 	}
-	send(t, conn, "DANCE")
+	send(t, conn, "FROBNICATE")
 	if data := expectMessage(t, conn, "error"); data["code"] != "unknown_command" {
 		t.Errorf("unknown command = %v", data)
 	}
