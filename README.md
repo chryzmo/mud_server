@@ -222,6 +222,10 @@ Record server RSS/CPU separately from the generator, report workload and world o
 and retain failed measurements too. The 5,000-player target remains unproven until sustained
 through the full stack; the current small world can expose known room fan-out bottlenecks.
 
+### Phase 4 crowd runs
+
+`scripts/load-crowd.sh [COUNT] [spread|feast] [SECONDS] [INTERVAL]` is a local run of the features added for the con: a server pinned to two CPUs plays a generic load world (`mudbot world` writes it: a cloneable Lobby and Garden, and a Feast Hall with capacity 200, a person, a lamp, ambient lines and a Feast event) while guests use the verb mix (`mudbot storm -mix verbs`: LOOK, EXAMINE, TALK, EMOTE, a social, WHO, SAY and a walk). `spread` lets guests wander over copies of the Lobby; `feast` (`-stay`) sends them all to the hall, which fills to its capacity and turns the rest back. One extra guest asks for STATS once a second and the report gives its p50/p95/p99/max, which is how long a command waits behind the crowd. The report also counts frames and bytes received, announcements, `events` frames, moves refused because a room was full and lines refused because it was quiet. It uses the dedicated local `mud_load` database and loopback only, and keeps the server log and report in the directory it prints.
+
 ## Deploying
 
 Production is a DigitalOcean Droplet (Fedora) running the game server, Postgres and Caddy as

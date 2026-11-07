@@ -46,6 +46,8 @@ type StormConfig struct {
 	Timeout     time.Duration // per dial and handshake
 	JoinTimeout time.Duration // whole admission phase
 	AllowRemote bool
+	Mix         string // what the bots do: "light" (SAY and a move, the default) or "verbs" (the full Phase 4 mix, see verbLines)
+	Stay        bool   // with the verbs mix, walk to the east room once and stay there, so a crowd forms in one room
 }
 
 func (c StormConfig) validate() error {
@@ -61,6 +63,12 @@ func (c StormConfig) validate() error {
 	}
 	if !validPrefix.MatchString(c.Prefix) || len(c.Prefix)+5 > 16 {
 		return errors.New("prefix must be alphanumeric/underscore and at most 11 characters, so names fit the 16-character limit")
+	}
+	if c.Mix != "" && c.Mix != "light" && c.Mix != "verbs" {
+		return errors.New(`mix must be "light" or "verbs"`)
+	}
+	if c.Stay && c.Mix != "verbs" {
+		return errors.New("stay needs the verbs mix")
 	}
 	if c.Interval < 250*time.Millisecond || c.Before < 0 || c.Between < 0 || c.Cycles < 0 || c.Cycles > 20 {
 		return errors.New("interval must be >=250ms, durations non-negative, cycles 0..20")
@@ -131,6 +139,21 @@ type StormReport struct {
 	UnplannedDrops  int           `json:"unplanned_drops"`
 	JoinRateLimited int           `json:"join_rate_limited_replies"` // refused by the server's join limit while joining; the bots waited and retried
 	FirstErrors     []string      `json:"first_errors,omitempty"`
+
+	// What the bots received over the whole run, to compare against the server's own counters.
+	FramesReceived int64 `json:"frames_received"`
+	BytesReceived  int64 `json:"bytes_received"`
+	Announces      int64 `json:"announce_frames"`
+	EventsFrames   int64 `json:"events_frames"`
+	TurnedBack     int64 `json:"moves_refused_room_full"`
+	QuietLimited   int64 `json:"lines_refused_quiet_room"`
+
+	// One extra guest asks for STATS once a second and times the reply: how long a command waits behind the crowd.
+	ProbeSamples int   `json:"probe_samples"`
+	ProbeP50MS   int64 `json:"probe_p50_ms"`
+	ProbeP95MS   int64 `json:"probe_p95_ms"`
+	ProbeP99MS   int64 `json:"probe_p99_ms"`
+	ProbeMaxMS   int64 `json:"probe_max_ms"`
 }
 
 type stormBot struct {
@@ -152,14 +175,20 @@ type stormBot struct {
 }
 
 type stormRun struct {
-	cfg       StormConfig
-	unplanned *StormCycle
-	active    atomic.Int64
-	actions   atomic.Int64
-	drops     atomic.Int64
-	limited   atomic.Int64 // rate_limited replies seen while joining
-	errMu     sync.Mutex
-	errs      []string
+	cfg        StormConfig
+	unplanned  *StormCycle
+	active     atomic.Int64
+	actions    atomic.Int64
+	drops      atomic.Int64
+	limited    atomic.Int64 // rate_limited replies seen while joining
+	frames     atomic.Int64 // every frame the bots read
+	bytes      atomic.Int64
+	announces  atomic.Int64
+	events     atomic.Int64
+	turnedBack atomic.Int64 // moves refused because the room was at capacity
+	quieted    atomic.Int64 // lines refused because the room was quiet
+	errMu      sync.Mutex
+	errs       []string
 }
 
 func (r *stormRun) fail(format string, args ...any) {
@@ -229,6 +258,11 @@ feed:
 
 	// Play.
 	var wg sync.WaitGroup
+	var probeLatencies []int64
+	if cfg.Mix == "verbs" {
+		wg.Add(1)
+		go func() { defer wg.Done(); probeLatencies = run.probe(runCtx) }()
+	}
 	for _, b := range bots {
 		if b == nil {
 			continue
@@ -270,6 +304,9 @@ feed:
 
 	report.ActiveAtEnd = run.active.Load()
 	report.ActionsSent = run.actions.Load()
+	report.FramesReceived, report.BytesReceived = run.frames.Load(), run.bytes.Load()
+	report.Announces, report.EventsFrames = run.announces.Load(), run.events.Load()
+	report.TurnedBack, report.QuietLimited = run.turnedBack.Load(), run.quieted.Load()
 	stop()
 	for _, b := range bots {
 		if b != nil {
@@ -277,6 +314,12 @@ feed:
 		}
 	}
 	wg.Wait()
+	report.ProbeSamples = len(probeLatencies)
+	if len(probeLatencies) > 0 {
+		sort.Slice(probeLatencies, func(i, j int) bool { return probeLatencies[i] < probeLatencies[j] })
+		at := func(p int) int64 { return probeLatencies[min(len(probeLatencies)-1, (len(probeLatencies)*p+99)/100-1)] }
+		report.ProbeP50MS, report.ProbeP95MS, report.ProbeP99MS, report.ProbeMaxMS = at(50), at(95), at(99), at(100)
+	}
 	run.unplanned.Dropped = int(run.drops.Load())
 	run.unplanned.finish()
 	report.UnplannedDrops = int(run.drops.Load())
@@ -389,7 +432,25 @@ func (b *stormBot) read(conn *websocket.Conn, done chan struct{}) {
 		if err != nil {
 			break
 		}
-		if counted(parseFrame(raw).T) {
+		parsed := parseFrame(raw)
+		typ := parsed.T
+		if typ == "text" {
+			switch {
+			case strings.Contains(parsed.Text, "too crowded to go that way"):
+				b.report.turnedBack.Add(1)
+			case strings.Contains(parsed.Text, "too crowded to talk over"):
+				b.report.quieted.Add(1)
+			}
+		}
+		b.report.frames.Add(1)
+		b.report.bytes.Add(int64(len(raw)))
+		switch typ {
+		case "announce":
+			b.report.announces.Add(1)
+		case "events":
+			b.report.events.Add(1)
+		}
+		if counted(typ) {
 			b.frames++ // one reader at a time owns the count; attach/resume hand it over
 		}
 	}
@@ -570,6 +631,10 @@ func (b *stormBot) resumeOnce(ctx context.Context, cycle *StormCycle, cutAt time
 // between the start room and the balcony.
 func (b *stormBot) actions(ctx context.Context) {
 	lines := []string{"SAY storm", "MOVE N", "SAY storm", "MOVE S"}
+	first := ""
+	if b.cfg.Mix == "verbs" {
+		first, lines = verbLines(b.index, b.cfg.Stay)
+	}
 	timer := time.NewTimer(time.Duration(b.index%1000) * b.cfg.Interval / 1000)
 	defer timer.Stop()
 	for sequence := 0; ; sequence++ {
@@ -582,8 +647,12 @@ func (b *stormBot) actions(ctx context.Context) {
 		conn, online := b.conn, b.online
 		b.mu.Unlock()
 		if online && conn != nil {
+			line := stormLine(lines[sequence%len(lines)], sequence)
+			if sequence == 0 && first != "" {
+				line = first
+			}
 			conn.SetWriteDeadline(time.Now().Add(b.cfg.Timeout))
-			if conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": stormLine(lines[sequence%len(lines)], sequence)})) == nil {
+			if conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": line})) == nil {
 				b.report.actions.Add(1)
 			}
 		}
@@ -604,10 +673,96 @@ func frameAny(t string, fields map[string]any) []byte {
 	return out
 }
 
+// verbLines is one bot's turn through the verbs a Phase 4 guest uses: look around, examine, talk to the
+// person, emote, a ready-made social, WHO, say something, and (unless staying) a walk to the next room and
+// back. The order is rotated by bot so a room does not all do the same thing at once. With stay the bot
+// first walks east, once, and then only talks and looks, so a crowd forms in that room.
+func verbLines(index int, stay bool) (first string, cycle []string) {
+	cycle = []string{"LOOK", "EXAMINE LAMP", "TALK", "EMOTE waves", "WAVE", "WHO", "SAY hello", "SAY well met"}
+	if stay {
+		first = "MOVE E"
+	} else {
+		cycle = append(cycle, "MOVE E", "LOOK", "MOVE W")
+	}
+	by := index % len(cycle)
+	return first, append(append([]string{}, cycle[by:]...), cycle[:by]...)
+}
+
 // stormLine makes a SAY unique by its sequence number: the server mutes a message repeated four times a minute.
 func stormLine(line string, sequence int) string {
-	if strings.HasPrefix(line, "SAY ") {
+	if strings.HasPrefix(line, "SAY ") || strings.HasPrefix(line, "EMOTE ") {
 		return fmt.Sprintf("%s %d", line, sequence)
 	}
 	return line
+}
+
+// probe is one more guest that joins after the crowd and, once a second, sends STATS and times the stats
+// frame that comes back, until ctx ends. It returns the latencies in milliseconds. A probe that cannot
+// join returns nothing, which shows in the report as no samples.
+func (r *stormRun) probe(ctx context.Context) []int64 {
+	conn, _, err := r.dial(ctx)
+	if err != nil {
+		r.fail("probe dial: %v", err)
+		return nil
+	}
+	defer conn.Close()
+	name := Name(r.cfg.Prefix, r.cfg.Count)
+	if err := conn.WriteMessage(websocket.TextMessage, frame("join", map[string]string{"name": name})); err != nil {
+		return nil
+	}
+	for {
+		_, raw, err := conn.ReadMessage()
+		if err != nil {
+			return nil
+		}
+		if f := parseFrame(raw); f.T == "auth" {
+			if !f.OK {
+				r.fail("probe refused: %s", f.Code)
+				return nil
+			}
+			break
+		}
+	}
+	conn.SetReadDeadline(time.Time{})
+	replies := make(chan struct{}, 1)
+	go func() {
+		for {
+			_, raw, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			if parseFrame(raw).T == "stats" {
+				select {
+				case replies <- struct{}{}:
+				default:
+				}
+			}
+		}
+	}()
+	var out []int64
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return out
+		case <-tick.C:
+		}
+		for len(replies) > 0 {
+			<-replies
+		}
+		sent := time.Now()
+		conn.SetWriteDeadline(time.Now().Add(r.cfg.Timeout))
+		if conn.WriteMessage(websocket.TextMessage, frame("cmd", map[string]string{"line": "STATS"})) != nil {
+			return out
+		}
+		select {
+		case <-replies:
+			out = append(out, time.Since(sent).Milliseconds())
+		case <-time.After(r.cfg.Timeout):
+			out = append(out, r.cfg.Timeout.Milliseconds())
+		case <-ctx.Done():
+			return out
+		}
+	}
 }
