@@ -279,7 +279,7 @@ func TestLoginLookAndMove(t *testing.T) {
 	send(t, conn, "SAY hello")
 	expect(t, conn, `You say: "hello"`)
 
-	send(t, conn, "DANCE")
+	send(t, conn, "FROBNICATE")
 	expect(t, conn, "Unknown command.")
 }
 

@@ -43,6 +43,7 @@ type MudServer struct {
 	codeByHash    map[string]string         // a code's HMAC -> its key
 	codeSecret    string                    // MUD_CODE_SECRET: the HMAC key; without it no code redeems
 	redeemBucket  commandLimiter            // every REDEEM attempt on the server spends from this
+	whoCache      *whoSnapshot              // the counts WHO shows, rebuilt every few seconds (social.go); loop only
 	recent        []talkLine                // the last lines of talk, for report context (report.go); loop only
 	reportMarks   map[string][]reportMark   // who reported whom lately, for the automatic mute; loop only
 	board         atomic.Pointer[board]     // the published leaderboard snapshot (leaderboard.go); nil until the first
@@ -181,6 +182,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	registerCosmetics(server, server.Commands)
 	registerProgress(server, server.Commands)
 	registerReport(server, server.Commands)
+	registerSocial(server, server.Commands)
 	server.codeSecret = codeSecretFromEnv()
 	if content != nil {
 		server.codes = content.codes

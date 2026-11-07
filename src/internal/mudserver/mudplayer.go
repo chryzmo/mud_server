@@ -55,6 +55,7 @@ type MudPlayer struct {
 	redeem        redeemGuard                   // wrong sticker codes; loop only (cosmetics.go)
 	mod           modState                      // automatic moderation record (moderation.go); loop only
 	server        *MudServer                    // set at admission, for the checks a command makes (moderation.go)
+	ignored       map[string]bool               // lower-case names whose talk this player does not see (social.go); loop only, for the session
 	reports       []time.Time                   // when this player last sent REPORTs (report.go); loop only
 	lineSink      func(where, who, text string) // remembers talk for report context; set at admission
 	lastHint      time.Time                     // when HINT last answered; loop only
