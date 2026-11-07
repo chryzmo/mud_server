@@ -138,6 +138,7 @@ func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64
 	if !ok {
 		player.SendLook()
 		player.SendStatUpdate()
+		player.sendCosmeticsIfAny()
 	}
 }
 

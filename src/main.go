@@ -30,6 +30,9 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-render-world" {
 		os.Exit(worldfile.RunRender(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "-new-codes" {
+		os.Exit(worldfile.RunNewCodes(os.Args[2:], os.Getenv("MUD_CODE_SECRET"), os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "-add-gm" {
 		os.Exit(mudserver.RunAddGM(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}

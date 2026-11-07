@@ -38,6 +38,7 @@ const (
 	msgStats     = "stats"
 	msgRoom      = "room"
 	msgInventory = "inventory"
+	msgCosmetics = "cosmetics"
 	msgError     = "error"
 )
 
@@ -97,11 +98,13 @@ type (
 	}
 	// chatMsg is a global chat line; GM marks a game master's.
 	chatMsg struct {
-		T    string `json:"t"`
-		Who  string `json:"who"`
-		Text string `json:"text"`
-		Ch   string `json:"ch"`
-		GM   bool   `json:"gm,omitempty"`
+		T     string `json:"t"`
+		Who   string `json:"who"`
+		Text  string `json:"text"`
+		Ch    string `json:"ch"`
+		GM    bool   `json:"gm,omitempty"`
+		Color string `json:"color,omitempty"` // the sender's active name colour key (cosmetics.go)
+		Badge string `json:"badge,omitempty"`
 	}
 	// announceMsg is a broadcast from the GM (From "gm") or an event ("event"): the client shows a banner.
 	announceMsg struct {
@@ -110,25 +113,33 @@ type (
 		From string `json:"from"`
 	}
 	sayMsg struct {
-		T    string `json:"t"`
-		Who  string `json:"who"`
-		Text string `json:"text"`
+		T     string `json:"t"`
+		Who   string `json:"who"`
+		Text  string `json:"text"`
+		Color string `json:"color,omitempty"` // the sender's active name colour key (cosmetics.go)
+		Badge string `json:"badge,omitempty"`
 	}
 	arriveMsg struct {
-		T    string `json:"t"`
-		Who  string `json:"who"`
-		From string `json:"from,omitempty"` // direction entered from; empty when they simply appeared
+		T     string `json:"t"`
+		Who   string `json:"who"`
+		From  string `json:"from,omitempty"`  // direction entered from; empty when they simply appeared
+		Color string `json:"color,omitempty"` // the sender's active name colour key (cosmetics.go)
+		Badge string `json:"badge,omitempty"`
 	}
 	leaveMsg struct {
-		T   string `json:"t"`
-		Who string `json:"who"`
-		To  string `json:"to,omitempty"` // direction left toward; empty when they vanished
+		T     string `json:"t"`
+		Who   string `json:"who"`
+		To    string `json:"to,omitempty"`    // direction left toward; empty when they vanished
+		Color string `json:"color,omitempty"` // the sender's active name colour key (cosmetics.go)
+		Badge string `json:"badge,omitempty"`
 	}
 	whisperMsg struct {
-		T    string `json:"t"`
-		Who  string `json:"who"`
-		Text string `json:"text"`
-		Out  bool   `json:"out,omitempty"` // your own echo: you whispered to Who
+		T     string `json:"t"`
+		Who   string `json:"who"`
+		Text  string `json:"text"`
+		Out   bool   `json:"out,omitempty"`   // your own echo: you whispered to Who
+		Color string `json:"color,omitempty"` // the sender's active name colour key (cosmetics.go)
+		Badge string `json:"badge,omitempty"`
 	}
 	authMsg struct {
 		T       string `json:"t"`
@@ -178,6 +189,14 @@ type (
 		Things []roomThing `json:"things,omitempty"`
 		Items  []roomItem  `json:"items,omitempty"`
 	}
+	// cosmeticsMsg is the player's own unlocks and what they wear, for the picker.
+	cosmeticsMsg struct {
+		T      string   `json:"t"`
+		Colors []string `json:"colors"`
+		Badges []string `json:"badges"`
+		Color  string   `json:"color,omitempty"`
+		Badge  string   `json:"badge,omitempty"`
+	}
 	inventoryMsg struct {
 		T    string `json:"t"`
 		Text string `json:"text"`
@@ -200,13 +219,20 @@ func encode(msg any) []byte {
 
 func encodeText(message string) []byte { return encode(textMsg{T: msgText, Text: message}) }
 
-func encodeSay(who, text string) []byte { return encode(sayMsg{T: msgSay, Who: who, Text: text}) }
-
-func encodeArrive(who, from string) []byte {
-	return encode(arriveMsg{T: msgArrive, Who: who, From: from})
+func encodeSay(p *MudPlayer, text string) []byte {
+	color, badge := p.look()
+	return encode(sayMsg{T: msgSay, Who: p.Username, Text: text, Color: color, Badge: badge})
 }
 
-func encodeLeave(who, to string) []byte { return encode(leaveMsg{T: msgLeave, Who: who, To: to}) }
+func encodeArrive(p *MudPlayer, from string) []byte {
+	color, badge := p.look()
+	return encode(arriveMsg{T: msgArrive, Who: p.Username, From: from, Color: color, Badge: badge})
+}
+
+func encodeLeave(p *MudPlayer, to string) []byte {
+	color, badge := p.look()
+	return encode(leaveMsg{T: msgLeave, Who: p.Username, To: to, Color: color, Badge: badge})
+}
 
 // SendMessage queues a line of game text. It never blocks; it fails only if the
 // session is closed or the client has fallen too far behind.
@@ -223,9 +249,11 @@ func (mp *MudPlayer) sendFrame(frame []byte) error {
 	return mp.Session.Send(frame)
 }
 
-// SendWhisper delivers a whisper; out marks the sender's own echo.
-func (mp *MudPlayer) SendWhisper(who, text string, out bool) error {
-	return mp.sendFrame(encode(whisperMsg{T: msgWhisper, Who: who, Text: text, Out: out}))
+// SendWhisper delivers a whisper; out marks the sender's own echo. other is the other party,
+// nil when they are not online (their cosmetics are then left out).
+func (mp *MudPlayer) SendWhisper(who, text string, out bool, other *MudPlayer) error {
+	color, badge := other.look()
+	return mp.sendFrame(encode(whisperMsg{T: msgWhisper, Who: who, Text: text, Out: out, Color: color, Badge: badge}))
 }
 
 // SendAuth answers a login attempt (join, resume and recover have their own replies).
