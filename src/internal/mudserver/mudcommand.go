@@ -44,6 +44,9 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			message := "You say: \"" + msg + "\""
 			player.SendMessage(message)
 
+			if player.lineSink != nil && player.Location != nil {
+				player.lineSink(player.Location.Name, player.Username, msg)
+			}
 			heard := encodeSay(player, msg)
 			for _, target_mp := range player.Location.Players() {
 				if target_mp.Username != player.Username {

@@ -60,6 +60,7 @@ hidden staff route, planned) and plays as an ordinary character; password accoun
 |---|---|
 | `GM WHO [prefix]` | counts (online, guests, accounts, away, whether visitors are locked), then names with rooms |
 | `GM MUTE <name> [minutes]` / `GM UNMUTE <name>` | refuse `SAY` and `WHISPER` (default 15 minutes, at most 1440); stored, so it survives a restart; a GM cannot be muted |
+| `GM REPORTS [number]` / `GM REPORTS CLOSE <number\|ALL>` | player reports sent with `REPORT <player> [reason]` (three an hour each; stored with the last lines of global chat and room talk); online GMs are told as they arrive; when three different players report the same person within ten minutes they are muted for ten (a mute, never a kick; logged in `gm_audit` as `system`; GMs are never auto-muted) |
 | `GM TELEPORT <name>` / `GM TELEPORT ROOM <text>` | go to a player, or to the room whose name starts with the text (ignores crowd caps) |
 | `GM SUMMON <name>` | bring a player to the GM's room |
 | `GM ANNOUNCE <text>` | a `[GM] text` line to every player, once encoded |

@@ -37,26 +37,28 @@ type MudPlayer struct {
 	// when the player is admitted (see World.place).
 	savedRoomID   int32
 	savedSpawnID  int32
-	world         *World           // set at admission; used to place a respawn
-	guest         bool             // joined by name only (see guest.go)
-	tokenHash     string           // hash of the resume token; set for a new guest until it is inserted
-	recoveryHash  string           // hash of the recovery code; likewise
-	lastCopy      map[*Area]int    // the copy of each area the player was last in; loop-owned
-	dormant       bool             // connection dropped, still in the world for a grace period (see resume.go)
-	lastActive    time.Time        // the last command, admission or resume; see idle.go
-	ring          [][]byte         // the last counted frames sent, for replay after a resume
-	sent          uint64           // counted frames sent over the player's lifetime in this process
-	replaySize    int              // ring capacity; 0 means no replay
-	sayLimiter    commandLimiter   // loop-owned; created on first SAY
-	state         *playerState     // puzzle state (state.go); created on first use
-	lastPuzzle    string           // the puzzle whose flag was set last (not saved); HINT with no name uses it
-	chatLimiter   commandLimiter   // this player's global chat bucket; created on first use
-	lastChat      time.Time        // when they last spoke on global chat (slow mode)
-	redeem        redeemGuard      // wrong sticker codes; loop only (cosmetics.go)
-	lastHint      time.Time        // when HINT last answered; loop only
-	stateSink     func(stateWrite) // where its changes are queued; set at admission
-	gm            bool             // a game master (a password account with the gm flag; never a guest); see gm.go
-	mutedUntil    time.Time        // SAY and WHISPER are refused until then; loop-owned
+	world         *World                        // set at admission; used to place a respawn
+	guest         bool                          // joined by name only (see guest.go)
+	tokenHash     string                        // hash of the resume token; set for a new guest until it is inserted
+	recoveryHash  string                        // hash of the recovery code; likewise
+	lastCopy      map[*Area]int                 // the copy of each area the player was last in; loop-owned
+	dormant       bool                          // connection dropped, still in the world for a grace period (see resume.go)
+	lastActive    time.Time                     // the last command, admission or resume; see idle.go
+	ring          [][]byte                      // the last counted frames sent, for replay after a resume
+	sent          uint64                        // counted frames sent over the player's lifetime in this process
+	replaySize    int                           // ring capacity; 0 means no replay
+	sayLimiter    commandLimiter                // loop-owned; created on first SAY
+	state         *playerState                  // puzzle state (state.go); created on first use
+	lastPuzzle    string                        // the puzzle whose flag was set last (not saved); HINT with no name uses it
+	chatLimiter   commandLimiter                // this player's global chat bucket; created on first use
+	lastChat      time.Time                     // when they last spoke on global chat (slow mode)
+	redeem        redeemGuard                   // wrong sticker codes; loop only (cosmetics.go)
+	reports       []time.Time                   // when this player last sent REPORTs (report.go); loop only
+	lineSink      func(where, who, text string) // remembers talk for report context; set at admission
+	lastHint      time.Time                     // when HINT last answered; loop only
+	stateSink     func(stateWrite)              // where its changes are queued; set at admission
+	gm            bool                          // a game master (a password account with the gm flag; never a guest); see gm.go
+	mutedUntil    time.Time                     // SAY and WHISPER are refused until then; loop-owned
 	SpawnLocation *Room
 }
 

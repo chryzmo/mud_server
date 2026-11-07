@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS world_flag; DROP TABLE IF EXISTS event_state;
+DROP TABLE IF EXISTS world_flag; DROP TABLE IF EXISTS event_state; DROP TABLE IF EXISTS report; -- reports name players, so they go with the players
 DROP TABLE IF EXISTS player_state; -- puzzle state is keyed by player id, and ids start again when the seed is reloaded
 DROP TABLE IF EXISTS player;
 
