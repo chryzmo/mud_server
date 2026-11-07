@@ -32,6 +32,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "storm" {
 		return storm(ctx, args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "world" {
+		return world(args[1:], stdout, stderr)
+	}
 	flags := flag.NewFlagSet("mudbot", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var c mudbot.Config
@@ -98,6 +101,8 @@ func storm(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags.DurationVar(&c.Timeout, "timeout", 10*time.Second, "per dial and handshake")
 	flags.DurationVar(&c.JoinTimeout, "join-timeout", 5*time.Minute, "total admission time budget")
 	flags.BoolVar(&c.AllowRemote, "allow-remote", false, "explicitly allow a non-loopback target; requires operator authorization")
+	flags.StringVar(&c.Mix, "mix", "light", `what bots do: "light" (SAY and a move) or "verbs" (look, examine, talk, emote, socials, WHO, SAY, a walk)`)
+	flags.BoolVar(&c.Stay, "stay", false, "with -mix verbs: walk east once and stay, so a crowd forms in that room (the feast)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -110,5 +115,23 @@ func storm(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 			return encodeErr
 		}
 	}
+	return err
+}
+
+func world(args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("mudbot world", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	dir := flags.String("dir", "", "directory to write world.yaml into (created if missing)")
+	feastIn := flags.Duration("feast-in", 2*time.Minute, "how long from now the Feast event starts (minute precision)")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 || *dir == "" {
+		return fmt.Errorf("world requires -dir and no positional arguments")
+	}
+	if err := mudbot.WriteLoadWorld(*dir, time.Now().Add(*feastIn)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(stdout, "Wrote %s/world.yaml (Feast at %s).\n", *dir, time.Now().Add(*feastIn).UTC().Format("15:04 UTC"))
 	return err
 }
