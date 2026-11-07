@@ -147,6 +147,7 @@ func (s *scheduler) advance(e *liveEvent, now time.Time) {
 func (s *scheduler) begin(e *liveEvent, started time.Time) {
 	e.running, e.started, e.step = true, started, 0
 	s.save(e)
+	s.broadcast(time.Now())
 	fmt.Printf("event %s started (occurrence %d of %d)\n", e.def.Key, e.occ+1, e.def.Count)
 }
 
@@ -158,6 +159,7 @@ func (s *scheduler) finish(e *liveEvent) {
 	e.running, e.started, e.step = false, time.Time{}, 0
 	e.occ++
 	s.save(e)
+	s.broadcast(time.Now())
 	fmt.Printf("event %s ended\n", e.def.Key)
 }
 
@@ -298,6 +300,47 @@ func (s *scheduler) summary(now time.Time) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// snapshot is the schedule as the banner shows it: every visible event on now, and the next five
+// to start. Loop only.
+func (s *scheduler) snapshot(now time.Time) eventsMsg {
+	out := eventsMsg{T: msgEvents, Now: []eventOnNow{}, Next: []eventNext{}}
+	for _, e := range s.events {
+		if e.def.Hidden {
+			continue
+		}
+		if e.running {
+			out.Now = append(out.Now, eventOnNow{e.def.Title, e.end().UnixMilli()})
+		} else if at, ok := e.nextStart(); ok && at.Add(e.def.Duration).After(now) {
+			out.Next = append(out.Next, eventNext{e.def.Title, at.UnixMilli()})
+		}
+	}
+	sort.Slice(out.Now, func(i, j int) bool { return out.Now[i].Ends < out.Now[j].Ends })
+	sort.Slice(out.Next, func(i, j int) bool { return out.Next[i].At < out.Next[j].At })
+	if len(out.Next) > 5 {
+		out.Next = out.Next[:5]
+	}
+	return out
+}
+
+// broadcast tells every player the schedule changed. Loop only.
+func (s *scheduler) broadcast(now time.Time) {
+	frame := encode(s.snapshot(now))
+	for _, p := range s.ms.players {
+		p.sendFrame(frame)
+	}
+}
+
+// sendEvents tells one player the schedule when there is anything visible to show, so a world
+// without events sends nothing. Loop only.
+func (mp *MudPlayer) sendEvents(s *scheduler) {
+	if s == nil {
+		return
+	}
+	if snap := s.snapshot(time.Now()); len(snap.Now)+len(snap.Next) > 0 {
+		mp.sendFrame(encode(snap))
+	}
+}
+
 // gmList is the GM's view: every event, hidden ones too, with its state.
 func (s *scheduler) gmList(now time.Time) string {
 	if len(s.events) == 0 {
@@ -349,6 +392,7 @@ func (s *scheduler) gmControl(verb, key string, now time.Time) string {
 		}
 		e.occ++
 		s.save(e)
+		s.broadcast(now)
 		return "Skipped the next occurrence of " + e.def.Title + "."
 	}
 	return "Usage: GM EVENT [START|STOP|SKIP <event>]"
