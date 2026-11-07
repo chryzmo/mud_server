@@ -26,6 +26,11 @@ import cloudflare-ips.caddy
 		}
 	}
 
+	# The leaderboard snapshot (mud_server serves it from memory and sets its own Cache-Control).
+	handle /api/leaderboard {
+		reverse_proxy 127.0.0.1:8080
+	}
+
 	handle {
 		root * /srv
 		header /assets/* Cache-Control "public, max-age=31536000, immutable"
