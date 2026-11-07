@@ -404,6 +404,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.world = ms.World
 		player.stateSink = ms.queueState
 		player.lineSink = ms.noteLine
+		player.server = ms
 		player.lastActive = time.Now()
 		if player.canResume() {
 			player.replaySize = ms.replayFrames()

@@ -324,6 +324,7 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 			return "usage"
 		}
 		ms.chat.off = strings.ToUpper(args[0]) == "OFF"
+		ms.gmOverridesQuiet(now)
 		gm.SendMessage(map[bool]string{true: "Global chat is off. GM CHAT ON turns it back on.", false: "Global chat is on."}[ms.chat.off])
 		return "chat " + strings.ToLower(args[0])
 
@@ -349,6 +350,7 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 			seconds = n
 		}
 		ms.chat.slow = time.Duration(seconds) * time.Second
+		ms.gmOverridesQuiet(now)
 		if seconds == 0 {
 			gm.SendMessage("Slow mode is off.")
 		} else {

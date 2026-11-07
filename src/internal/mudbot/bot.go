@@ -540,7 +540,7 @@ func (b *client) action(sequence int) (string, string) {
 	case 0:
 		return "MOVE N", "move"
 	case 1:
-		return "SAY mudbot hello", "say"
+		return fmt.Sprintf("SAY mudbot hello %d", sequence), "say" // unique: the server mutes a repeated message
 	case 2:
 		return "MOVE E", "move"
 	case 3, 4:
@@ -551,7 +551,7 @@ func (b *client) action(sequence int) (string, string) {
 	case 5:
 		return "MOVE W", "move"
 	case 6:
-		return "SAY mudbot goodbye", "say"
+		return fmt.Sprintf("SAY mudbot goodbye %d", sequence), "say"
 	default:
 		return "MOVE S", "move"
 	}

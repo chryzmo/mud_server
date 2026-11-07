@@ -22,7 +22,7 @@ const (
 	defaultChatSeconds = 5
 	defaultChatBurst   = 3
 	defaultChatOverall = 30
-	defaultChatMinAge  = 300 * time.Second
+	defaultChatMinAge  = 60 * time.Second
 	defaultChatLength  = 200
 	channelGlobal      = "global"
 )
@@ -32,6 +32,8 @@ type chatState struct {
 	off     bool           // the GM switched global chat off
 	slow    time.Duration  // the GM's slow mode: the least gap between one player's messages
 	overall commandLimiter // every message from every player spends from this
+	// A GM who sets chat or slow mode by hand turns the night defaults off until this time (moderation.go).
+	quietOverrideUntil time.Time
 }
 
 func (ms *MudServer) chatSettings() (perPlayer commandLimiter, minAge time.Duration, maxLen int, overall int) {
@@ -110,6 +112,7 @@ func (ms *MudServer) globalChat(p *MudPlayer, text string, now time.Time) {
 		return
 	}
 	perPlayer, minAge, maxLen, overall := ms.chatSettings()
+	minAge = ms.guestWait(minAge, now)
 	if ms.chat.off && !p.gm {
 		p.SendMessage("Global chat is switched off for now. SAY still works.")
 		return
@@ -124,11 +127,11 @@ func (ms *MudServer) globalChat(p *MudPlayer, text string, now time.Time) {
 	if !p.gm {
 		if p.guest && now.Sub(p.TimeConnected) < minAge {
 			wait := minAge - now.Sub(p.TimeConnected)
-			p.SendMessage(fmt.Sprintf("Global chat opens for new visitors after a few minutes of play (about %s more). SAY works in the meantime.", roundUp(wait)))
+			p.SendMessage(fmt.Sprintf("Global chat opens for new visitors after a little play (about %s more). SAY works in the meantime.", chatWaitText(wait)))
 			return
 		}
-		if ms.chat.slow > 0 && now.Sub(p.lastChat) < ms.chat.slow {
-			p.SendMessage(fmt.Sprintf("Slow mode: one message every %d seconds.", int(ms.chat.slow/time.Second)))
+		if slow := ms.effectiveSlow(now); slow > 0 && now.Sub(p.lastChat) < slow {
+			p.SendMessage(fmt.Sprintf("Slow mode: one message every %d seconds.", int(slow/time.Second)))
 			return
 		}
 		if p.chatLimiter.capacity == 0 {
@@ -136,6 +139,7 @@ func (ms *MudServer) globalChat(p *MudPlayer, text string, now time.Time) {
 			p.chatLimiter.last = now
 		}
 		if ok, notify := p.chatLimiter.allow(now); !ok {
+			ms.noteRefused(p, now)
 			if notify {
 				p.SendError(codeRateLimited, "You are chatting too fast. Give it a few seconds.")
 			}
@@ -149,6 +153,9 @@ func (ms *MudServer) globalChat(p *MudPlayer, text string, now time.Time) {
 		if notify {
 			p.SendMessage("Global chat is busy. Try again in a moment.")
 		}
+		return
+	}
+	if ms.checkRepeat(p, text, now) {
 		return
 	}
 	p.lastChat = now
@@ -168,4 +175,12 @@ func registerChat(ms *MudServer, cList map[string]*MudCommand) {
 	}
 	cList["GLOBAL"] = &MudCommand{description: "Say something to everyone in the world.  Usage: GLOBAL <message>", action: run}
 	cList["G"] = &MudCommand{description: "Short for GLOBAL.", action: run}
+}
+
+// chatWaitText says how long a new guest has left to wait, in words that read after "about".
+func chatWaitText(d time.Duration) string {
+	if d <= time.Minute {
+		return "a minute"
+	}
+	return roundUp(d)
 }

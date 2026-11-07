@@ -104,7 +104,8 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 	start := time.Now()
 	for batch := 0; batch < 40; batch++ {
 		for i := 0; i < 100; i++ {
-			send(t, active, "SAY "+chatter)
+			// Each line differs, or automatic moderation (rightly) mutes the repeater.
+			send(t, active, fmt.Sprintf("SAY %s %d-%d", chatter, batch, i))
 		}
 		marker := fmt.Sprintf("batch %d", batch)
 		send(t, active, "SAY "+marker)
