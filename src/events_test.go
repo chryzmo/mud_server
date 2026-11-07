@@ -112,7 +112,9 @@ func TestAnEventAnnouncesOpensAGateForEveryoneAndClosesItAgain(t *testing.T) {
 
 	send(t, gm, "GM EVENT START opening")
 	expect(t, gm, "Started Grand Opening.")
-	expect(t, guest, "[Event] The Hall is open.")
+	if a := expectMessage(t, guest, "announce"); a["text"] != "The Hall is open." || a["from"] != "event" {
+		t.Errorf("announce = %v", a)
+	}
 	expect(t, guest, "The Hall hums.") // a minute-free step, one second in
 	send(t, guest, "MOVE E")
 	expect(t, guest, "You are in 'Vault'")

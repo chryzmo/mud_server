@@ -58,6 +58,7 @@ stage files by name anyway.
   Rooms may have `rules` and `gates` (puzzles; `mudserver/rules.go`: verbs, conditions, effects, per-player exits) and players carry
   `state` (flags, counters, sequences, gates; `mudserver/state.go`, persisted through a queue to `player_state`).
   `puzzles:` and `region` feed JOURNAL, HINT and MAP (`mudserver/guide.go`; rooms entered are `visited` state).
+  Global chat is `mudserver/chat.go` (GLOBAL, per-player and overall limits, guest wait, word masking, `GM CHAT`/`GM SLOW`).
   `events:` are scheduled by `mudserver/scheduler.go` (one step of the world tick, progress in `event_state`, world flags in `world_flag`; EVENTS, GM EVENT, GM FLAG).
 - `src/internal/mudserver/`: game logic. The server and its loop (`mudserver.go`), players (`mudplayer.go`),
   rooms and world (`room.go`, `world.go`), commands (`mudcommand.go`), items, equipment, NPCs and spawners.

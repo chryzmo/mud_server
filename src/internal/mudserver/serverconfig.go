@@ -59,6 +59,14 @@ type Configuration struct {
 		PlayerStartAttack    int   `json:"PlayerStartAttack"`
 		PlayerStartDefense   int   `json:"PlayerStartDefense"`
 	} `json:"Game"`
+	// Global chat (see chat.go); zero values take the defaults.
+	Chat struct {
+		PerPlayerSeconds   int `json:"PerPlayerSeconds"`   // one message per this many seconds per player (default 5)
+		PlayerBurst        int `json:"PlayerBurst"`        // messages a player may send at once (default 3)
+		OverallPerSecond   int `json:"OverallPerSecond"`   // messages per second across the whole server (default 30)
+		GuestMinAgeSeconds int `json:"GuestMinAgeSeconds"` // a guest may use global chat after this long in the world (default 300; -1 no wait)
+		MaxLength          int `json:"MaxLength"`          // characters per message (default 200)
+	} `json:"Chat"`
 	// Area copies for crowds; none by default. See crowd.go.
 	Crowd CrowdConfig `json:"Crowd"`
 	// World content files (YAML; see src/internal/worldfile). Empty means the world comes from the

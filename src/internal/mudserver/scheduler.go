@@ -170,7 +170,7 @@ func (s *scheduler) run(step worldfile.ResolvedStep, stale bool) {
 	switch step.Kind {
 	case worldfile.StepAnnounce:
 		if !stale {
-			frame := encodeText("[Event] " + step.Text)
+			frame := encode(announceMsg{T: msgAnnounce, Text: step.Text, From: "event"})
 			for _, p := range ms.players {
 				p.sendFrame(frame)
 			}
