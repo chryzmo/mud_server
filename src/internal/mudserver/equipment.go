@@ -2,6 +2,7 @@ package mudserver
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	muddatabase "mud_server/src/internal/database"
@@ -124,47 +125,65 @@ func (e *EquipmentItem) BonusSummary() string {
 }
 
 // ---------------------------------------------------------------------------
-// EquipmentSlots — the nine gear slots a player can fill.
+// EquipmentSlots — the five gear slots a player can fill.
 // ---------------------------------------------------------------------------
 
+// Slot names. The cosmetic slot is for looks only and carries no stats.
+const (
+	SlotWeapon   = "weapon"
+	SlotArmor    = "armor"
+	SlotShield   = "shield"
+	SlotBoots    = "boots"
+	SlotCosmetic = "cosmetic"
+)
+
 type EquipmentSlots struct {
-	Weapon *EquipmentItem
-	Shield *EquipmentItem
-	Helmet *EquipmentItem
-	Chest  *EquipmentItem
-	Legs   *EquipmentItem
-	Hands  *EquipmentItem
-	Ring1  *EquipmentItem
-	Ring2  *EquipmentItem
-	Neck   *EquipmentItem
+	Weapon   *EquipmentItem
+	Armor    *EquipmentItem
+	Shield   *EquipmentItem
+	Boots    *EquipmentItem
+	Cosmetic *EquipmentItem
 }
 
 func NewEquipmentSlots() *EquipmentSlots {
 	return &EquipmentSlots{}
 }
 
+// legacySlots maps the retired nine-slot names to a current slot. A catalog item or a
+// saved slot using an old name keeps working: chest is armor, legs are boots, and the
+// head, hands, ring and neck pieces become cosmetics.
+var legacySlots = map[string]string{
+	"chest": SlotArmor, "legs": SlotBoots,
+	"helmet": SlotCosmetic, "hands": SlotCosmetic, "ring": SlotCosmetic, "neck": SlotCosmetic,
+}
+
+// NormalizeSlot returns the current slot name for a current or retired one, or "" if unknown.
+func NormalizeSlot(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if s, ok := legacySlots[name]; ok {
+		return s
+	}
+	switch name {
+	case SlotWeapon, SlotArmor, SlotShield, SlotBoots, SlotCosmetic:
+		return name
+	}
+	return ""
+}
+
 // GetSlotPtr returns a pointer-to-pointer for a named slot so callers can read or set it.
-// Returns nil for unknown slot names.
+// Retired names resolve to their current slot. Returns nil for unknown slot names.
 func (es *EquipmentSlots) GetSlotPtr(slotName string) **EquipmentItem {
-	switch strings.ToLower(slotName) {
-	case "weapon":
+	switch NormalizeSlot(slotName) {
+	case SlotWeapon:
 		return &es.Weapon
-	case "shield":
+	case SlotArmor:
+		return &es.Armor
+	case SlotShield:
 		return &es.Shield
-	case "helmet":
-		return &es.Helmet
-	case "chest":
-		return &es.Chest
-	case "legs":
-		return &es.Legs
-	case "hands":
-		return &es.Hands
-	case "ring1":
-		return &es.Ring1
-	case "ring2":
-		return &es.Ring2
-	case "neck":
-		return &es.Neck
+	case SlotBoots:
+		return &es.Boots
+	case SlotCosmetic:
+		return &es.Cosmetic
 	}
 	return nil
 }
@@ -179,73 +198,73 @@ func (es *EquipmentSlots) AllSlots() []struct {
 		Item *EquipmentItem
 	}{
 		{"Weapon", es.Weapon},
+		{"Armor", es.Armor},
 		{"Shield", es.Shield},
-		{"Helmet", es.Helmet},
-		{"Chest", es.Chest},
-		{"Legs", es.Legs},
-		{"Hands", es.Hands},
-		{"Ring1", es.Ring1},
-		{"Ring2", es.Ring2},
-		{"Neck", es.Neck},
+		{"Boots", es.Boots},
+		{"Cosmetic", es.Cosmetic},
 	}
 }
 
 // ToIDMap serialises equipment slots to a map suitable for the JSON DB column.
 func (es *EquipmentSlots) ToIDMap() map[string]int32 {
 	m := make(map[string]int32)
-	if es.Weapon != nil {
-		m["weapon"] = es.Weapon.ID
-	}
-	if es.Shield != nil {
-		m["shield"] = es.Shield.ID
-	}
-	if es.Helmet != nil {
-		m["helmet"] = es.Helmet.ID
-	}
-	if es.Chest != nil {
-		m["chest"] = es.Chest.ID
-	}
-	if es.Legs != nil {
-		m["legs"] = es.Legs.ID
-	}
-	if es.Hands != nil {
-		m["hands"] = es.Hands.ID
-	}
-	if es.Ring1 != nil {
-		m["ring1"] = es.Ring1.ID
-	}
-	if es.Ring2 != nil {
-		m["ring2"] = es.Ring2.ID
-	}
-	if es.Neck != nil {
-		m["neck"] = es.Neck.ID
+	for name, item := range map[string]*EquipmentItem{
+		SlotWeapon: es.Weapon, SlotArmor: es.Armor, SlotShield: es.Shield,
+		SlotBoots: es.Boots, SlotCosmetic: es.Cosmetic,
+	} {
+		if item != nil {
+			m[name] = item.ID
+		}
 	}
 	return m
 }
 
-// LoadFromIDMap populates slots by fetching each equipment entry from the DB.
-func (es *EquipmentSlots) LoadFromIDMap(db *muddatabase.MudDatabase, idmap map[string]int32) {
-	for slot, equipID := range idmap {
-		item := FetchEquipmentByID(db, equipID)
+// LoadFromIDMap populates slots by fetching each equipment entry from the DB. It reads
+// saved gear from either naming: chest and legs move to armor and boots, and a piece
+// from a retired slot (helmet, hands, ring1, ring2, neck) or one that would land on a
+// slot already filled is returned in `leftover` so the caller can put it in the pack.
+// Slots are visited in name order so the result does not depend on map order.
+func (es *EquipmentSlots) LoadFromIDMap(db *muddatabase.MudDatabase, idmap map[string]int32) (leftover []*EquipmentItem) {
+	names := make([]string, 0, len(idmap))
+	for slot := range idmap {
+		names = append(names, slot)
+	}
+	sort.Strings(names)
+	for _, slot := range names {
+		item := FetchEquipmentByID(db, idmap[slot])
 		if item == nil {
 			continue
 		}
-		ptr := es.GetSlotPtr(slot)
-		if ptr != nil {
-			*ptr = item
-		}
+		es.place(slot, item, &leftover)
 	}
+	return leftover
+}
+
+// place puts a saved piece in its slot, or into leftover when the slot is retired or taken.
+func (es *EquipmentSlots) place(savedSlot string, item *EquipmentItem, leftover *[]*EquipmentItem) {
+	slot := strings.ToLower(savedSlot)
+	switch slot {
+	case "chest", "legs":
+		slot = legacySlots[slot]
+	case "helmet", "hands", "ring1", "ring2", "neck":
+		*leftover = append(*leftover, item)
+		return
+	}
+	ptr := es.GetSlotPtr(slot)
+	if ptr == nil || *ptr != nil {
+		*leftover = append(*leftover, item)
+		return
+	}
+	*ptr = item
 }
 
 // ---------------------------------------------------------------------------
 // Bonus aggregation helpers — called by MudPlayer.EffectiveX() methods.
+// The cosmetic slot is for looks and never adds a stat.
 // ---------------------------------------------------------------------------
 
 func (es *EquipmentSlots) allItems() []*EquipmentItem {
-	return []*EquipmentItem{
-		es.Weapon, es.Shield, es.Helmet, es.Chest,
-		es.Legs, es.Hands, es.Ring1, es.Ring2, es.Neck,
-	}
+	return []*EquipmentItem{es.Weapon, es.Armor, es.Shield, es.Boots}
 }
 
 func (es *EquipmentSlots) TotalBonusAttackPower() int {
@@ -286,4 +305,15 @@ func (es *EquipmentSlots) TotalBonusMaxMP() int {
 		}
 	}
 	return total
+}
+
+// Worn lists what is worn, for EXAMINE <player>: item names in slot order.
+func (es *EquipmentSlots) Worn() []string {
+	var out []string
+	for _, s := range es.AllSlots() {
+		if s.Item != nil {
+			out = append(out, s.Item.Name)
+		}
+	}
+	return out
 }

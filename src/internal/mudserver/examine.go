@@ -143,7 +143,7 @@ func (mp *MudPlayer) examineTargets(packOnly bool) []examineTarget {
 				out = append(out, examineTarget{display: who, names: []string{who}, text: "That is you."})
 				continue
 			}
-			out = append(out, examineTarget{display: who, names: []string{who}, text: mudutils.ColorString(who, mudutils.COLOR_BLUE) + " is here with you."})
+			out = append(out, examineTarget{display: who, names: []string{who}, text: mudutils.ColorString(who, mudutils.COLOR_BLUE) + " is here with you." + wornSentence(p)})
 		}
 		for _, b := range room.BaddieMap {
 			out = append(out, examineTarget{
@@ -189,4 +189,16 @@ func (mp *MudPlayer) examine(arguments string) {
 	default:
 		mp.SendMessage("You do not see that here.")
 	}
+}
+
+// wornSentence says what a player wears, for EXAMINE <player>; empty when they wear nothing.
+func wornSentence(p *MudPlayer) string {
+	if p.Equipment == nil {
+		return ""
+	}
+	worn := p.Equipment.Worn()
+	if len(worn) == 0 {
+		return ""
+	}
+	return " They wear " + strings.Join(worn, ", ") + "."
 }

@@ -73,27 +73,27 @@ items:
   leather-cap:
     name: LEATHER CAP
     description: A snug leather cap.
-    equipment: {slot: helmet, defense: 2}
+    equipment: {slot: cosmetic}
   leather-armor:
     name: LEATHER ARMOR
     description: A jerkin of boiled leather.
-    equipment: {slot: chest, defense: 5, max_hp: 5}
+    equipment: {slot: armor, defense: 5, max_hp: 5}
   leather-leggings:
     name: LEATHER LEGGINGS
     description: Supple leather leggings.
-    equipment: {slot: legs, defense: 3}
+    equipment: {slot: boots, defense: 3}
   leather-gloves:
     name: LEATHER GLOVES
     description: Worn leather gloves.
-    equipment: {slot: hands, attack: 2, defense: 1}
+    equipment: {slot: cosmetic}
   copper-ring:
     name: COPPER RING
     description: A thin copper band that hums faintly.
-    equipment: {slot: ring, max_mp: 5}
+    equipment: {slot: cosmetic}
   silver-pendant:
     name: SILVER PENDANT
     description: A small silver pendant on a chain.
-    equipment: {slot: neck, defense: 1, max_hp: 2}
+    equipment: {slot: cosmetic}
 
 npcs:
   orc:
