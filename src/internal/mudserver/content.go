@@ -45,7 +45,6 @@ type contentResult struct {
 	areas       []AreaConfig // by room ID, for crowd control
 	guide       *guide       // the puzzles and regions, for JOURNAL, HINT and MAP
 	events      []*worldfile.ResolvedEvent
-	codes       map[string]worldfile.Code // sticker codes, by key
 	progression worldfile.Progression
 	onboarding  *worldfile.Onboarding // the guided first steps; nil turns them off
 	ambient     map[string]*roomAmbient // by room key (ambient.go)
@@ -77,7 +76,6 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	}
 	out.guide = newGuide(w.Puzzles, w.Rooms)
 	out.events = w.ResolveEvents()
-	out.codes = w.Codes
 	out.progression = w.ResolvedProgression()
 	out.ambient = buildAmbient(w)
 	out.mobs = map[string]mobTraits{}

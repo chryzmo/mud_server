@@ -76,3 +76,14 @@ func TestAnUnlockedCosmeticSurvivesLoggingBackIn(t *testing.T) {
 		t.Errorf("cosmetics after login = %v", c)
 	}
 }
+
+func TestStickerCodesAreGone(t *testing.T) {
+	wsURL := unlockServer(t)
+	conn := eventPlayer(t, wsURL, "hopeful")
+	for _, line := range []string{"REDEEM ABCD-2345", "PROGRESS"} {
+		send(t, conn, line)
+		expect(t, conn, "Unknown command.")
+	}
+	send(t, conn, "COSMETIC")
+	expect(t, conn, "Quests and bosses give them.")
+}

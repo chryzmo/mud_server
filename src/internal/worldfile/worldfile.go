@@ -57,7 +57,6 @@ type File struct {
 	Areas     map[string]Area   `yaml:"areas"`
 	Puzzles   map[string]Puzzle `yaml:"puzzles"`
 	Events    map[string]Event  `yaml:"events"`
-	Codes     map[string]Code   `yaml:"codes"`
 	// Progression tunes XP and levels; at most one file may set it.
 	Progression *Progression `yaml:"progression"`
 
@@ -177,7 +176,6 @@ type World struct {
 	Areas       map[string]Area
 	Puzzles     map[string]Puzzle
 	Events      map[string]Event
-	Codes       map[string]Code
 	Progression *Progression
 	Onboarding  *Onboarding
 	source      map[string]string // "room:lobby" -> file it was defined in
@@ -244,7 +242,7 @@ func Load(dir string) (*World, *Result, error) {
 	}
 	sort.Strings(files)
 
-	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, Puzzles: map[string]Puzzle{}, Events: map[string]Event{}, Codes: map[string]Code{}, source: map[string]string{}}
+	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, Puzzles: map[string]Puzzle{}, Events: map[string]Event{}, source: map[string]string{}}
 	res := &Result{}
 	for _, path := range files {
 		rel, _ := filepath.Rel(dir, path)
@@ -328,14 +326,6 @@ func (w *World) merge(file string, f *File, res *Result) {
 			w.Onboarding = f.Onboarding
 			w.source["onboarding"] = file
 		}
-	}
-	for k, v := range f.Codes {
-		if prev, dup := w.source["code:"+k]; dup {
-			res.errorf(file, "codes."+k, "duplicate code key (also in %s)", prev)
-			continue
-		}
-		w.Codes[k] = v
-		w.source["code:"+k] = file
 	}
 	for k, v := range f.NPCs {
 		if prev, dup := w.source["npc:"+k]; dup {
@@ -662,7 +652,6 @@ func (w *World) Validate(res *Result) {
 	}
 
 	w.validateRules(res)
-	w.validateCodes(res)
 	w.validateProgression(res)
 	w.validateAmbient(res)
 	w.validateOnboarding(res)
