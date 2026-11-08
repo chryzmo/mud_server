@@ -236,7 +236,11 @@ func (mp *MudPlayer) LoadFromDB(db *muddatabase.MudDatabase, player *MudPlayer, 
 		player.savedRoomID = ret.RoomID
 		player.Inventory = CreateInventory()
 		player.Equipment = NewEquipmentSlots()
-		player.Equipment.LoadFromIDMap(db, ret.EquipmentSlots)
+		for _, old := range player.Equipment.LoadFromIDMap(db, ret.EquipmentSlots) {
+			// Gear from a retired slot goes back in the pack; the next save records it.
+			player.Inventory.AddItem(&Item{ID: old.ItemID, Name: old.Name, Quantity: 1})
+			player.dirty = true
+		}
 		player.AttackPower = ret.AttackPower
 		player.Defense = ret.Defense
 		player.HP = ret.HP

@@ -29,7 +29,11 @@ var Directions = []string{"N", "S", "E", "W", "U", "D"}
 var opposite = map[string]string{"N": "S", "S": "N", "E": "W", "W": "E", "U": "D", "D": "U"}
 
 // Slots are the equipment slots an item can fill.
-var Slots = []string{"weapon", "shield", "helmet", "chest", "legs", "hands", "ring", "neck"}
+var Slots = []string{"weapon", "armor", "shield", "boots", "cosmetic"}
+
+// LegacySlots are the retired slot names that content may still use until its items are
+// converted: chest is armor, legs are boots, and helmet, hands, ring and neck are cosmetics.
+var LegacySlots = []string{"helmet", "chest", "legs", "hands", "ring", "neck"}
 
 // Behaviors are the NPC turn functions the server implements.
 var Behaviors = []string{"orc"}
@@ -399,8 +403,13 @@ func (w *World) Validate(res *Result) {
 			res.warnf(f, p+".description", "description is %d characters; over %d reads badly on a phone", len(it.Description), MaxDescription)
 		}
 		if e := it.Equipment; e != nil {
-			if !contains(Slots, e.Slot) {
+			if !contains(Slots, e.Slot) && !contains(LegacySlots, e.Slot) {
 				res.errorf(f, p+".equipment.slot", "slot %q is not one of %s", e.Slot, strings.Join(Slots, ", "))
+			} else if contains(LegacySlots, e.Slot) {
+				res.warnf(f, p+".equipment.slot", "slot %q is retired; use %s", e.Slot, strings.Join(Slots, ", "))
+			}
+			if e.Slot == "cosmetic" && (e.HP|e.MaxHP|e.MP|e.MaxMP|e.Attack|e.Defense) != 0 {
+				res.errorf(f, p+".equipment", "a cosmetic is for looks only and has no bonuses")
 			}
 			for name, v := range map[string]int{"hp": e.HP, "max_hp": e.MaxHP, "mp": e.MP, "max_mp": e.MaxMP, "attack": e.Attack, "defense": e.Defense} {
 				if v < 0 || v > 1000 {

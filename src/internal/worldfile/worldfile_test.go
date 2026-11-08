@@ -357,3 +357,26 @@ func TestPeopleAreChecked(t *testing.T) {
 		t.Errorf("too many topics: %v", tooManyTopics.Errors)
 	}
 }
+
+func TestGearSlotsAreFiveAndTheOldNamesWarn(t *testing.T) {
+	items := func(equipment string) map[string]string {
+		return map[string]string{"w.yaml": twoRooms + "\nitems:\n  thing:\n    name: THING\n    description: A thing.\n    equipment: " + equipment + "\n"}
+	}
+	for _, slot := range []string{"weapon", "armor", "shield", "boots"} {
+		if res := validate(t, items("{slot: "+slot+", defense: 1}")); len(res.Errors) != 0 || len(res.Warnings) != 0 {
+			t.Errorf("slot %s: errors %v warnings %v", slot, res.Errors, res.Warnings)
+		}
+	}
+	if res := validate(t, items("{slot: cosmetic}")); len(res.Errors) != 0 || len(res.Warnings) != 0 {
+		t.Errorf("a plain cosmetic: errors %v warnings %v", res.Errors, res.Warnings)
+	}
+	if res := validate(t, items("{slot: cosmetic, defense: 1}")); !has(res.Errors, "a cosmetic is for looks only") {
+		t.Errorf("a cosmetic with a bonus is accepted: %v", res.Errors)
+	}
+	for _, old := range []string{"helmet", "chest", "legs", "hands", "ring", "neck"} {
+		res := validate(t, items("{slot: "+old+", defense: 1}"))
+		if len(res.Errors) != 0 || !has(res.Warnings, `slot "`+old+`" is retired`) {
+			t.Errorf("old slot %s: errors %v warnings %v", old, res.Errors, res.Warnings)
+		}
+	}
+}
