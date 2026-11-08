@@ -90,6 +90,20 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			return muddata.MUD_OK
 		},
 	}
+	c_shop := MudCommand{
+		description: "See what a shopkeeper sells.  Usage: SHOP [person]",
+		action: func(player *MudPlayer, arguments string) int {
+			player.shop(arguments)
+			return muddata.MUD_OK
+		},
+	}
+	c_buy := MudCommand{
+		description: "Buy an item from a shopkeeper with gold.  Usage: BUY <item> [FROM <person>]",
+		action: func(player *MudPlayer, arguments string) int {
+			player.buy(arguments)
+			return muddata.MUD_OK
+		},
+	}
 	c_ask := MudCommand{
 		description: "Ask a friendly character about something.  Usage: ASK <person> ABOUT <topic>",
 		action: func(player *MudPlayer, arguments string) int {
@@ -435,6 +449,8 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["EXAMINE"] = &c_examine
 	cList["TALK"] = &c_talk
 	cList["ASK"] = &c_ask
+	cList["SHOP"] = &c_shop
+	cList["BUY"] = &c_buy
 	cList["MOVE"] = &c_move
 	cList["GET"] = &c_get
 	cList["DROP"] = &c_drop

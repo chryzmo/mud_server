@@ -79,3 +79,43 @@ func TestDropsAreRenderedForReview(t *testing.T) {
 		t.Errorf("overview is missing the drops\n%s", out)
 	}
 }
+
+func TestShopsAreCheckedAndRendered(t *testing.T) {
+	world := func(shop string) map[string]string {
+		return map[string]string{"w.yaml": `start_room: hall
+rooms:
+  hall:
+    name: Hall
+    description: A hall.
+    people:
+      smith:
+        names: [Smith]
+        examine: A smith.
+        greeting: Hello.
+        shop: ` + shop + `
+items:
+  dagger: {name: DAGGER, description: A dagger., equipment: {slot: weapon, attack: 2}}
+  token: {name: TOKEN, description: A token., bound: true}
+`}
+	}
+	good := render(t, world("[{item: dagger, price: 7}]"))
+	if !strings.Contains(good, "sells: dagger (7 gold)") {
+		t.Errorf("overview lacks the wares\n%s", good)
+	}
+	for shop, want := range map[string]string{
+		"[{item: nothing, price: 5}]":                          `"nothing" is not an item`,
+		"[{item: token, price: 5}]":                            "puzzle token and cannot be sold",
+		"[{item: dagger, price: 5}, {item: dagger, price: 6}]": "listed twice",
+		"[{item: dagger, price: 0}]":                           "price must be from 1 to 10000",
+		"[{item: dagger, price: 10001}]":                       "price must be from 1 to 10000",
+	} {
+		_, res, _ := ValidateDir(write(t, world(shop)))
+		var all []string
+		for _, p := range res.Errors {
+			all = append(all, p.String())
+		}
+		if !strings.Contains(strings.Join(all, "\n"), want) {
+			t.Errorf("shop %s: want %q, got %v", shop, want, all)
+		}
+	}
+}

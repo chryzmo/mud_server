@@ -113,6 +113,13 @@ func Render(w *World, res *Result) string {
 				for _, l := range pe.Idle {
 					fmt.Fprintf(&b, "  - idle: %s\n", md(strings.TrimSpace(l)))
 				}
+				if len(pe.Shop) > 0 {
+					var wares []string
+					for _, ware := range pe.Shop {
+						wares = append(wares, fmt.Sprintf("%s (%d gold)", md(ware.Item), ware.Price))
+					}
+					fmt.Fprintf(&b, "  - sells: %s\n", strings.Join(wares, ", "))
+				}
 				if strings.TrimSpace(pe.Shrug) != "" {
 					fmt.Fprintf(&b, "  - otherwise: %s\n", md(strings.Join(strings.Fields(pe.Shrug), " ")))
 				}
@@ -168,16 +175,7 @@ func Render(w *World, res *Result) string {
 			slot, bonus := "", ""
 			if e := it.Equipment; e != nil {
 				slot = e.Slot
-				var parts []string
-				for _, p := range []struct {
-					name string
-					v    int
-				}{{"attack", e.Attack}, {"defense", e.Defense}, {"max hp", e.MaxHP}, {"hp", e.HP}, {"max mp", e.MaxMP}, {"mp", e.MP}} {
-					if p.v != 0 {
-						parts = append(parts, fmt.Sprintf("%s %+d", p.name, p.v))
-					}
-				}
-				bonus = strings.Join(parts, ", ")
+				bonus = e.Summary()
 			}
 			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s |\n", cell(it.Name), key, slot, bonus, cell(it.Description))
 		}

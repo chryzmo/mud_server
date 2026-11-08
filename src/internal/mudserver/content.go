@@ -194,6 +194,16 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 				t := pe.Topics[tk]
 				person.Topics = append(person.Topics, Topic{Key: tk, Keywords: t.Keywords, Say: strings.TrimSpace(t.Say)})
 			}
+			for _, ware := range pe.Shop {
+				note := ""
+				if e := w.Items[ware.Item].Equipment; e != nil {
+					note = e.Summary()
+					if e.Slot == "cosmetic" {
+						note = "worn for looks"
+					}
+				}
+				person.Shop = append(person.Shop, ShopItem{Item: ware.Item, Price: int32(ware.Price), Note: note})
+			}
 			people = append(people, person)
 		}
 		peopleJSON, _ := json.Marshal(people)
