@@ -101,7 +101,7 @@ func storm(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags.DurationVar(&c.Timeout, "timeout", 10*time.Second, "per dial and handshake")
 	flags.DurationVar(&c.JoinTimeout, "join-timeout", 5*time.Minute, "total admission time budget")
 	flags.BoolVar(&c.AllowRemote, "allow-remote", false, "explicitly allow a non-loopback target; requires operator authorization")
-	flags.StringVar(&c.Mix, "mix", "light", `what bots do: "light" (SAY and a move) or "verbs" (look, examine, talk, emote, socials, WHO, SAY, a walk)`)
+	flags.StringVar(&c.Mix, "mix", "light", `what bots do: "light" (SAY and a move), "verbs" (look, examine, talk, emote, socials, WHO, SAY, a walk) or "cast" (learn the load world's spells and cast them)`)
 	flags.BoolVar(&c.Stay, "stay", false, "with -mix verbs: walk east once and stay, so a crowd forms in that room (the feast)")
 	if err := flags.Parse(args); err != nil {
 		return err

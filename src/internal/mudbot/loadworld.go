@@ -12,7 +12,8 @@ The world the Phase 4 load runs play in (plans/event-systems.md, D2). It is gene
 world text. A Lobby (the start room) and a Garden form a cloneable area, so thousands of guests spread
 over copies of 50, as the real world will. East of the Lobby is the Feast Hall: its own room with
 capacity 200, a person and a lamp to examine, ambient lines, and a Feast event that announces to
-everyone and speaks in the hall. Bots started with -mix verbs -stay walk to the hall and fill it.
+everyone and speaks in the hall. Bots started with -mix verbs -stay walk to the hall and fill it. A plaque in
+the Lobby teaches three spells (a fun one, a mend and a ward), so bots started with -mix cast can cast.
 */
 
 // LoadWorldYAML is the world file, with the Feast starting at feast (minute precision, UTC).
@@ -28,6 +29,11 @@ rooms:
     exits: {E: hall, S: garden}
     features:
       lamp: {names: [lamp], examine: "A brass lamp hangs from a hook, unlit."}
+      plaque: {names: [plaque], examine: "A brass plaque you could READ."}
+    rules:
+      - on: {verb: READ, target: plaque}
+        unless: [{knows_spell: glow}]
+        do: [{teach: glow}, {teach: mend}, {teach: ward}]
     people:
       keeper:
         names: [Keeper]
@@ -59,6 +65,10 @@ rooms:
         greeting: "Welcome to the feast."
     ambient:
       - {every: [20, 40], lines: ["Glasses clink along the tables.", "A cheer goes up at the far end."]}
+spells:
+  glow: {name: Glow, effect: fun, cost: 1, cooldown: 3, description: "A soft glow.", cast: "You glow.", room: "{player} glows."}
+  mend: {name: Mend, effect: mend, cost: 4, cooldown: 6, power: 10, description: "Heals.", cast: "You mend."}
+  ward: {name: Ward, effect: ward, cost: 5, cooldown: 20, power: 3, description: "Shields.", cast: "You ward yourself."}
 events:
   feast:
     title: The Feast
