@@ -33,6 +33,7 @@ type World struct {
 	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
 	itemsByKey    map[string]*Item                         // content items by key: templates for what rules give
 	mobTemplates  map[string]*BaddieNPC                    // content monsters by npc key: what a spawn step or GM SPAWN copies (mobs.go)
+	consumes      map[string]worldfile.Consume             // what USE restores, by item key (consume.go)
 	announceAll   func(text string)                        // tells every player; set by the server (mobs.go)
 
 	// Where new players start, and where a saved location that no longer exists falls
@@ -67,6 +68,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		w.guide = content.guide
 		w.prog = content.progression
 		w.onboarding = content.onboarding
+		w.consumes = content.consumes
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking

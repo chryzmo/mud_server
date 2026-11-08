@@ -177,6 +177,9 @@ func Render(w *World, res *Result) string {
 				slot = e.Slot
 				bonus = e.Summary()
 			}
+			if c := it.Consume; c != nil {
+				slot, bonus = "(used up)", c.Summary()
+			}
 			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s |\n", cell(it.Name), key, slot, bonus, cell(it.Description))
 		}
 		b.WriteString("\n")

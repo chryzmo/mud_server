@@ -119,3 +119,32 @@ items:
 		}
 	}
 }
+
+func TestConsumablesAreChecked(t *testing.T) {
+	world := func(item string) map[string]string {
+		return map[string]string{"w.yaml": roomWith + "items:\n  potion: " + item + "\n"}
+	}
+	if _, res, _ := ValidateDir(write(t, world("{name: POTION, description: Red., consume: {hp: 20, mp: 5}}"))); len(res.Errors) != 0 {
+		t.Errorf("a good potion is an error: %v", res.Errors)
+	}
+	for item, want := range map[string]string{
+		"{name: POTION, description: Red., consume: {}}":                                            "at least one above zero",
+		"{name: POTION, description: Red., consume: {hp: -1}}":                                      "from 0 to 1000",
+		"{name: POTION, description: Red., consume: {hp: 5000}}":                                    "from 0 to 1000",
+		"{name: POTION, description: Red., consume: {hp: 5}, equipment: {slot: weapon, attack: 1}}": "worn or used up, not both",
+		"{name: POTION, description: Red., bound: true, consume: {hp: 5}}":                          "puzzle token cannot be used up",
+	} {
+		_, res, _ := ValidateDir(write(t, world(item)))
+		var all []string
+		for _, p := range res.Errors {
+			all = append(all, p.String())
+		}
+		if !strings.Contains(strings.Join(all, "\n"), want) {
+			t.Errorf("item %s: want %q, got %v", item, want, all)
+		}
+	}
+	out := render(t, world("{name: POTION, description: Red., consume: {hp: 20}}"))
+	if !strings.Contains(out, "(used up)") || !strings.Contains(out, "restores 20 hp") {
+		t.Errorf("the overview lacks the potion\n%s", out)
+	}
+}

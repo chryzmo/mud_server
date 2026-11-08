@@ -165,6 +165,25 @@ type Item struct {
 	Persistent  bool       `yaml:"persistent"` // stays in the room after being picked up (a fixture)
 	Bound       bool       `yaml:"bound"`      // a puzzle token: cannot be dropped or given away; some rule must give it
 	Equipment   *Equipment `yaml:"equipment"`
+	Consume     *Consume   `yaml:"consume"` // USE <item> restores hp and mp and uses the item up
+}
+
+// Consume is what using up an item restores; at least one is above zero.
+type Consume struct {
+	HP int `yaml:"hp"`
+	MP int `yaml:"mp"`
+}
+
+// Summary says what it restores, such as "restores 20 hp, 5 mp".
+func (c *Consume) Summary() string {
+	var parts []string
+	if c.HP > 0 {
+		parts = append(parts, fmt.Sprintf("%d hp", c.HP))
+	}
+	if c.MP > 0 {
+		parts = append(parts, fmt.Sprintf("%d mp", c.MP))
+	}
+	return "restores " + strings.Join(parts, ", ")
 }
 
 // Equipment is what an item does while worn.
@@ -445,6 +464,17 @@ func (w *World) Validate(res *Result) {
 		}
 		if len(it.Description) > MaxDescription {
 			res.warnf(f, p+".description", "description is %d characters; over %d reads badly on a phone", len(it.Description), MaxDescription)
+		}
+		if c := it.Consume; c != nil {
+			if c.HP < 0 || c.MP < 0 || c.HP > 1000 || c.MP > 1000 || c.HP+c.MP == 0 {
+				res.errorf(f, p+".consume", "consume restores hp and mp from 0 to 1000, at least one above zero")
+			}
+			if it.Equipment != nil {
+				res.errorf(f, p+".consume", "an item is worn or used up, not both")
+			}
+			if it.Bound {
+				res.errorf(f, p+".consume", "a puzzle token cannot be used up like a potion")
+			}
 		}
 		if e := it.Equipment; e != nil {
 			if !contains(Slots, e.Slot) {

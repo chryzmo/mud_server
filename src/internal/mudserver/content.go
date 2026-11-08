@@ -51,6 +51,7 @@ type contentResult struct {
 	crowd       map[string]roomCrowd    // capacity settings by room key (stage.go); rooms with none are left out
 	mobs        map[string]mobTraits    // what content says about each monster, by race (mobs.go)
 	mobRaces    map[string]string       // npc key -> race, for spawning by key (mobs.go)
+	consumes    map[string]worldfile.Consume // item key -> what USE restores (consume.go)
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -81,6 +82,12 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	out.ambient = buildAmbient(w)
 	out.mobs = map[string]mobTraits{}
 	out.mobRaces = map[string]string{}
+	out.consumes = map[string]worldfile.Consume{}
+	for key, it := range w.Items {
+		if it.Consume != nil {
+			out.consumes[key] = *it.Consume
+		}
+	}
 	for key, n := range w.NPCs {
 		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP, drops: n.Drops, boss: n.Boss, name: n.Name}
 		out.mobRaces[key] = n.Race
@@ -196,6 +203,9 @@ func applyContent(db *muddatabase.MudDatabase, w *worldfile.World) (*contentResu
 			}
 			for _, ware := range pe.Shop {
 				note := ""
+				if c := w.Items[ware.Item].Consume; c != nil {
+					note = c.Summary()
+				}
 				if e := w.Items[ware.Item].Equipment; e != nil {
 					note = e.Summary()
 					if e.Slot == "cosmetic" {

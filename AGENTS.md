@@ -56,6 +56,7 @@ stage files by name anyway.
   Rooms may have `features` (examinable scenery; `mudserver/examine.go`: EXAMINE, aliases, prefixes, ambiguity).
   Rooms may have `people` (friendly characters with greeting and topics; `mudserver/people.go`: TALK and ASK).
   A person may have a `shop` (items for gold; `mudserver/shop.go`: SHOP and BUY; shopkeepers carry the `SHOP` verb in the room frame).
+  An item may have `consume: {hp, mp}` (potions; `mudserver/consume.go`: USE <item> restores and uses it up).
   Rooms may have `rules` and `gates` (puzzles; `mudserver/rules.go`: verbs, conditions, effects, per-player exits) and players carry
   `state` (flags, counters, sequences, gates; `mudserver/state.go`, persisted through a queue to `player_state`).
   `puzzles:` and `region` feed JOURNAL, HINT and MAP (`mudserver/guide.go`; rooms entered are `visited` state).
