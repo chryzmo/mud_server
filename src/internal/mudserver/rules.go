@@ -230,6 +230,12 @@ func (rr *ruleRun) effect(e worldfile.Effect, depth int) {
 		p.appendSequence(e.Append.Sequence, e.Append.Value)
 	case e.Reset != nil:
 		p.resetSequence(e.Reset.Sequence)
+	case e.Unlock != nil:
+		if e.Unlock.Color != "" {
+			p.grantCosmetic("color", e.Unlock.Color)
+		} else {
+			p.grantCosmetic("badge", e.Unlock.Badge)
+		}
 	case e.GiveItem != nil:
 		p.giveItemKey(*e.GiveItem)
 	case e.TakeItem != nil:

@@ -100,6 +100,22 @@ func (mp *MudPlayer) unlockCosmetic(kind, key string) {
 	mp.chooseCosmetic(kind, key)
 }
 
+// grantCosmetic is a quest reward: the colour or badge is added to the player's set and worn, with
+// a message and a fresh cosmetics frame. One the player already owns changes nothing, so a rule that
+// runs again does not repeat the news or change what they chose to wear. Loop only.
+func (mp *MudPlayer) grantCosmetic(kind, key string) {
+	if mp.unlocked(kind, key) {
+		return
+	}
+	mp.unlockCosmetic(kind, key)
+	if kind == "color" {
+		mp.SendMessage(fmt.Sprintf("Your name now shows in %s. COSMETIC changes it.", key))
+	} else {
+		mp.SendMessage(fmt.Sprintf("You earned the %s badge. COSMETIC changes it.", key))
+	}
+	mp.SendCosmetics()
+}
+
 // chooseCosmetic makes key the active colour or badge, or clears it when key is empty.
 func (mp *MudPlayer) chooseCosmetic(kind, key string) {
 	if key == "" {
