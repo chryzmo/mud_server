@@ -115,3 +115,10 @@ func TestShippedConfigCopiesTheSeededStartingArea(t *testing.T) {
 		t.Errorf("shipped caps = %d/%d/%d, want 50/60/200", c.Crowd.SoftCap, c.Crowd.HardCap, c.Crowd.MaxCopies)
 	}
 }
+
+func TestShippedConfigStartsAPlayerWithFifteenMagicFull(t *testing.T) {
+	c := Configuration{}.LoadConfig("../../../config/server_config.json")
+	if c.Game.PlayerStartMP != 15 || c.Game.PlayerStartMaxMP != 15 {
+		t.Errorf("shipped start MP = %d/%d, want 15/15 (five Firebolts)", c.Game.PlayerStartMP, c.Game.PlayerStartMaxMP)
+	}
+}
