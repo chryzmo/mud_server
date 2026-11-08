@@ -666,16 +666,16 @@ func (ms *MudServer) processAliases(cn string, args string) (string, string) {
 	case "SOUTH", "S":
 		command_name = "MOVE"
 		arguments = "SOUTH"
-	case "EAST":
+	case "EAST", "E":
 		command_name = "MOVE"
 		arguments = "EAST"
 	case "WEST", "W":
 		command_name = "MOVE"
 		arguments = "WEST"
-	case "UP":
+	case "UP", "U":
 		command_name = "MOVE"
 		arguments = "UP"
-	case "DOWN":
+	case "DOWN", "D":
 		command_name = "MOVE"
 		arguments = "DOWN"
 	case "L":
