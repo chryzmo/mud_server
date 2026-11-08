@@ -46,7 +46,7 @@ type StormConfig struct {
 	Timeout     time.Duration // per dial and handshake
 	JoinTimeout time.Duration // whole admission phase
 	AllowRemote bool
-	Mix         string // what the bots do: "light" (SAY and a move, the default) or "verbs" (the full Phase 4 mix, see verbLines)
+	Mix         string // what the bots do: "light" (SAY and a move, the default), "verbs" (the full Phase 4 mix, see verbLines) or "cast" (learn the load world's spells and cast them, see castLines)
 	Stay        bool   // with the verbs mix, walk to the east room once and stay there, so a crowd forms in one room
 }
 
@@ -64,8 +64,8 @@ func (c StormConfig) validate() error {
 	if !validPrefix.MatchString(c.Prefix) || len(c.Prefix)+5 > 16 {
 		return errors.New("prefix must be alphanumeric/underscore and at most 11 characters, so names fit the 16-character limit")
 	}
-	if c.Mix != "" && c.Mix != "light" && c.Mix != "verbs" {
-		return errors.New(`mix must be "light" or "verbs"`)
+	if c.Mix != "" && c.Mix != "light" && c.Mix != "verbs" && c.Mix != "cast" {
+		return errors.New(`mix must be "light", "verbs" or "cast"`)
 	}
 	if c.Stay && c.Mix != "verbs" {
 		return errors.New("stay needs the verbs mix")
@@ -259,7 +259,7 @@ feed:
 	// Play.
 	var wg sync.WaitGroup
 	var probeLatencies []int64
-	if cfg.Mix == "verbs" {
+	if cfg.Mix == "verbs" || cfg.Mix == "cast" {
 		wg.Add(1)
 		go func() { defer wg.Done(); probeLatencies = run.probe(runCtx) }()
 	}
@@ -632,8 +632,11 @@ func (b *stormBot) resumeOnce(ctx context.Context, cycle *StormCycle, cutAt time
 func (b *stormBot) actions(ctx context.Context) {
 	lines := []string{"SAY storm", "MOVE N", "SAY storm", "MOVE S"}
 	first := ""
-	if b.cfg.Mix == "verbs" {
+	switch b.cfg.Mix {
+	case "verbs":
 		first, lines = verbLines(b.index, b.cfg.Stay)
+	case "cast":
+		first, lines = castLines(b.index)
 	}
 	timer := time.NewTimer(time.Duration(b.index%1000) * b.cfg.Interval / 1000)
 	defer timer.Stop()
@@ -686,6 +689,16 @@ func verbLines(index int, stay bool) (first string, cycle []string) {
 	}
 	by := index % len(cycle)
 	return first, append(append([]string{}, cycle[by:]...), cycle[:by]...)
+}
+
+// castLines is one bot's turn with spells: read the Lobby's plaque (it teaches the load world's three spells,
+// which take slots 1 to 3), then cast each readied spell in turn, look, and say something. Most casts after
+// the first few are refused for want of magic or for a cooldown, which is part of the load: the server still
+// reads, checks and answers each one. The order is rotated by bot so a room does not all cast at once.
+func castLines(index int) (first string, cycle []string) {
+	cycle = []string{"CAST 1", "CAST 2", "CAST 3", "LOOK", "SAY hello", "CAST 1", "CAST 1", "WHO"}
+	by := index % len(cycle)
+	return "READ plaque", append(append([]string{}, cycle[by:]...), cycle[:by]...)
 }
 
 // stormLine makes a SAY unique by its sequence number: the server mutes a message repeated four times a minute.

@@ -3,10 +3,11 @@
 # world (mudbot world), and guest bots using the full verb mix. Local only: the dedicated mud_load database,
 # loopback, nothing is sent anywhere else.
 #
-#   scripts/load-crowd.sh [COUNT] [spread|feast] [SECONDS] [INTERVAL]
+#   scripts/load-crowd.sh [COUNT] [spread|feast|cast] [SECONDS] [INTERVAL]
 #     COUNT     guests (default 1000)
 #     spread    guests walk about and use every verb, spread over copies of the Lobby and Garden
 #     feast     guests walk to the Feast Hall (capacity 200) and fill it; the rest talk in the lobby copies
+#     cast      guests read the Lobby plaque (three spells) and then cast them over and over
 #     SECONDS   play time after everyone has joined and the feast has started (default 150: the Feast starts 90 to 150 s after the server does)
 #     INTERVAL  each bot's pause between actions (default 6s, the "realistic" profile)
 #
@@ -19,7 +20,7 @@ count="${1:-1000}"
 scenario="${2:-spread}"
 seconds="${3:-150}"
 interval="${4:-6s}"
-case "$scenario" in spread | feast) ;; *) echo "usage: $0 [COUNT] [spread|feast] [SECONDS] [INTERVAL]" >&2; exit 2 ;; esac
+case "$scenario" in spread | feast | cast) ;; *) echo "usage: $0 [COUNT] [spread|feast|cast] [SECONDS] [INTERVAL]" >&2; exit 2 ;; esac
 
 out="$(mktemp -d "${TMPDIR:-/tmp}/mud-load-crowd.XXXXXX")"
 scripts/db.sh up >/dev/null 2>&1 || echo "load-crowd.sh: could not start the local database; is one already running?" >&2
@@ -42,9 +43,11 @@ done
 
 stay=()
 [ "$scenario" = feast ] && stay=(-stay)
+mix=verbs
+[ "$scenario" = cast ] && mix=cast
 set +e
 GOMAXPROCS=8 taskset -c 2-15 "$out/mudbot" storm -url ws://127.0.0.1:18080/ws -count "$count" -join-workers 16 \
-	-mix verbs "${stay[@]}" -interval "$interval" -cycles 0 -before 0 -between "${seconds}s" \
+	-mix "$mix" "${stay[@]}" -interval "$interval" -cycles 0 -before 0 -between "${seconds}s" \
 	-join-timeout 10m >"$out/report.json" 2>"$out/bots.err"
 status=$?
 set -e

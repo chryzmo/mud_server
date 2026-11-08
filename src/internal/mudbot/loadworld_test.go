@@ -58,3 +58,40 @@ func TestVerbsMixRotatesAndStaysWhenAsked(t *testing.T) {
 		t.Error("an unknown mix should be refused")
 	}
 }
+
+func TestCastMixReadsThePlaqueFirstThenCastsAndRotates(t *testing.T) {
+	first, cycle := castLines(0)
+	if first != "READ plaque" {
+		t.Errorf("casting bots learn first, got %q", first)
+	}
+	var casts int
+	for _, line := range cycle {
+		if strings.HasPrefix(line, "CAST ") {
+			casts++
+		}
+	}
+	if casts < 3 {
+		t.Errorf("a casting turn should cast the three slots, got %d casts in %v", casts, cycle)
+	}
+	if _, other := castLines(1); other[0] == cycle[0] {
+		t.Errorf("neighbouring bots should start at different lines, both started with %q", cycle[0])
+	}
+	c := goodStormConfig()
+	c.Mix = "cast"
+	if err := c.validate(); err != nil {
+		t.Errorf("the cast mix is refused: %v", err)
+	}
+	c.Stay = true
+	if err := c.validate(); err == nil {
+		t.Error("stay is for the verbs mix only")
+	}
+	// The plaque must teach spells the world defines.
+	w, res, err := worldfile.ValidateDir(func() string {
+		dir := t.TempDir()
+		_ = WriteLoadWorld(dir, time.Now().Add(time.Minute))
+		return dir
+	}())
+	if err != nil || len(res.Errors) != 0 || len(w.Spells) != 3 {
+		t.Errorf("load world spells: err %v, errors %v, spells %d", err, res.Errors, len(w.Spells))
+	}
+}
