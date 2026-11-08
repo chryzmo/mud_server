@@ -149,20 +149,9 @@ func NewEquipmentSlots() *EquipmentSlots {
 	return &EquipmentSlots{}
 }
 
-// legacySlots maps the retired nine-slot names to a current slot. A catalog item or a
-// saved slot using an old name keeps working: chest is armor, legs are boots, and the
-// head, hands, ring and neck pieces become cosmetics.
-var legacySlots = map[string]string{
-	"chest": SlotArmor, "legs": SlotBoots,
-	"helmet": SlotCosmetic, "hands": SlotCosmetic, "ring": SlotCosmetic, "neck": SlotCosmetic,
-}
-
-// NormalizeSlot returns the current slot name for a current or retired one, or "" if unknown.
+// NormalizeSlot returns the slot name in lower case, or "" if it is not one of the five.
 func NormalizeSlot(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
-	if s, ok := legacySlots[name]; ok {
-		return s
-	}
 	switch name {
 	case SlotWeapon, SlotArmor, SlotShield, SlotBoots, SlotCosmetic:
 		return name
@@ -171,7 +160,7 @@ func NormalizeSlot(name string) string {
 }
 
 // GetSlotPtr returns a pointer-to-pointer for a named slot so callers can read or set it.
-// Retired names resolve to their current slot. Returns nil for unknown slot names.
+// Returns nil for unknown slot names.
 func (es *EquipmentSlots) GetSlotPtr(slotName string) **EquipmentItem {
 	switch NormalizeSlot(slotName) {
 	case SlotWeapon:
@@ -220,7 +209,7 @@ func (es *EquipmentSlots) ToIDMap() map[string]int32 {
 }
 
 // LoadFromIDMap populates slots by fetching each equipment entry from the DB. It reads
-// saved gear from either naming: chest and legs move to armor and boots, and a piece
+// saved gear from the retired nine-slot saves too: chest and legs move to armor and boots, and a piece
 // from a retired slot (helmet, hands, ring1, ring2, neck) or one that would land on a
 // slot already filled is returned in `leftover` so the caller can put it in the pack.
 // Slots are visited in name order so the result does not depend on map order.
@@ -244,8 +233,10 @@ func (es *EquipmentSlots) LoadFromIDMap(db *muddatabase.MudDatabase, idmap map[s
 func (es *EquipmentSlots) place(savedSlot string, item *EquipmentItem, leftover *[]*EquipmentItem) {
 	slot := strings.ToLower(savedSlot)
 	switch slot {
-	case "chest", "legs":
-		slot = legacySlots[slot]
+	case "chest":
+		slot = SlotArmor
+	case "legs":
+		slot = SlotBoots
 	case "helmet", "hands", "ring1", "ring2", "neck":
 		*leftover = append(*leftover, item)
 		return

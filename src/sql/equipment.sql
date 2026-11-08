@@ -15,16 +15,16 @@ CREATE TABLE IF NOT EXISTS equipment
     CONSTRAINT fk_item FOREIGN KEY (itemid) REFERENCES item(id)
 );
 
-/* Slots: weapon, shield, helmet, chest, legs, hands, ring, neck */
+/* Slots: weapon, armor, shield, boots, cosmetic (a cosmetic has no stats) */
 INSERT INTO equipment (itemid, slot, bonusattackpower, bonusdefense, bonushp, bonusmaxhp, bonusmp, bonusmaxmp) VALUES
     ((SELECT id FROM item WHERE name='IRON SWORD'),      'weapon', 5,  0,  0,  0,  0,  0),
     ((SELECT id FROM item WHERE name='WOODEN SHIELD'),   'shield', 0,  4,  0,  0,  0,  0),
-    ((SELECT id FROM item WHERE name='LEATHER CAP'),     'helmet', 0,  2,  0,  0,  0,  0),
-    ((SELECT id FROM item WHERE name='LEATHER ARMOR'),   'chest',  0,  5,  0,  5,  0,  0),
-    ((SELECT id FROM item WHERE name='LEATHER LEGGINGS'),'legs',   0,  3,  0,  0,  0,  0),
-    ((SELECT id FROM item WHERE name='LEATHER GLOVES'),  'hands',  2,  1,  0,  0,  0,  0),
-    ((SELECT id FROM item WHERE name='COPPER RING'),     'ring',   0,  0,  0,  0,  1,  5),
-    ((SELECT id FROM item WHERE name='SILVER PENDANT'),  'neck',   0,  1,  0,  2,  0,  0);
+    ((SELECT id FROM item WHERE name='LEATHER CAP'),     'cosmetic', 0,  0,  0,  0,  0,  0),
+    ((SELECT id FROM item WHERE name='LEATHER ARMOR'),   'armor', 0,  5,  0,  5,  0,  0),
+    ((SELECT id FROM item WHERE name='LEATHER LEGGINGS'),'boots', 0,  3,  0,  0,  0,  0),
+    ((SELECT id FROM item WHERE name='LEATHER GLOVES'),  'cosmetic', 0,  0,  0,  0,  0,  0),
+    ((SELECT id FROM item WHERE name='COPPER RING'),     'cosmetic', 0,  0,  0,  0,  0,  0),
+    ((SELECT id FROM item WHERE name='SILVER PENDANT'),  'cosmetic', 0,  0,  0,  0,  0,  0);
 
 ALTER TABLE IF EXISTS equipment
     OWNER to mud;
