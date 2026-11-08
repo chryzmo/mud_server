@@ -184,6 +184,36 @@ func Render(w *World, res *Result) string {
 		}
 		b.WriteString("\n")
 	}
+	if len(w.Spells) > 0 {
+		b.WriteString("## Spells\n\n| Spell | Key | Effect | MP | Cooldown | Power | Learned from | Description |\n|---|---|---|---|---|---|---|---|\n")
+		for _, key := range sortedKeys(w.Spells) {
+			sp := w.Spells[key]
+			var from []string
+			for _, ik := range sortedKeys(w.Items) {
+				if w.Items[ik].Teaches == key {
+					from = append(from, "scroll `"+ik+"`")
+				}
+			}
+			for _, nk := range sortedKeys(w.NPCs) {
+				for _, d := range w.NPCs[nk].Drops {
+					if d.Item != "" && w.Items[d.Item].Teaches == key {
+						from = append(from, fmt.Sprintf("%s drops it (%d%%)", w.NPCs[nk].Race, d.Chance))
+					}
+				}
+			}
+			for _, rk := range sortedKeys(w.Rooms) {
+				for i := range w.Rooms[rk].Rules {
+					for _, e := range w.Rooms[rk].Rules[i].Do {
+						if e.Teach != nil && *e.Teach == key {
+							from = append(from, "rule in `"+rk+"`")
+						}
+					}
+				}
+			}
+			fmt.Fprintf(&b, "| %s | `%s` | %s | %d | %ds | %d | %s | %s |\n", cell(sp.Name), key, sp.Effect, sp.Cost, sp.Cooldown, sp.Power, cell(strings.Join(from, ", ")), cell(sp.Description))
+		}
+		b.WriteString("\n")
+	}
 	if len(w.NPCs) > 0 {
 		b.WriteString("## NPCs\n\n| Race | Key | HP | Attack | Defense | Accuracy | Acts every | Gold | Fights | XP |\n|---|---|---|---|---|---|---|---|---|---|\n")
 		for _, key := range sortedKeys(w.NPCs) {

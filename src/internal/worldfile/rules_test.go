@@ -97,7 +97,7 @@ func TestRuleProblems(t *testing.T) {
 		{"unknown placeholder", "    rules:\n      - on: {verb: PULL, target: lever}\n        do: [{say: 'You have {gold} coins'}]\n", "", "{gold} is not a counter", false},
 		{"unused named rule", "    rules:\n      - id: lonely\n        do: [{say: x}]\n", "", "no rule runs this one", true},
 		{"shadowed rule", "    rules:\n      - on: {verb: PULL, target: lever}\n        do: [{say: x}]\n      - on: {verb: PULL, target: lever}\n        do: [{say: y}]\n", "", "can never run", true},
-		{"bound item with no source", "", "  token: {name: TOKEN, description: A token., bound: true}\n", "no rule gives it", false},
+		{"bound item with no source", "", "  token: {name: TOKEN, description: A token., bound: true}\n", "no rule or monster drop gives it", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
