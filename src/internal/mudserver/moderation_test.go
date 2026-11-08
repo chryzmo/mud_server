@@ -94,3 +94,12 @@ func TestStrikesEscalateAndAQuietHourForgetsThem(t *testing.T) {
 		t.Errorf("after a quiet hour the mute was %v, want the first step again", d)
 	}
 }
+
+func TestQuietHoursOffKeepsTheNightDefaultsAwayWhateverTheClock(t *testing.T) {
+	ms := &MudServer{}
+	ms.Configuration.Chat.QuietHoursOff = true
+	night := eastern(t, 2027, 1, 8, 3, 0)
+	if ms.quietActive(night) || ms.effectiveSlow(night) != 0 || ms.guestWait(time.Minute, night) != time.Minute {
+		t.Errorf("night defaults applied with QuietHoursOff: slow %v wait %v", ms.effectiveSlow(night), ms.guestWait(time.Minute, night))
+	}
+}

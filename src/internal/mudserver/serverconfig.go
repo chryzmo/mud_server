@@ -66,6 +66,7 @@ type Configuration struct {
 		OverallPerSecond   int `json:"OverallPerSecond"`   // messages per second across the whole server (default 30)
 		GuestMinAgeSeconds int `json:"GuestMinAgeSeconds"` // a guest may use global chat after this long in the world (default 300; -1 no wait)
 		MaxLength          int `json:"MaxLength"`          // characters per message (default 200)
+		QuietHoursOff      bool `json:"QuietHoursOff"`     // true: no night defaults (01:00-08:00 Eastern) for chat; tests set it so they do not depend on the clock
 	} `json:"Chat"`
 	// Area copies for crowds; none by default. See crowd.go.
 	Crowd CrowdConfig `json:"Crowd"`
