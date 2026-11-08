@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/mudutils"
+	"mud_server/src/internal/worldfile"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type BaddieNPC struct {
 	LootGoldMax int32
 	passive     bool        // fights only those who attack it (mobs.go); the zero value attacks anyone in the room
 	xp          int         // paid to each fighter for a kill; 0 means the progression's kill XP
+	drops       []worldfile.Drop // rolled for each fighter on a kill (mobs.go)
 	hitters     []*MudPlayer // who has attacked it, latest last
 	dead        bool        // set when it is killed, so a late blow at the same monster is ignored
 }

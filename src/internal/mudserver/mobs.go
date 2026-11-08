@@ -5,6 +5,8 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
+
+	"mud_server/src/internal/worldfile"
 )
 
 /*
@@ -27,6 +29,7 @@ const defaultMobCap = 300
 type mobTraits struct {
 	aggressive bool
 	xp         int
+	drops      []worldfile.Drop
 }
 
 // applyMobTraits gives each spawner's template monster its traits from content. A monster that has no
@@ -37,6 +40,7 @@ func (w *World) applyMobTraits(traits map[string]mobTraits) {
 		if t, ok := traits[strings.ToUpper(s.baddie.Race)]; ok {
 			s.baddie.passive = !t.aggressive
 			s.baddie.xp = t.xp
+			s.baddie.drops = t.drops
 		}
 	}
 }
@@ -120,12 +124,35 @@ func (r *Room) defeated(npc *BaddieNPC, killer *MudPlayer) {
 			}
 			p.dirty = true
 		}
+		npc.rollDrops(p)
 		if p.NPCTarget == npc {
 			p.NPCTarget = nil
 		}
 	}
 	r.KillNPC(npc.Name, killer.Username)
 	r.roomChanged() // the monster is no longer tappable
+}
+
+// dropHits is one percent roll: true with the given chance (100 always hits).
+func dropHits(chance int) bool { return chance >= 100 || rand.IntN(100) < chance }
+
+// rollDrops gives one fighter whatever their own roll wins from the monster's drop table: each fighter
+// rolls for themself, so joining a fight never costs you loot. A colour or badge the player already
+// owns changes nothing. Loop only.
+func (npc *BaddieNPC) rollDrops(p *MudPlayer) {
+	for _, d := range npc.drops {
+		if !dropHits(d.Chance) {
+			continue
+		}
+		switch {
+		case d.Item != "":
+			p.giveItemKey(d.Item)
+		case d.Color != "":
+			p.grantCosmetic("color", d.Color)
+		case d.Badge != "":
+			p.grantCosmetic("badge", d.Badge)
+		}
+	}
 }
 
 // uniqueMobName is the monster's name, made different from every monster already in the room: two with

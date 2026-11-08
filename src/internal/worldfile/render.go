@@ -197,6 +197,24 @@ func Render(w *World, res *Result) string {
 			fmt.Fprintf(&b, "| %s | `%s` | %d | %d | %d | %d | %s | %d-%d | %s | %s |\n", cell(n.Race), key, n.HP, n.Attack, n.Defense, n.Accuracy, seconds(n.CombatTickMS), n.LootGoldMin, n.LootGoldMax, fights, xp)
 		}
 		b.WriteString("\n")
+		for _, key := range sortedKeys(w.NPCs) {
+			n := w.NPCs[key]
+			if len(n.Drops) == 0 {
+				continue
+			}
+			var parts []string
+			for _, d := range n.Drops {
+				what := d.Item
+				switch {
+				case d.Color != "":
+					what = d.Color + " colour"
+				case d.Badge != "":
+					what = d.Badge + " badge"
+				}
+				parts = append(parts, fmt.Sprintf("%s (%d%%)", md(what), d.Chance))
+			}
+			fmt.Fprintf(&b, "**Drops from %s:** %s\n\n", md(n.Race), strings.Join(parts, ", "))
+		}
 	}
 	if len(w.Puzzles) > 0 {
 		b.WriteString("## Puzzles\n\nWhat JOURNAL and HINT show, in order.\n\n")

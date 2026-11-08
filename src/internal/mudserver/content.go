@@ -80,7 +80,7 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	out.ambient = buildAmbient(w)
 	out.mobs = map[string]mobTraits{}
 	for _, n := range w.NPCs {
-		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP}
+		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP, drops: n.Drops}
 	}
 	out.crowd = map[string]roomCrowd{}
 	for key, r := range w.Rooms {

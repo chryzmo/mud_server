@@ -380,3 +380,27 @@ func TestGearSlotsAreFiveAndTheOldNamesWarn(t *testing.T) {
 		}
 	}
 }
+
+func TestDropTablesAreChecked(t *testing.T) {
+	npc := func(drops string) map[string]string {
+		return map[string]string{"w.yaml": twoRooms + "\nitems:\n  charm:\n    name: CHARM\n    description: A charm.\nnpcs:\n  rat:\n    race: RAT\n    hp: 5\n    attack: 1\n    accuracy: 50\n    combat_tick_ms: 500\n    behavior: orc\n    drops: " + drops + "\n"}
+	}
+	good := validate(t, npc("[{item: charm, chance: 50}, {badge: flame, chance: 100}, {color: gold, chance: 1}]"))
+	if len(good.Errors) != 0 {
+		t.Errorf("a good table is an error: %v", good.Errors)
+	}
+	for drops, want := range map[string]string{
+		"[{item: nothing, chance: 5}]":             `"nothing" is not an item`,
+		"[{badge: skull, chance: 5}]":              `"skull" is not one of`,
+		"[{color: plaid, chance: 5}]":              `"plaid" is not one of`,
+		"[{item: charm, badge: flame, chance: 5}]": "exactly one of item, color or badge",
+		"[{chance: 5}]":                            "exactly one of item, color or badge",
+		"[{item: charm, chance: 0}]":               "chance must be from 1 to 100",
+		"[{item: charm, chance: 101}]":             "chance must be from 1 to 100",
+		"[{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5},{item: charm, chance: 5}]": "at most 8",
+	} {
+		if res := validate(t, npc(drops)); !has(res.Errors, want) {
+			t.Errorf("drops %s: want an error containing %q, got %v", drops, want, res.Errors)
+		}
+	}
+}
