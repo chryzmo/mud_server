@@ -25,13 +25,6 @@ const CodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 // CodeLength is the number of characters in a code, without the dash.
 const CodeLength = 8
 
-// Colors and Badges are the fixed sets the client can draw. A code names one by key, never CSS
-// or text, so a code cannot inject styling and every colour can be contrast-tested in the client.
-var (
-	Colors = []string{"gold", "crimson", "azure", "emerald", "violet", "amber", "rose", "silver"}
-	Badges = []string{"star", "crown", "key", "lantern", "bell", "gear", "quill", "flame"}
-)
-
 // MaxCodeMessage is the longest message a code may show.
 const MaxCodeMessage = 300
 

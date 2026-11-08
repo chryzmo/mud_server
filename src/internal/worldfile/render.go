@@ -234,6 +234,13 @@ func Render(w *World, res *Result) string {
 			b.WriteString("\n")
 		}
 	}
+	if lines := cosmeticRewards(w); len(lines) > 0 {
+		b.WriteString("## Cosmetic rewards\n\nName colours and badges that quests grant (a rule's `unlock` effect).\n\n")
+		for _, l := range lines {
+			b.WriteString(l + "\n")
+		}
+		b.WriteString("\n")
+	}
 	if len(w.Codes) > 0 {
 		b.WriteString("## Sticker codes\n\nWhat each code grants (the codes themselves are never shown).\n\n")
 		for _, key := range sortedKeys(w.Codes) {
@@ -426,4 +433,39 @@ func describeStep(s ResolvedStep) string {
 		return "set world flag `" + s.Flag + "`"
 	}
 	return "clear world flag `" + s.Flag + "`"
+}
+
+// cosmeticRewards lists every rule that grants a colour or badge, by room, so a reviewer can see what the quests pay.
+func cosmeticRewards(w *World) []string {
+	var out []string
+	for _, key := range sortedKeys(w.Rooms) {
+		for i := range w.Rooms[key].Rules {
+			r := w.Rooms[key].Rules[i]
+			for _, e := range r.Do {
+				if e.Unlock == nil {
+					continue
+				}
+				what := "colour `" + e.Unlock.Color + "`"
+				if e.Unlock.Badge != "" {
+					what = "badge `" + e.Unlock.Badge + "`"
+				}
+				out = append(out, fmt.Sprintf("- `%s`: %s grants the %s", key, ruleTrigger(r), what))
+			}
+		}
+	}
+	return out
+}
+
+// ruleTrigger words what sets a rule off.
+func ruleTrigger(r Rule) string {
+	switch t := r.On; {
+	case t == nil:
+		return "rule `" + r.ID + "` (run by another rule)"
+	case t.Enter:
+		return "entering the room"
+	case t.Say != "":
+		return "saying \"" + t.Say + "\""
+	default:
+		return t.Verb + " " + t.Target
+	}
 }

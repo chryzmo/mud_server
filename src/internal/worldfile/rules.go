@@ -79,6 +79,13 @@ type Effect struct {
 	Teleport  *string       `yaml:"teleport" json:"teleport,omitempty"` // a room key
 	Stop      *bool         `yaml:"stop" json:"stop,omitempty"`         // end the rule here
 	Run       *string       `yaml:"run" json:"run,omitempty"`           // another rule of this room, by id
+	Unlock    *UnlockEffect `yaml:"unlock" json:"unlock,omitempty"`     // a quest reward: a name colour or badge
+}
+
+// UnlockEffect grants a cosmetic from the fixed palette (Colors, Badges); exactly one is set.
+type UnlockEffect struct {
+	Color string `yaml:"color" json:"color,omitempty"`
+	Badge string `yaml:"badge" json:"badge,omitempty"`
 }
 
 // AddEffect changes a counter by By; with Wrap [min, max] it stays in that range and wraps around.
@@ -199,6 +206,7 @@ func (e Effect) kind() (name string, n int) {
 	add("teleport", e.Teleport != nil)
 	add("stop", e.Stop != nil)
 	add("run", e.Run != nil)
+	add("unlock", e.Unlock != nil)
 	return
 }
 
@@ -424,6 +432,15 @@ func (w *World) validateRules(res *Result) {
 				case "append":
 					if e.Append.Sequence == "" || e.Append.Value == "" {
 						res.errorf(f, ep+".append", "needs a sequence and a value")
+					}
+				case "unlock":
+					switch u := e.Unlock; {
+					case (u.Color == "") == (u.Badge == ""):
+						res.errorf(f, ep+".unlock", "set exactly one of color and badge")
+					case u.Color != "" && !contains(Colors, u.Color):
+						res.errorf(f, ep+".unlock.color", "%q is not a colour (%s)", u.Color, strings.Join(Colors, ", "))
+					case u.Badge != "" && !contains(Badges, u.Badge):
+						res.errorf(f, ep+".unlock.badge", "%q is not a badge (%s)", u.Badge, strings.Join(Badges, ", "))
 					}
 				case "give_item":
 					if _, ok := w.Items[*e.GiveItem]; !ok {
