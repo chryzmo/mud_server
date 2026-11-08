@@ -149,6 +149,9 @@ func (ms *MudServer) gmOverridesQuiet(now time.Time) { ms.chat.quietOverrideUnti
 
 // quietActive reports whether the night defaults apply right now.
 func (ms *MudServer) quietActive(now time.Time) bool {
+	if ms.Configuration.Chat.QuietHoursOff {
+		return false
+	}
 	return quietHours(now) && !now.Before(ms.chat.quietOverrideUntil)
 }
 

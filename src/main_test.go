@@ -103,6 +103,7 @@ func serveTestServer(t *testing.T, url string, configure func(*mudserver.Configu
 	c.Game.PlayerStartMaxMP = 10
 	c.Game.PlayerStartAttack = 5
 	c.Game.PlayerStartDefense = 10
+	c.Chat.QuietHoursOff = true // the night defaults depend on the clock; a test that wants them builds its own server
 	if configure != nil {
 		configure(&c)
 	}
