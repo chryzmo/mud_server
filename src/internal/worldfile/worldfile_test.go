@@ -358,7 +358,7 @@ func TestPeopleAreChecked(t *testing.T) {
 	}
 }
 
-func TestGearSlotsAreFiveAndTheOldNamesWarn(t *testing.T) {
+func TestGearSlotsAreFiveAndTheOldNamesAreRefused(t *testing.T) {
 	items := func(equipment string) map[string]string {
 		return map[string]string{"w.yaml": twoRooms + "\nitems:\n  thing:\n    name: THING\n    description: A thing.\n    equipment: " + equipment + "\n"}
 	}
@@ -374,9 +374,8 @@ func TestGearSlotsAreFiveAndTheOldNamesWarn(t *testing.T) {
 		t.Errorf("a cosmetic with a bonus is accepted: %v", res.Errors)
 	}
 	for _, old := range []string{"helmet", "chest", "legs", "hands", "ring", "neck"} {
-		res := validate(t, items("{slot: "+old+", defense: 1}"))
-		if len(res.Errors) != 0 || !has(res.Warnings, `slot "`+old+`" is retired`) {
-			t.Errorf("old slot %s: errors %v warnings %v", old, res.Errors, res.Warnings)
+		if res := validate(t, items("{slot: "+old+", defense: 1}")); !has(res.Errors, `slot "`+old+`" is not one of weapon, armor, shield, boots, cosmetic`) {
+			t.Errorf("old slot %s is accepted: %v", old, res.Errors)
 		}
 	}
 }
