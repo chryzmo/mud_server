@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"mud_server/src/internal/mudutils"
-	"mud_server/src/internal/worldfile"
 )
 
 /*
@@ -63,6 +62,7 @@ func (mp *MudPlayer) learnSpell(key string) bool {
 		return false
 	}
 	mp.st().spells[key] = true
+	defer mp.SendSpells()
 	mp.persistState("spell", key, "1", false)
 	msg := "You learn " + mudutils.ColorString(sp.Name, mudutils.COLOR_GREEN) + "."
 	for i := 0; i < spellSlots; i++ {
@@ -200,6 +200,7 @@ func (mp *MudPlayer) ready(arguments string) {
 	}
 	mp.setSlot(slot, key)
 	mp.SendMessage(fmt.Sprintf("%s is ready in slot %d.", mp.world.spells[key].Name, slot+1))
+	mp.SendSpells()
 }
 
 // unready answers UNREADY <slot or spell>. Loop only.
@@ -226,6 +227,45 @@ func (mp *MudPlayer) unready(arguments string) {
 	name := mp.world.spells[mp.st().slots[slot]].Name
 	mp.setSlot(slot, "")
 	mp.SendMessage(fmt.Sprintf("%s is no longer ready.", name))
+	mp.SendSpells()
 }
 
-var _ = worldfile.MaxSpells
+// spellInfo is one known spell in the spells frame.
+type spellInfo struct {
+	Key      string `json:"key"`
+	Name     string `json:"name"`
+	Effect   string `json:"effect"`
+	Cost     int    `json:"cost"`
+	Cooldown int    `json:"cooldown"`
+	Desc     string `json:"desc"`
+}
+
+// spellsMsg tells the client what the player knows and has readied (slot keys, empty when free).
+type spellsMsg struct {
+	T     string      `json:"t"`
+	Known []spellInfo `json:"known"`
+	Ready []string    `json:"ready"`
+}
+
+// SendSpells sends the spells frame. Loop only.
+func (mp *MudPlayer) SendSpells() {
+	if mp.world == nil {
+		return
+	}
+	msg := spellsMsg{T: msgSpells, Known: []spellInfo{}, Ready: append([]string{}, mp.st().slots[:]...)}
+	for k := range mp.st().spells {
+		if sp, ok := mp.world.spells[k]; ok {
+			msg.Known = append(msg.Known, spellInfo{Key: k, Name: sp.Name, Effect: sp.Effect, Cost: sp.Cost, Cooldown: sp.Cooldown, Desc: sp.Description})
+		}
+	}
+	sort.Slice(msg.Known, func(i, j int) bool { return msg.Known[i].Name < msg.Known[j].Name })
+	mp.sendFrame(encode(msg))
+}
+
+// sendSpellsIfAny is for entering the world: a player who knows no spell is sent nothing, which the
+// client reads as an empty set, so most players see no extra frame.
+func (mp *MudPlayer) sendSpellsIfAny() {
+	if mp.state != nil && len(mp.state.spells) > 0 {
+		mp.SendSpells()
+	}
+}

@@ -179,6 +179,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	registerProgress(server, server.Commands)
 	registerReport(server, server.Commands)
 	registerSocial(server, server.Commands)
+	registerCast(server, server.Commands)
 	server.World.worldFlags = loadWorldFlags(&server.DB)
 	if content != nil {
 		server.sched = newScheduler(server, content.events, &server.DB)
@@ -417,6 +418,7 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.applyLevels(false) // repairs a crash between the XP write and the stat save
 		player.SendStatUpdate()
 		player.sendCosmeticsIfAny()
+		player.sendSpellsIfAny()
 		player.sendEvents(ms.sched)
 		fresh := player.tourFresh() // before entered() counts the first room as visited
 		player.entered()

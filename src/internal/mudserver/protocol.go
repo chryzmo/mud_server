@@ -39,6 +39,7 @@ const (
 	msgRoom      = "room"
 	msgInventory = "inventory"
 	msgCosmetics = "cosmetics"
+	msgSpells    = "spells"
 	msgEvents    = "events"
 	msgError     = "error"
 )
@@ -299,6 +300,7 @@ func (mp *MudPlayer) SendInventory(text string) error {
 
 // SendStatUpdate pushes the player's current stats for the stats bar.
 func (mp *MudPlayer) SendStatUpdate() {
+	mp.regenMP(time.Now())
 	level, xp, next := mp.xpFields()
 	mp.sendFrame(encode(statsMsg{
 		Level: level, XP: xp, Next: next,

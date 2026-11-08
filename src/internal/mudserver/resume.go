@@ -139,6 +139,7 @@ func (ms *MudServer) attach(player *MudPlayer, session *Session, received uint64
 		player.SendLook()
 		player.SendStatUpdate()
 		player.sendCosmeticsIfAny()
+		player.sendSpellsIfAny()
 	}
 }
 
