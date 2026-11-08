@@ -72,3 +72,10 @@ rooms:
 		}
 	}
 }
+
+func TestDropsAreRenderedForReview(t *testing.T) {
+	out := render(t, map[string]string{"w.yaml": roomWith + "items:\n  charm: {name: CHARM, description: A charm.}\nnpcs:\n  rat: {race: RAT, hp: 5, combat_tick_ms: 1000, behavior: orc, drops: [{item: charm, chance: 25}, {badge: flame, chance: 100}]}\n"})
+	if !strings.Contains(out, "**Drops from RAT:** charm (25%), flame badge (100%)") {
+		t.Errorf("overview is missing the drops\n%s", out)
+	}
+}

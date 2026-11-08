@@ -76,6 +76,7 @@ func (spawner *BaddieSpawner) tick (now time.Time, w *World) {
 				LootGoldMax: spawner.baddie.LootGoldMax,
 				passive: spawner.baddie.passive,
 				xp: spawner.baddie.xp,
+				drops: spawner.baddie.drops,
 			}
 
 			if newbaddie.Name == "" {

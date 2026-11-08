@@ -169,6 +169,20 @@ type NPC struct {
 	// at those who attack it. XP is what each fighter is paid for a kill (0: the progression's kill XP).
 	Aggressive bool `yaml:"aggressive"`
 	XP         int  `yaml:"xp"`
+	// Drops are rolled once for each fighter who helped with the kill.
+	Drops []Drop `yaml:"drops"`
+}
+
+// MaxDrops is the most entries one monster's drop table may have.
+const MaxDrops = 8
+
+// Drop is one thing a monster may leave for a fighter: an item, a name colour or a badge (exactly
+// one), with a Chance from 1 to 100 percent. 100 is a guaranteed drop.
+type Drop struct {
+	Item   string `yaml:"item"`
+	Color  string `yaml:"color"`
+	Badge  string `yaml:"badge"`
+	Chance int    `yaml:"chance"`
 }
 
 // World is every file merged, with where each key came from.
@@ -444,6 +458,35 @@ func (w *World) Validate(res *Result) {
 		}
 		if n.XP < 0 || n.XP > MaxXPAward {
 			res.errorf(f, p+".xp", "xp must be from 0 to %d (0 means the progression's kill XP)", MaxXPAward)
+		}
+		if len(n.Drops) > MaxDrops {
+			res.errorf(f, p+".drops", "%d drops; at most %d", len(n.Drops), MaxDrops)
+		}
+		for i, d := range n.Drops {
+			dp := fmt.Sprintf("%s.drops[%d]", p, i)
+			set := 0
+			for _, v := range []string{d.Item, d.Color, d.Badge} {
+				if v != "" {
+					set++
+				}
+			}
+			if set != 1 {
+				res.errorf(f, dp, "a drop names exactly one of item, color or badge")
+			}
+			if d.Item != "" {
+				if _, ok := w.Items[d.Item]; !ok {
+					res.errorf(f, dp+".item", "%q is not an item", d.Item)
+				}
+			}
+			if d.Color != "" && !contains(Colors, d.Color) {
+				res.errorf(f, dp+".color", "%q is not one of %s", d.Color, strings.Join(Colors, ", "))
+			}
+			if d.Badge != "" && !contains(Badges, d.Badge) {
+				res.errorf(f, dp+".badge", "%q is not one of %s", d.Badge, strings.Join(Badges, ", "))
+			}
+			if d.Chance < 1 || d.Chance > 100 {
+				res.errorf(f, dp+".chance", "chance must be from 1 to 100 (percent)")
+			}
 		}
 		if n.LootGoldMin < 0 || n.LootGoldMax < n.LootGoldMin {
 			res.errorf(f, p+".loot_gold_max", "loot_gold_max (%d) must not be below loot_gold_min (%d), and neither may be negative", n.LootGoldMax, n.LootGoldMin)
