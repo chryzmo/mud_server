@@ -204,7 +204,7 @@ func Render(w *World, res *Result) string {
 			for _, rk := range sortedKeys(w.Rooms) {
 				for i := range w.Rooms[rk].Rules {
 					for _, e := range w.Rooms[rk].Rules[i].Do {
-						if e.Teach != nil && *e.Teach == key {
+						if (e.Teach != nil && *e.Teach == key) || (e.TeachRoom != nil && *e.TeachRoom == key) {
 							from = append(from, "rule in `"+rk+"`")
 						}
 					}

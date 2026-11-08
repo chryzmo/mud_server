@@ -53,9 +53,9 @@ type Condition struct {
 	NotFlag              string              `yaml:"not_flag" json:"not_flag,omitempty"`
 	HasItem              string              `yaml:"has_item" json:"has_item,omitempty"`
 	KnowsSpell           string              `yaml:"knows_spell" json:"knows_spell,omitempty"` // the player has learned this spell (a key)
-	RoomFlag             string              `yaml:"room_flag" json:"room_flag,omitempty"`   // a held key in this room (see hold)
-	WorldFlag            string              `yaml:"world_flag" json:"world_flag,omitempty"` // set for everyone by an event or the GM
-	Counter              map[string]int      `yaml:"counter" json:"counter,omitempty"`       // every named counter equals the value
+	RoomFlag             string              `yaml:"room_flag" json:"room_flag,omitempty"`     // a held key in this room (see hold)
+	WorldFlag            string              `yaml:"world_flag" json:"world_flag,omitempty"`   // set for everyone by an event or the GM
+	Counter              map[string]int      `yaml:"counter" json:"counter,omitempty"`         // every named counter equals the value
 	CounterAtLeast       map[string]int      `yaml:"counter_at_least" json:"counter_at_least,omitempty"`
 	Sequence             map[string][]string `yaml:"sequence" json:"sequence,omitempty"` // the recorded sequence equals the list
 	SequenceLongerThan   map[string]int      `yaml:"sequence_longer_than" json:"sequence_longer_than,omitempty"`
@@ -77,11 +77,12 @@ type Effect struct {
 	Open      *GateEffect   `yaml:"open" json:"open,omitempty"`
 	Close     *GateEffect   `yaml:"close" json:"close,omitempty"`
 	Hold      *HoldEffect   `yaml:"hold" json:"hold,omitempty"`
-	Teleport  *string       `yaml:"teleport" json:"teleport,omitempty"` // a room key
-	Stop      *bool         `yaml:"stop" json:"stop,omitempty"`         // end the rule here
-	Run       *string       `yaml:"run" json:"run,omitempty"`           // another rule of this room, by id
-	Unlock    *UnlockEffect `yaml:"unlock" json:"unlock,omitempty"`     // a quest reward: a name colour or badge
-	Teach     *string       `yaml:"teach" json:"teach,omitempty"`       // a quest reward: a spell (a key)
+	Teleport  *string       `yaml:"teleport" json:"teleport,omitempty"`     // a room key
+	Stop      *bool         `yaml:"stop" json:"stop,omitempty"`             // end the rule here
+	Run       *string       `yaml:"run" json:"run,omitempty"`               // another rule of this room, by id
+	Unlock    *UnlockEffect `yaml:"unlock" json:"unlock,omitempty"`         // a quest reward: a name colour or badge
+	Teach     *string       `yaml:"teach" json:"teach,omitempty"`           // a quest reward: a spell (a key)
+	TeachRoom *string       `yaml:"teach_room" json:"teach_room,omitempty"` // the same for everyone in the room now
 }
 
 // UnlockEffect grants a cosmetic from the fixed palette (Colors, Badges); exactly one is set.
@@ -211,6 +212,7 @@ func (e Effect) kind() (name string, n int) {
 	add("run", e.Run != nil)
 	add("unlock", e.Unlock != nil)
 	add("teach", e.Teach != nil)
+	add("teach_room", e.TeachRoom != nil)
 	return
 }
 
@@ -453,6 +455,10 @@ func (w *World) validateRules(res *Result) {
 				case "teach":
 					if _, ok := w.Spells[*e.Teach]; !ok {
 						res.errorf(f, ep+".teach", "%q is not a spell", *e.Teach)
+					}
+				case "teach_room":
+					if _, ok := w.Spells[*e.TeachRoom]; !ok {
+						res.errorf(f, ep+".teach_room", "%q is not a spell", *e.TeachRoom)
 					}
 				case "give_item":
 					if _, ok := w.Items[*e.GiveItem]; !ok {
