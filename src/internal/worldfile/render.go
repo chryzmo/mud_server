@@ -430,6 +430,8 @@ func describeStep(s ResolvedStep) string {
 		return fmt.Sprintf("announce %q", s.Text)
 	case StepRoomSay:
 		return fmt.Sprintf("tell everyone in `%s` %q", s.Room, s.Text)
+	case StepSpawn:
+		return fmt.Sprintf("spawn `%s` in `%s`", s.NPC, s.Room)
 	case StepSetFlag:
 		return "set world flag `" + s.Flag + "`"
 	}

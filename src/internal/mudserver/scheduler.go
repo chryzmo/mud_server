@@ -187,6 +187,12 @@ func (s *scheduler) run(step worldfile.ResolvedStep, stale bool) {
 				}
 			}
 		}
+	case worldfile.StepSpawn:
+		if !stale { // a monster for an event that was missed is not worth waking
+			if _, why := ms.World.spawnMob(step.NPC, ms.World.roomsByKey[step.Room], time.Now()); why != "" {
+				fmt.Printf("event spawn of %s in %s skipped: %s\n", step.NPC, step.Room, why)
+			}
+		}
 	case worldfile.StepSetFlag:
 		ms.setWorldFlag(step.Flag, true)
 	case worldfile.StepClearFlag:

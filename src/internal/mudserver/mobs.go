@@ -5,6 +5,9 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
+	"time"
+
+	muddatabase "mud_server/src/internal/database"
 
 	"mud_server/src/internal/worldfile"
 )
@@ -30,6 +33,8 @@ type mobTraits struct {
 	aggressive bool
 	xp         int
 	drops      []worldfile.Drop
+	boss       bool
+	name       string
 }
 
 // applyMobTraits gives each spawner's template monster its traits from content. A monster that has no
@@ -41,8 +46,85 @@ func (w *World) applyMobTraits(traits map[string]mobTraits) {
 			s.baddie.passive = !t.aggressive
 			s.baddie.xp = t.xp
 			s.baddie.drops = t.drops
+			s.baddie.boss = t.boss
+			s.baddie.Name = t.name
 		}
 	}
+}
+
+// copyOf is a fresh monster from a template: its numbers and traits, no name, place or fight yet.
+func (t *BaddieNPC) copyOf(now time.Time) *BaddieNPC {
+	return &BaddieNPC{
+		Race: t.Race, Name: t.Name,
+		AttackAccuracy: t.AttackAccuracy, AttackPower: t.AttackPower, Defense: t.Defense,
+		HP: t.HP, MP: t.MP, TurnAction: t.TurnAction,
+		combatTickerDurationInMS: t.combatTickerDurationInMS,
+		// As with the old per-NPC ticker, the first swing comes one interval after spawning.
+		nextAttackAt: now.Add(time.Millisecond * time.Duration(t.combatTickerDurationInMS)),
+		LootGoldMin:  t.LootGoldMin, LootGoldMax: t.LootGoldMax,
+		passive: t.passive, xp: t.xp, drops: t.drops, boss: t.boss,
+	}
+}
+
+// placeMob puts a new monster in its Location, named apart from the others there, and tells the room.
+// w may be nil. Loop only.
+func (w *World) placeMob(m *BaddieNPC) {
+	if m.Name == "" {
+		m.Name = m.GenerateName()
+	}
+	m.Name = m.Location.uniqueMobName(m.Name)
+	m.Location.BaddieMap[strings.ToUpper(m.Name)] = m
+	if w != nil {
+		w.liveMobs++
+	}
+	m.Location.Broadcast(m.Name+" - "+m.Race+" - appears in the room!", "")
+	m.Location.roomChanged()
+}
+
+// loadMobTemplates reads each content monster's numbers once, at world build, so a spawn by key never
+// touches the database on the loop.
+func (w *World) loadMobTemplates(db *muddatabase.MudDatabase, content *contentResult) {
+	w.mobTemplates = map[string]*BaddieNPC{}
+	for key, race := range content.mobRaces {
+		t := BaddieNPC{}.FetchGenericFromDB(db, race)
+		if t.Race == "" {
+			continue
+		}
+		traits := content.mobs[strings.ToUpper(race)]
+		t.passive, t.xp, t.drops, t.boss, t.Name = !traits.aggressive, traits.xp, traits.drops, traits.boss, traits.name
+		w.mobTemplates[key] = &t
+	}
+}
+
+// spawnMob puts one monster (by npc key) in a room. It returns the monster, or the reason it could not
+// be placed. A boss is one at a time: a second is refused while one is alive. Loop only.
+func (w *World) spawnMob(npcKey string, room *Room, now time.Time) (*BaddieNPC, string) {
+	t := w.mobTemplates[npcKey]
+	if t == nil {
+		return nil, "there is no monster called " + npcKey
+	}
+	if room == nil {
+		return nil, "there is no such room"
+	}
+	if w.mobCap > 0 && w.liveMobs >= w.mobCap {
+		return nil, "the world holds as many monsters as it can"
+	}
+	if t.boss {
+		for _, r := range w.RoomMap {
+			for _, b := range r.BaddieMap {
+				if b.boss && b.Race == t.Race && !b.dead {
+					return nil, b.Name + " is already about"
+				}
+			}
+		}
+	}
+	m := t.copyOf(now)
+	m.Location = room
+	w.placeMob(m)
+	if m.boss && w.announceAll != nil {
+		w.announceAll(m.Name + " has appeared in " + room.Name + "!")
+	}
+	return m, ""
 }
 
 // provoke notes that the player attacked this monster: it will fight back at them, and a kill pays them.
@@ -129,6 +211,13 @@ func (r *Room) defeated(npc *BaddieNPC, killer *MudPlayer) {
 			p.NPCTarget = nil
 		}
 	}
+	if npc.boss && killer.world != nil && killer.world.announceAll != nil {
+		names := make([]string, 0, len(fighters))
+		for _, p := range fighters {
+			names = append(names, p.Username)
+		}
+		killer.world.announceAll(npc.Name + " has fallen to " + strings.Join(names, ", ") + "!")
+	}
 	r.KillNPC(npc.Name, killer.Username)
 	r.roomChanged() // the monster is no longer tappable
 }
@@ -175,4 +264,31 @@ func lootGold(min, max int32) int32 {
 		return min
 	}
 	return min + rand.Int32N(max-min+1)
+}
+
+// gmSpawn is GM SPAWN <npc> [room key]: put a monster in your room, or in the room with that key.
+func (ms *MudServer) gmSpawn(gm *MudPlayer, args []string) string {
+	if len(args) < 1 || len(args) > 2 {
+		gm.SendMessage("Usage: GM SPAWN <npc> [room]")
+		return "usage"
+	}
+	room := gm.Location
+	if len(args) == 2 {
+		room = ms.World.roomsByKey[strings.ToLower(args[1])]
+	}
+	m, why := ms.World.spawnMob(strings.ToLower(args[0]), room, time.Now())
+	if why != "" {
+		gm.SendMessage("Not spawned: " + why + ".")
+		return "spawn refused"
+	}
+	gm.SendMessage(m.Name + " is in " + room.Name + ".")
+	return "spawn " + strings.ToLower(args[0])
+}
+
+// announceAll tells every player a line, in the same frame as a GM announcement. Loop only.
+func (ms *MudServer) announceAll(text string) {
+	frame := encode(announceMsg{T: msgAnnounce, Text: text, From: "event"})
+	for _, p := range ms.players {
+		p.sendFrame(frame)
+	}
 }

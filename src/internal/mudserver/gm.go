@@ -83,6 +83,7 @@ const gmUsage = `GM commands:
   GM REPORTS CLOSE <number|ALL>
   GM HIDE|UNHIDE <name>      keep a name off the leaderboard, or put it back (works for anyone who has played)
   GM FLAG [name [on|off]]    show, set or clear a world flag (events and gates read them)
+  GM SPAWN <npc> [room]      put a monster in your room (or the room with that key)
   GM LOCK / GM UNLOCK        refuse or allow new visitors (players already in can reconnect)`
 
 // gmCommand is the GM command. Loop only, like every command.
@@ -388,6 +389,9 @@ func (ms *MudServer) gmRun(gm *MudPlayer, verb string, args []string, text strin
 		}
 		gm.SendMessage("Usage: GM FLAG [name [on|off]]")
 		return "usage"
+
+	case "SPAWN":
+		return ms.gmSpawn(gm, args)
 
 	case "STAGE":
 		return ms.gmStage(gm, args)

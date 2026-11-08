@@ -166,6 +166,7 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 		stateQ:        make(chan stateWrite, stateQueueSize),
 		stateDone:     make(chan struct{}),
 	}
+	server.World.announceAll = server.announceAll
 	server.recoveries = newRecoveryGuard(server.recoveryLock())
 	server.joinLimit = newJoinLimiter(c.Connection.JoinPerSecond, c.Connection.JoinBurst)
 	server.ipLimit = newIPLimiter(c.Connection.MaxJoinsPerMinutePerIP)
