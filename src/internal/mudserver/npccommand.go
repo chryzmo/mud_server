@@ -20,13 +20,23 @@ func GenerateNPCCommandList() map[int32]NPCCommand {
 				// Target is no longer in the room
 				baddie.TargetPC = nil
 			}
+			if baddie.passive && baddie.TargetPC != nil {
+				// A passive monster fights only those who have hit it: drop a target that has left or fallen.
+				baddie.stillFighting()
+				found := false
+				for _, h := range baddie.hitters {
+					found = found || h == baddie.TargetPC
+				}
+				if !found {
+					baddie.TargetPC = nil
+				}
+			}
 			if baddie.TargetPC == nil {
-				// Select one occupant and announce once. Broadcasting for every
+				// Select one fighter and announce once. Broadcasting for every
 				// candidate floods each client's queue in a crowded room.
-				for _, p := range baddie.Location.Players() {
+				if p := baddie.pickTarget(); p != nil {
 					baddie.TargetPC = p
 					baddie.Location.Broadcast(mudutils.ColorString(baddie.Name, mudutils.COLOR_RED)+" looks at "+p.Username+".", "")
-					break
 				}
 			} else {
 				// If NPC has target, attack

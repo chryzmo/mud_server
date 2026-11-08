@@ -52,6 +52,9 @@ func (mp *MudPlayer) roomFrame() roomMsg {
 		}
 		msg.Things = append(msg.Things, roomThing{ID: f.Key, Name: f.Names[0], Verbs: room.frameVerbs(f.Key)})
 	}
+	for _, b := range room.BaddieMap {
+		msg.Things = append(msg.Things, roomThing{ID: "mob:" + strings.ToUpper(b.Name), Name: b.Name, Verbs: []string{"ATTACK"}})
+	}
 	sort.Slice(msg.Things, func(i, j int) bool { return msg.Things[i].Name < msg.Things[j].Name }) // content is a map: keep the order steady
 	for _, p := range room.People {
 		if len(p.Names) > 0 {

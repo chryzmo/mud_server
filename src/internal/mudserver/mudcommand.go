@@ -201,10 +201,14 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				player.NPCTarget = player.Location.BaddieMap[npc_target_name]
 			}
 
+			if player.NPCTarget != nil && player.NPCTarget.dead {
+				player.NPCTarget = nil // someone else finished it
+			}
 			if player.NPCTarget == nil {
 				player.SendMessage("You must have a target to attack.")
 			} else if player.NPCTarget.Location == player.Location {
 				// Perform attack!
+				player.NPCTarget.provoke(player)
 				attackRoll := rand.IntN(100)
 				effAtk := player.EffectiveAttackPower()
 				if attackRoll > player.NPCTarget.Defense {
@@ -213,8 +217,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 					player.Location.Broadcast(player.Username+" hits "+player.NPCTarget.Name+" for "+strconv.Itoa(effAtk)+" points of damage!", player.Username)
 					if player.NPCTarget.HP <= 0 {
 						player.SendMessage("You kill " + player.NPCTarget.Name + "!")
-						player.killedMonster()
-						player.Location.KillNPC(player.NPCTarget.Name, player.Username)
+						player.Location.defeated(player.NPCTarget, player)
 						player.NPCTarget = nil
 						player.dirty = true // saved in the next batch (persist.go)
 					}

@@ -26,6 +26,8 @@ type World struct {
 	ambientBudget commandLimiter                           // every ambient line spends from this (ambient.go); loop only
 	ambientGap    func(lo, hi time.Duration) time.Duration // nil: random; tests fix it
 	onboarding    *worldfile.Onboarding                    // the walkthrough script; nil when the content has none
+	mobCap        int                                      // most live monsters in the world; spawners wait at this (mobs.go)
+	liveMobs      int                                      // monsters alive, counted once per world tick; loop only
 	prog          worldfile.Progression                    // XP and level tuning; set when the world is built and never changed
 	guide         *guide                                   // puzzles and regions the content declares; nil without content
 	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
@@ -55,6 +57,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		worldFlags:       map[string]bool{},
 		guide:            newGuide(nil, nil), // no puzzles or regions without content
 		prog:             worldfile.DefaultProgression(),
+		mobCap:           defaultMobCap,
 	}
 	if content != nil {
 		w.startRoomID = content.startRoomID
@@ -86,6 +89,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 			room.ambient = content.ambient[room.Key]
 			room.crowd = content.crowd[room.Key]
 		}
+		w.applyMobTraits(content.mobs)
 	}
 	w.configureAreas(crowd)
 
@@ -129,12 +133,14 @@ func (w *World) indexContent(db *muddatabase.MudDatabase) {
 // tick advances the world by one step: every room's NPCs act, then every
 // spawner checks whether it's due.
 func (w *World) tick(now time.Time) {
+	w.liveMobs = 0
 	for _, room := range w.RoomMap {
 		room.tick(now)
 		w.ambientTick(room, now)
+		w.liveMobs += len(room.BaddieMap)
 	}
 	for _, spawner := range w.Spawners {
-		spawner.tick(now)
+		spawner.tick(now, w)
 	}
 }
 

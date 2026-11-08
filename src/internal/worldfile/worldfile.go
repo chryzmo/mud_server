@@ -162,6 +162,10 @@ type NPC struct {
 	Behavior     string `yaml:"behavior"`
 	LootGoldMin  int    `yaml:"loot_gold_min"`
 	LootGoldMax  int    `yaml:"loot_gold_max"`
+	// Aggressive monsters attack whoever is in the room; the default is a monster that only fights back
+	// at those who attack it. XP is what each fighter is paid for a kill (0: the progression's kill XP).
+	Aggressive bool `yaml:"aggressive"`
+	XP         int  `yaml:"xp"`
 }
 
 // World is every file merged, with where each key came from.
@@ -438,6 +442,9 @@ func (w *World) Validate(res *Result) {
 		}
 		if !contains(Behaviors, n.Behavior) {
 			res.errorf(f, p+".behavior", "behavior %q is not one of %s", n.Behavior, strings.Join(Behaviors, ", "))
+		}
+		if n.XP < 0 || n.XP > MaxXPAward {
+			res.errorf(f, p+".xp", "xp must be from 0 to %d (0 means the progression's kill XP)", MaxXPAward)
 		}
 		if n.LootGoldMin < 0 || n.LootGoldMax < n.LootGoldMin {
 			res.errorf(f, p+".loot_gold_max", "loot_gold_max (%d) must not be below loot_gold_min (%d), and neither may be negative", n.LootGoldMax, n.LootGoldMin)
