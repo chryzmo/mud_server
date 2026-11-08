@@ -54,14 +54,14 @@ func TestScrollsTeachEffectsAndConditionsPointAtRealSpells(t *testing.T) {
 			t.Errorf("scroll %s: want %q, got %q", extra, want, errs)
 		}
 	}
-	rule := "rooms:\n  hall:\n    name: Hall\n    description: A hall.\n    features:\n      desk: {names: [desk], examine: A desk.}\n    rules:\n      - on: {verb: PULL, target: desk}\n        if: [{knows_spell: ghost}]\n        do: [{teach: phantom}]\n"
+	rule := "rooms:\n  hall:\n    name: Hall\n    description: A hall.\n    features:\n      desk: {names: [desk], examine: A desk.}\n    rules:\n      - on: {verb: PULL, target: desk}\n        if: [{knows_spell: ghost}]\n        do: [{teach: phantom}, {teach_room: spook}]\n"
 	_, res, _ := ValidateDir(write(t, map[string]string{"w.yaml": "start_room: hall\n" + rule + goodSpell}))
 	var all []string
 	for _, p := range res.Errors {
 		all = append(all, p.String())
 	}
 	errs := strings.Join(all, "\n")
-	for _, want := range []string{`"ghost" is not a spell`, `"phantom" is not a spell`} {
+	for _, want := range []string{`"ghost" is not a spell`, `"phantom" is not a spell`, `"spook" is not a spell`} {
 		if !strings.Contains(errs, want) {
 			t.Errorf("want %q in %s", want, errs)
 		}

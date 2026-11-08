@@ -240,6 +240,10 @@ func (rr *ruleRun) effect(e worldfile.Effect, depth int) {
 		}
 	case e.Teach != nil:
 		p.learnSpell(*e.Teach)
+	case e.TeachRoom != nil:
+		for _, other := range room.Players() {
+			other.learnSpell(*e.TeachRoom)
+		}
 	case e.GiveItem != nil:
 		p.giveItemKey(*e.GiveItem)
 	case e.TakeItem != nil:
