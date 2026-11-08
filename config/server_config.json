@@ -15,8 +15,8 @@
         "RoomTickDurationInMS": 250,
         "PlayerStartHP": 20,
         "PlayerStartMaxHP": 20,
-        "PlayerStartMP": 10,
-        "PlayerStartMaxMP": 10,
+        "PlayerStartMP": 15,
+        "PlayerStartMaxMP": 15,
         "PlayerStartAttack": 5,
         "PlayerStartDefense": 10
     },
