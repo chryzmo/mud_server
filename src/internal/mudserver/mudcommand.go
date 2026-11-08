@@ -338,25 +338,11 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				return muddata.MUD_OK
 			}
 
-			// Determine the target slot; rings fill ring1 first, then ring2
-			targetSlot := equipItem.Slot
-			if targetSlot == "ring" {
-				if player.Equipment.Ring1 == nil {
-					targetSlot = "ring1"
-				} else {
-					targetSlot = "ring2"
-				}
-			}
-
+			// The slot comes from the item; a retired slot name maps to its current one.
+			targetSlot := NormalizeSlot(equipItem.Slot)
 			slotPtr := player.Equipment.GetSlotPtr(targetSlot)
 			if slotPtr == nil {
-				player.SendMessage("Unknown equipment slot: " + targetSlot + "\n")
-				return muddata.MUD_OK
-			}
-
-			// Both ring slots full
-			if targetSlot == "ring2" && player.Equipment.Ring2 != nil {
-				player.SendMessage("Both ring slots are occupied. Unequip a ring first.\n")
+				player.SendMessage("Unknown equipment slot: " + equipItem.Slot + "\n")
 				return muddata.MUD_OK
 			}
 
@@ -371,7 +357,11 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			// Equip the new item
 			*slotPtr = equipItem
 			player.Inventory.RemoveItem(invItem)
-			player.SendMessage("You equip " + equipItem.Name + ". " + equipItem.BonusSummary() + "\n")
+			if targetSlot == SlotCosmetic {
+				player.SendMessage("You put on " + equipItem.Name + ". It is for looks only.\n")
+			} else {
+				player.SendMessage("You equip " + equipItem.Name + ". " + equipItem.BonusSummary() + "\n")
+			}
 			player.SendStatUpdate()
 			player.dirty = true // saved in the next batch (persist.go)
 			return muddata.MUD_OK
@@ -380,17 +370,17 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 
 	// UNEQUIP <slot>  — remove gear from the named slot and return it to inventory
 	c_unequip := MudCommand{
-		description: "Remove equipped gear from a slot and return it to your inventory.  Usage: UNEQUIP <slot>  (slots: weapon shield helmet chest legs hands ring1 ring2 neck)",
+		description: "Remove equipped gear from a slot and return it to your inventory.  Usage: UNEQUIP <slot>  (slots: weapon armor shield boots cosmetic)",
 		action: func(player *MudPlayer, arguments string) int {
 			slotName := strings.ToLower(strings.TrimSpace(arguments))
 			if slotName == "" {
-				player.SendMessage("Usage: UNEQUIP <slot>\nSlots: weapon shield helmet chest legs hands ring1 ring2 neck\n")
+				player.SendMessage("Usage: UNEQUIP <slot>\nSlots: weapon armor shield boots cosmetic\n")
 				return muddata.MUD_OK
 			}
 
 			slotPtr := player.Equipment.GetSlotPtr(slotName)
 			if slotPtr == nil {
-				player.SendMessage("Unknown slot '" + arguments + "'. Valid slots: weapon shield helmet chest legs hands ring1 ring2 neck\n")
+				player.SendMessage("Unknown slot '" + arguments + "'. Valid slots: weapon armor shield boots cosmetic\n")
 				return muddata.MUD_OK
 			}
 
