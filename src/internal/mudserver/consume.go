@@ -3,6 +3,7 @@ package mudserver
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"mud_server/src/internal/mudutils"
 )
@@ -35,6 +36,7 @@ func (mp *MudPlayer) useConsumable(query string) bool {
 	if it == nil {
 		return false
 	}
+	mp.regenMP(time.Now())
 	maxHP, maxMP := mp.EffectiveMaxHP(), mp.EffectiveMaxMP()
 	hp := min(c.HP, max(maxHP-mp.HP, 0))
 	mpGain := min(c.MP, max(maxMP-mp.MP, 0))

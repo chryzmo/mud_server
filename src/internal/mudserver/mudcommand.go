@@ -313,6 +313,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	c_stats := MudCommand{
 		description: "Show your current HP, MP, attack, and defense, including any equipment bonuses.",
 		action: func(player *MudPlayer, arguments string) int {
+			player.regenMP(time.Now())
 			atkBonus := player.Equipment.TotalBonusAttackPower()
 			defBonus := player.Equipment.TotalBonusDefense()
 

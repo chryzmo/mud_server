@@ -44,6 +44,10 @@ type MudPlayer struct {
 	lastCopy      map[*Area]int                 // the copy of each area the player was last in; loop-owned
 	dormant       bool                          // connection dropped, still in the world for a grace period (see resume.go)
 	lastQuiet     time.Time                     // the last line spoken in a quiet room (stage.go)
+	mpStamp       time.Time                     // magic regrows from here (cast.go)
+	wardUntil     time.Time                     // a ward spell lasts until then (cast.go)
+	wardBonus     int                           // the defence it adds
+	cooldowns     map[string]time.Time          // spell key -> when it can be cast again (cast.go)
 	lastStage     time.Time                     // the last STAGE line
 	lastActive    time.Time                     // the last command, admission or resume; see idle.go
 	ring          [][]byte                      // the last counted frames sent, for replay after a resume
@@ -137,7 +141,11 @@ func (mp *MudPlayer) EffectiveAttackPower() int {
 
 // EffectiveDefense returns base defense plus all equipment bonuses.
 func (mp *MudPlayer) EffectiveDefense() int {
-	return mp.Defense + mp.Equipment.TotalBonusDefense()
+	d := mp.Defense + mp.Equipment.TotalBonusDefense()
+	if mp.wardBonus > 0 && time.Now().Before(mp.wardUntil) {
+		d += mp.wardBonus
+	}
+	return d
 }
 
 // EffectiveMaxHP returns base MaxHP plus all equipment bonuses.
