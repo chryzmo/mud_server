@@ -52,6 +52,8 @@ type contentResult struct {
 	mobs        map[string]mobTraits    // what content says about each monster, by race (mobs.go)
 	mobRaces    map[string]string       // npc key -> race, for spawning by key (mobs.go)
 	consumes    map[string]worldfile.Consume // item key -> what USE restores (consume.go)
+	spells      map[string]worldfile.Spell // spell key -> definition (spells.go)
+	scrolls     map[string]string          // item key -> the spell it teaches (spells.go)
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -83,9 +85,14 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	out.mobs = map[string]mobTraits{}
 	out.mobRaces = map[string]string{}
 	out.consumes = map[string]worldfile.Consume{}
+	out.spells = w.Spells
+	out.scrolls = map[string]string{}
 	for key, it := range w.Items {
 		if it.Consume != nil {
 			out.consumes[key] = *it.Consume
+		}
+		if it.Teaches != "" {
+			out.scrolls[key] = it.Teaches
 		}
 	}
 	for key, n := range w.NPCs {

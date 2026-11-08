@@ -34,6 +34,8 @@ type playerState struct {
 	active    map[string]string // "color" or "badge" -> the key worn
 	xp        map[string]int    // "explore", "combat", and "level" (the last level whose gains were applied)
 	seen      map[string]bool   // "room/feature" keys already examined once, for exploration XP
+	spells    map[string]bool   // spell keys this player has learned (spells.go)
+	slots     [3]string         // the spell keys readied in slots 1 to 3; empty when free
 }
 
 func newPlayerState() *playerState {
@@ -41,7 +43,7 @@ func newPlayerState() *playerState {
 		flags: map[string]bool{}, counters: map[string]int{},
 		sequences: map[string][]string{}, gates: map[string]bool{},
 		visited: map[string]bool{}, hints: map[string]int{},
-		unlocks: map[string]bool{}, active: map[string]string{}, xp: map[string]int{}, seen: map[string]bool{},
+		unlocks: map[string]bool{}, active: map[string]string{}, xp: map[string]int{}, seen: map[string]bool{}, spells: map[string]bool{},
 	}
 }
 
@@ -174,6 +176,12 @@ func (mp *MudPlayer) loadState(db *muddatabase.MudDatabase) {
 			state.seen[r.Key] = true
 		case "unlock":
 			state.unlocks[r.Key] = true
+		case "spell":
+			state.spells[r.Key] = true
+		case "slot":
+			if n, err := strconv.Atoi(r.Key); err == nil && n >= 1 && n <= 3 {
+				state.slots[n-1] = r.Value
+			}
 		case "cosmetic":
 			state.active[r.Key] = r.Value
 		case "hint":

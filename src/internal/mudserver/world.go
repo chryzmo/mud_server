@@ -32,6 +32,8 @@ type World struct {
 	guide         *guide                                   // puzzles and regions the content declares; nil without content
 	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
 	itemsByKey    map[string]*Item                         // content items by key: templates for what rules give
+	spells        map[string]worldfile.Spell               // spell definitions by key (spells.go)
+	scrolls       map[string]string                        // item key -> the spell READ teaches (spells.go)
 	mobTemplates  map[string]*BaddieNPC                    // content monsters by npc key: what a spawn step or GM SPAWN copies (mobs.go)
 	consumes      map[string]worldfile.Consume             // what USE restores, by item key (consume.go)
 	announceAll   func(text string)                        // tells every player; set by the server (mobs.go)
@@ -69,6 +71,8 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 		w.prog = content.progression
 		w.onboarding = content.onboarding
 		w.consumes = content.consumes
+		w.spells = content.spells
+		w.scrolls = content.scrolls
 	}
 
 	// Load rooms into RoomMap; ensures all rooms are loaded prior to linking

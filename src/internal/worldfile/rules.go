@@ -52,6 +52,7 @@ type Condition struct {
 	Flag                 string              `yaml:"flag" json:"flag,omitempty"`
 	NotFlag              string              `yaml:"not_flag" json:"not_flag,omitempty"`
 	HasItem              string              `yaml:"has_item" json:"has_item,omitempty"`
+	KnowsSpell           string              `yaml:"knows_spell" json:"knows_spell,omitempty"` // the player has learned this spell (a key)
 	RoomFlag             string              `yaml:"room_flag" json:"room_flag,omitempty"`   // a held key in this room (see hold)
 	WorldFlag            string              `yaml:"world_flag" json:"world_flag,omitempty"` // set for everyone by an event or the GM
 	Counter              map[string]int      `yaml:"counter" json:"counter,omitempty"`       // every named counter equals the value
@@ -80,6 +81,7 @@ type Effect struct {
 	Stop      *bool         `yaml:"stop" json:"stop,omitempty"`         // end the rule here
 	Run       *string       `yaml:"run" json:"run,omitempty"`           // another rule of this room, by id
 	Unlock    *UnlockEffect `yaml:"unlock" json:"unlock,omitempty"`     // a quest reward: a name colour or badge
+	Teach     *string       `yaml:"teach" json:"teach,omitempty"`       // a quest reward: a spell (a key)
 }
 
 // UnlockEffect grants a cosmetic from the fixed palette (Colors, Badges); exactly one is set.
@@ -173,6 +175,7 @@ func (c Condition) kind() (name string, n int) {
 	add("flag", c.Flag != "")
 	add("not_flag", c.NotFlag != "")
 	add("has_item", c.HasItem != "")
+	add("knows_spell", c.KnowsSpell != "")
 	add("room_flag", c.RoomFlag != "")
 	add("world_flag", c.WorldFlag != "")
 	add("counter", len(c.Counter) > 0)
@@ -207,6 +210,7 @@ func (e Effect) kind() (name string, n int) {
 	add("stop", e.Stop != nil)
 	add("run", e.Run != nil)
 	add("unlock", e.Unlock != nil)
+	add("teach", e.Teach != nil)
 	return
 }
 
@@ -380,6 +384,10 @@ func (w *World) validateRules(res *Result) {
 						if _, ok := w.Items[c.HasItem]; !ok {
 							res.errorf(f, cp+".has_item", "%q is not an item", c.HasItem)
 						}
+					case "knows_spell":
+						if _, ok := w.Spells[c.KnowsSpell]; !ok {
+							res.errorf(f, cp+".knows_spell", "%q is not a spell", c.KnowsSpell)
+						}
 					case "counter":
 						for k := range c.Counter {
 							if !facts.counters[k] {
@@ -441,6 +449,10 @@ func (w *World) validateRules(res *Result) {
 						res.errorf(f, ep+".unlock.color", "%q is not a colour (%s)", u.Color, strings.Join(Colors, ", "))
 					case u.Badge != "" && !contains(Badges, u.Badge):
 						res.errorf(f, ep+".unlock.badge", "%q is not a badge (%s)", u.Badge, strings.Join(Badges, ", "))
+					}
+				case "teach":
+					if _, ok := w.Spells[*e.Teach]; !ok {
+						res.errorf(f, ep+".teach", "%q is not a spell", *e.Teach)
 					}
 				case "give_item":
 					if _, ok := w.Items[*e.GiveItem]; !ok {
@@ -610,9 +622,15 @@ func (w *World) validateRules(res *Result) {
 			res.errorf("", "", "world flag %q is read (%s) but no event sets it", name, facts.worldRead[name])
 		}
 	}
+	dropped := map[string]bool{}
+	for _, n := range w.NPCs {
+		for _, d := range n.Drops {
+			dropped[d.Item] = true
+		}
+	}
 	for _, ik := range sortedKeys(w.Items) {
-		if w.Items[ik].Bound && !facts.gives[ik] {
-			res.errorf(w.source["item:"+ik], "items."+ik, "a bound item is a puzzle token, but no rule gives it")
+		if w.Items[ik].Bound && !facts.gives[ik] && !dropped[ik] {
+			res.errorf(w.source["item:"+ik], "items."+ik, "a bound item is a puzzle token, but no rule or monster drop gives it")
 		}
 	}
 }

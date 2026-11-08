@@ -104,6 +104,27 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 			return muddata.MUD_OK
 		},
 	}
+	c_spells := MudCommand{
+		description: "List the spells you know and which are ready.  Usage: SPELLS",
+		action: func(player *MudPlayer, arguments string) int {
+			player.spellsList()
+			return muddata.MUD_OK
+		},
+	}
+	c_ready := MudCommand{
+		description: "Ready a spell you know in one of three slots.  Usage: READY <spell> [slot 1-3]",
+		action: func(player *MudPlayer, arguments string) int {
+			player.ready(arguments)
+			return muddata.MUD_OK
+		},
+	}
+	c_unready := MudCommand{
+		description: "Free a spell slot.  Usage: UNREADY <slot 1-3 or spell>",
+		action: func(player *MudPlayer, arguments string) int {
+			player.unready(arguments)
+			return muddata.MUD_OK
+		},
+	}
 	c_ask := MudCommand{
 		description: "Ask a friendly character about something.  Usage: ASK <person> ABOUT <topic>",
 		action: func(player *MudPlayer, arguments string) int {
@@ -449,6 +470,9 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 	cList["EXAMINE"] = &c_examine
 	cList["TALK"] = &c_talk
 	cList["ASK"] = &c_ask
+	cList["SPELLS"] = &c_spells
+	cList["READY"] = &c_ready
+	cList["UNREADY"] = &c_unready
 	cList["SHOP"] = &c_shop
 	cList["BUY"] = &c_buy
 	cList["MOVE"] = &c_move

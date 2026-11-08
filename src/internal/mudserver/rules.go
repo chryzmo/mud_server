@@ -141,6 +141,8 @@ func (rr *ruleRun) holdsOne(c worldfile.Condition) bool {
 		return !p.flag(c.NotFlag)
 	case c.HasItem != "":
 		return p.hasItemKey(c.HasItem)
+	case c.KnowsSpell != "":
+		return p.knowsSpell(c.KnowsSpell)
 	case c.WorldFlag != "":
 		return p.world.worldFlags[c.WorldFlag]
 	case c.RoomFlag != "":
@@ -236,6 +238,8 @@ func (rr *ruleRun) effect(e worldfile.Effect, depth int) {
 		} else {
 			p.grantCosmetic("badge", e.Unlock.Badge)
 		}
+	case e.Teach != nil:
+		p.learnSpell(*e.Teach)
 	case e.GiveItem != nil:
 		p.giveItemKey(*e.GiveItem)
 	case e.TakeItem != nil:
@@ -499,6 +503,9 @@ func (mp *MudPlayer) doVerb(verb, arguments string) {
 		targetText = args
 	}
 
+	if verb == "READ" && mp.useScroll(targetText) {
+		return
+	}
 	var withKey string
 	if verb == "USE" && withText == "" {
 		if mp.useConsumable(targetText) {

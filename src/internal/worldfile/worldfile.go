@@ -32,7 +32,6 @@ var opposite = map[string]string{"N": "S", "S": "N", "E": "W", "W": "E", "U": "D
 // Slots are the equipment slots an item can fill.
 var Slots = []string{"weapon", "armor", "shield", "boots", "cosmetic"}
 
-
 // Behaviors are the NPC turn functions the server implements.
 var Behaviors = []string{"orc"}
 
@@ -59,6 +58,7 @@ type File struct {
 	Areas     map[string]Area   `yaml:"areas"`
 	Puzzles   map[string]Puzzle `yaml:"puzzles"`
 	Events    map[string]Event  `yaml:"events"`
+	Spells    map[string]Spell  `yaml:"spells"`
 	// Progression tunes XP and levels; at most one file may set it.
 	Progression *Progression `yaml:"progression"`
 
@@ -166,6 +166,7 @@ type Item struct {
 	Bound       bool       `yaml:"bound"`      // a puzzle token: cannot be dropped or given away; some rule must give it
 	Equipment   *Equipment `yaml:"equipment"`
 	Consume     *Consume   `yaml:"consume"` // USE <item> restores hp and mp and uses the item up
+	Teaches     string     `yaml:"teaches"` // a scroll: READ <item> teaches this spell (a key) and uses the item up
 }
 
 // Consume is what using up an item restores; at least one is above zero.
@@ -243,6 +244,7 @@ type World struct {
 	Areas       map[string]Area
 	Puzzles     map[string]Puzzle
 	Events      map[string]Event
+	Spells      map[string]Spell
 	Progression *Progression
 	Onboarding  *Onboarding
 	source      map[string]string // "room:lobby" -> file it was defined in
@@ -309,7 +311,7 @@ func Load(dir string) (*World, *Result, error) {
 	}
 	sort.Strings(files)
 
-	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, Puzzles: map[string]Puzzle{}, Events: map[string]Event{}, source: map[string]string{}}
+	w := &World{Rooms: map[string]Room{}, Items: map[string]Item{}, NPCs: map[string]NPC{}, Areas: map[string]Area{}, Puzzles: map[string]Puzzle{}, Events: map[string]Event{}, Spells: map[string]Spell{}, source: map[string]string{}}
 	res := &Result{}
 	for _, path := range files {
 		rel, _ := filepath.Rel(dir, path)
@@ -369,6 +371,14 @@ func (w *World) merge(file string, f *File, res *Result) {
 		}
 		w.Puzzles[k] = v
 		w.source["puzzle:"+k] = file
+	}
+	for k, v := range f.Spells {
+		if prev, dup := w.source["spell:"+k]; dup {
+			res.errorf(file, "spells."+k, "duplicate spell key (also in %s)", prev)
+			continue
+		}
+		w.Spells[k] = v
+		w.source["spell:"+k] = file
 	}
 	for k, v := range f.Events {
 		if prev, dup := w.source["event:"+k]; dup {
@@ -474,6 +484,17 @@ func (w *World) Validate(res *Result) {
 			}
 			if it.Bound {
 				res.errorf(f, p+".consume", "a puzzle token cannot be used up like a potion")
+			}
+		}
+		if it.Teaches != "" {
+			if _, ok := w.Spells[it.Teaches]; !ok {
+				res.errorf(f, p+".teaches", "%q is not a spell", it.Teaches)
+			}
+			if !it.Bound {
+				res.errorf(f, p+".teaches", "a scroll must be bound: true, so one scroll cannot be passed around")
+			}
+			if it.Equipment != nil {
+				res.errorf(f, p+".teaches", "a scroll is read, not worn")
 			}
 		}
 		if e := it.Equipment; e != nil {
@@ -784,6 +805,7 @@ func (w *World) Validate(res *Result) {
 		}
 	}
 
+	w.validateSpells(res)
 	w.validateRules(res)
 	w.validateProgression(res)
 	w.validateAmbient(res)
