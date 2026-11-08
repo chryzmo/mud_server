@@ -108,15 +108,6 @@ npcs:
     loot_gold_min: 0
     loot_gold_max: 5
 
-# Sticker codes hold only the HMAC of a code. This hash belongs to a code nobody was given, so the sample
-# shows the format without a working sticker. Real hashes live in the private content repository.
-codes:
-  sample-sticker:
-    hash: d7053fad68e3b8bc0316ef2a3cfe9df55b668d1b7c889c1a154efc47f6ca9d45
-    color: gold
-    badge: star
-    message: "A warm light finds you."
-
 # XP and levels. Anything left out takes the default; with no block the defaults apply.
 progression:
   levels: [0, 25, 60, 110, 180, 270, 380, 520, 700, 900]

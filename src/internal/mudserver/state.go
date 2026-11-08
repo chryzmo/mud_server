@@ -32,7 +32,6 @@ type playerState struct {
 	hints     map[string]int    // puzzle key -> the hint tier last shown
 	unlocks   map[string]bool   // "color:gold", "badge:star": cosmetics this player owns
 	active    map[string]string // "color" or "badge" -> the key worn
-	redeemed  map[string]bool   // sticker code keys already used
 	xp        map[string]int    // "explore", "combat", and "level" (the last level whose gains were applied)
 	seen      map[string]bool   // "room/feature" keys already examined once, for exploration XP
 }
@@ -42,7 +41,7 @@ func newPlayerState() *playerState {
 		flags: map[string]bool{}, counters: map[string]int{},
 		sequences: map[string][]string{}, gates: map[string]bool{},
 		visited: map[string]bool{}, hints: map[string]int{},
-		unlocks: map[string]bool{}, active: map[string]string{}, redeemed: map[string]bool{}, xp: map[string]int{}, seen: map[string]bool{},
+		unlocks: map[string]bool{}, active: map[string]string{}, xp: map[string]int{}, seen: map[string]bool{},
 	}
 }
 
@@ -177,8 +176,6 @@ func (mp *MudPlayer) loadState(db *muddatabase.MudDatabase) {
 			state.unlocks[r.Key] = true
 		case "cosmetic":
 			state.active[r.Key] = r.Value
-		case "redeemed":
-			state.redeemed[r.Key] = true
 		case "hint":
 			if n, err := strconv.Atoi(r.Value); err == nil {
 				state.hints[r.Key] = n

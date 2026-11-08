@@ -7,7 +7,6 @@ import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
 	"mud_server/src/internal/muddata"
-	"mud_server/src/internal/worldfile"
 	"net/netip"
 	"os"
 	"strconv"
@@ -39,10 +38,6 @@ type MudServer struct {
 	stateQ        chan stateWrite       // puzzle state changes for the writer (state.go)
 	stateDone     chan struct{}
 	chat          chatState
-	codes         map[string]worldfile.Code // sticker codes by key (cosmetics.go)
-	codeByHash    map[string]string         // a code's HMAC -> its key
-	codeSecret    string                    // MUD_CODE_SECRET: the HMAC key; without it no code redeems
-	redeemBucket  commandLimiter            // every REDEEM attempt on the server spends from this
 	whoCache      *whoSnapshot              // the counts WHO shows, rebuilt every few seconds (social.go); loop only
 	recent        []talkLine                // the last lines of talk, for report context (report.go); loop only
 	reportMarks   map[string][]reportMark   // who reported whom lately, for the automatic mute; loop only
@@ -183,11 +178,6 @@ func NewMudServer(c Configuration) (*MudServer, error) {
 	registerProgress(server, server.Commands)
 	registerReport(server, server.Commands)
 	registerSocial(server, server.Commands)
-	server.codeSecret = codeSecretFromEnv()
-	if content != nil {
-		server.codes = content.codes
-		server.codeByHash = codeIndex(content.codes)
-	}
 	server.World.worldFlags = loadWorldFlags(&server.DB)
 	if content != nil {
 		server.sched = newScheduler(server, content.events, &server.DB)

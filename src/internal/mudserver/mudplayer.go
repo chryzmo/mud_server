@@ -54,7 +54,6 @@ type MudPlayer struct {
 	lastPuzzle    string                        // the puzzle whose flag was set last (not saved); HINT with no name uses it
 	chatLimiter   commandLimiter                // this player's global chat bucket; created on first use
 	lastChat      time.Time                     // when they last spoke on global chat (slow mode)
-	redeem        redeemGuard                   // wrong sticker codes; loop only (cosmetics.go)
 	mod           modState                      // automatic moderation record (moderation.go); loop only
 	server        *MudServer                    // set at admission, for the checks a command makes (moderation.go)
 	ignored       map[string]bool               // lower-case names whose talk this player does not see (social.go); loop only, for the session

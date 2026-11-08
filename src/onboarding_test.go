@@ -124,7 +124,7 @@ func TestTheWalkthroughIsOfferedOnceAndResumesAfterReconnecting(t *testing.T) {
 }
 
 func TestWithoutAnOnboardingBlockThereIsNoWalkthrough(t *testing.T) {
-	wsURL, _ := startTestServerWithConfig(t, withContent(redeemWorld(t)))
+	wsURL, _ := startTestServerWithConfig(t, withContent(contentDir(t, map[string]string{"world.yaml": "start_room: hall\nrooms:\n  hall:\n    name: Hall\n    description: A hall.\n"})))
 	conn := eventPlayer(t, wsURL, "plain")
 	send(t, conn, "TOUR")
 	neverSaw(t, readUntil(t, conn, "There is no walkthrough here."), "TOUR SKIP")
