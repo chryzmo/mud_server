@@ -190,11 +190,12 @@ func TestUnresponsiveClientIsDisconnected(t *testing.T) {
 // settle waits until the server has finished writing a new player's welcome. passwordPlayer returns
 // at the first look, while stats and the like are still being written; closing then can make the
 // server's write fail first and be counted as a write_error, a real thing a vanishing client does
-// but not what the close-reason tests are about. A reply to a command means the server has gone quiet.
+// but not what the close-reason tests are about. The last frame of a command's reply means the server has gone quiet.
 func settle(t *testing.T, conn *websocket.Conn) {
 	t.Helper()
 	send(t, conn, "STATS")
-	expect(t, conn, "STATUPDATE")
+	expect(t, conn, "Your stats:") // only the reply says this; a stats frame from the welcome could match STATUPDATE alone
+	expect(t, conn, "STATUPDATE")  // the last thing the reply writes
 }
 
 // A client that says goodbye and one whose connection just vanishes are
