@@ -21,6 +21,7 @@ type Person struct {
 	Greeting string   `json:"greeting"`
 	Shrug    string   `json:"shrug,omitempty"`
 	Topics   []Topic  `json:"topics,omitempty"`
+	Shop     []ShopItem `json:"shop,omitempty"` // what they sell (shop.go)
 }
 
 // Topic is something a person can be asked about; the first keyword is the one TALK lists.

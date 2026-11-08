@@ -107,6 +107,33 @@ type Person struct {
 	Idle      []string         `yaml:"idle"`       // lines they murmur to the room while players are there (optional)
 	IdleEvery []int            `yaml:"idle_every"` // [least, most] seconds between them; default [120, 300]
 	Topics    map[string]Topic `yaml:"topics"`
+	Shop      []ShopEntry      `yaml:"shop"` // what they sell, for gold (optional)
+}
+
+// MaxShopEntries is the most wares one person may sell.
+const MaxShopEntries = 12
+
+// MaxPrice is the most one ware may cost, in gold.
+const MaxPrice = 10000
+
+// ShopEntry is one thing for sale: an item key and its price in gold.
+type ShopEntry struct {
+	Item  string `yaml:"item"`
+	Price int    `yaml:"price"`
+}
+
+// Summary says what worn equipment does, such as "attack +5, defense +2"; empty without bonuses.
+func (e *Equipment) Summary() string {
+	var parts []string
+	for _, p := range []struct {
+		name string
+		v    int
+	}{{"attack", e.Attack}, {"defense", e.Defense}, {"max hp", e.MaxHP}, {"hp", e.HP}, {"max mp", e.MaxMP}, {"mp", e.MP}} {
+		if p.v != 0 {
+			parts = append(parts, fmt.Sprintf("%s %+d", p.name, p.v))
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 // Topic is something a person can be asked about. Keywords are what a player may type after
@@ -630,6 +657,26 @@ func (w *World) Validate(res *Result) {
 				}
 				if len(field.text) > MaxDescription {
 					res.warnf(f, pp+"."+field.name, "text is %d characters; over %d reads badly on a phone", len(field.text), MaxDescription)
+				}
+			}
+			if len(pe.Shop) > MaxShopEntries {
+				res.errorf(f, pp+".shop", "%d wares; at most %d per person", len(pe.Shop), MaxShopEntries)
+			}
+			seen := map[string]bool{}
+			for i, ware := range pe.Shop {
+				wp := fmt.Sprintf("%s.shop[%d]", pp, i)
+				it, ok := w.Items[ware.Item]
+				switch {
+				case !ok:
+					res.errorf(f, wp+".item", "%q is not an item", ware.Item)
+				case it.Bound:
+					res.errorf(f, wp+".item", "%q is a puzzle token and cannot be sold", ware.Item)
+				case seen[ware.Item]:
+					res.errorf(f, wp+".item", "%q is listed twice", ware.Item)
+				}
+				seen[ware.Item] = true
+				if ware.Price < 1 || ware.Price > MaxPrice {
+					res.errorf(f, wp+".price", "price must be from 1 to %d gold", MaxPrice)
 				}
 			}
 			if len(pe.Topics) > MaxTopics {
