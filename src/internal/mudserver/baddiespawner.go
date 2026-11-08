@@ -3,7 +3,6 @@ package mudserver
 import (
 	"fmt"
 	muddatabase "mud_server/src/internal/database"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -59,37 +58,9 @@ func (spawner *BaddieSpawner) tick (now time.Time, w *World) {
 		}
 		if spawner.countBaddiesInRoom(spawner.baddie.Race) < spawner.TotalNumber{
 			// Spawn another baddie!
-			newbaddie := &BaddieNPC{
-				Location: spawner.Location,
-				Name: spawner.baddie.Name,
-				Race: spawner.baddie.Race,
-				AttackAccuracy: spawner.baddie.AttackAccuracy,
-				AttackPower: spawner.baddie.AttackPower,
-				Defense: spawner.baddie.Defense,
-				HP: spawner.baddie.HP,
-				MP: spawner.baddie.MP,
-				TurnAction: spawner.baddie.TurnAction,
-				combatTickerDurationInMS: spawner.baddie.combatTickerDurationInMS,
-				// As with the old per-NPC ticker, the first swing comes one interval after spawning.
-				nextAttackAt: now.Add(time.Millisecond * time.Duration(spawner.baddie.combatTickerDurationInMS)),
-				LootGoldMin: spawner.baddie.LootGoldMin,
-				LootGoldMax: spawner.baddie.LootGoldMax,
-				passive: spawner.baddie.passive,
-				xp: spawner.baddie.xp,
-				drops: spawner.baddie.drops,
-			}
-
-			if newbaddie.Name == "" {
-				newbaddie.Name = newbaddie.GenerateName()
-			}
-
-			newbaddie.Name = spawner.Location.uniqueMobName(newbaddie.Name)
-			spawner.Location.BaddieMap[strings.ToUpper(newbaddie.Name)] = newbaddie
-			if w != nil {
-				w.liveMobs++
-			}
-			spawner.Location.Broadcast(newbaddie.Name+" - "+newbaddie.Race+" - appears in the room!","")
-			spawner.Location.roomChanged()
+			newbaddie := spawner.baddie.copyOf(now)
+			newbaddie.Location = spawner.Location
+			w.placeMob(newbaddie)
 		}
 	}
 }

@@ -50,6 +50,7 @@ type contentResult struct {
 	ambient     map[string]*roomAmbient // by room key (ambient.go)
 	crowd       map[string]roomCrowd    // capacity settings by room key (stage.go); rooms with none are left out
 	mobs        map[string]mobTraits    // what content says about each monster, by race (mobs.go)
+	mobRaces    map[string]string       // npc key -> race, for spawning by key (mobs.go)
 	rooms       int
 	created     int // rows created in this run, of every kind
 }
@@ -79,8 +80,10 @@ func loadContent(db *muddatabase.MudDatabase, dir string, log func(string)) (*co
 	out.progression = w.ResolvedProgression()
 	out.ambient = buildAmbient(w)
 	out.mobs = map[string]mobTraits{}
-	for _, n := range w.NPCs {
-		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP, drops: n.Drops}
+	out.mobRaces = map[string]string{}
+	for key, n := range w.NPCs {
+		out.mobs[strings.ToUpper(n.Race)] = mobTraits{aggressive: n.Aggressive, xp: n.XP, drops: n.Drops, boss: n.Boss, name: n.Name}
+		out.mobRaces[key] = n.Race
 	}
 	out.crowd = map[string]roomCrowd{}
 	for key, r := range w.Rooms {

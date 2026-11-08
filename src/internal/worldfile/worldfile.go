@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -171,6 +172,11 @@ type NPC struct {
 	XP         int  `yaml:"xp"`
 	// Drops are rolled once for each fighter who helped with the kill.
 	Drops []Drop `yaml:"drops"`
+	// A boss is one big monster at a time: its arrival and its fall are announced to the whole world, and
+	// it is not spawned again while one is alive. Give it hp, xp and drops like any monster.
+	Boss bool `yaml:"boss"`
+	// Name is a fixed name for each monster of this kind ("Grak the Unbroken"); blank picks a random one.
+	Name string `yaml:"name"`
 }
 
 // MaxDrops is the most entries one monster's drop table may have.
@@ -458,6 +464,9 @@ func (w *World) Validate(res *Result) {
 		}
 		if n.XP < 0 || n.XP > MaxXPAward {
 			res.errorf(f, p+".xp", "xp must be from 0 to %d (0 means the progression's kill XP)", MaxXPAward)
+		}
+		if utf8.RuneCountInString(n.Name) > 40 || strings.ContainsAny(n.Name, "\n\r\x1b") {
+			res.errorf(f, p+".name", "a monster's name is at most 40 characters on one line")
 		}
 		if len(n.Drops) > MaxDrops {
 			res.errorf(f, p+".drops", "%d drops; at most %d", len(n.Drops), MaxDrops)

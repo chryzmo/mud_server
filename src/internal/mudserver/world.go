@@ -32,6 +32,8 @@ type World struct {
 	guide         *guide                                   // puzzles and regions the content declares; nil without content
 	roomsByKey    map[string]*Room                         // content rooms by key (the originals)
 	itemsByKey    map[string]*Item                         // content items by key: templates for what rules give
+	mobTemplates  map[string]*BaddieNPC                    // content monsters by npc key: what a spawn step or GM SPAWN copies (mobs.go)
+	announceAll   func(text string)                        // tells every player; set by the server (mobs.go)
 
 	// Where new players start, and where a saved location that no longer exists falls
 	// back to. Set when the world is built and never changed, so connection readers may read it.
@@ -90,6 +92,7 @@ func createWorld(db *muddatabase.MudDatabase, crowd CrowdConfig, content *conten
 			room.crowd = content.crowd[room.Key]
 		}
 		w.applyMobTraits(content.mobs)
+		w.loadMobTemplates(db, content)
 	}
 	w.configureAreas(crowd)
 

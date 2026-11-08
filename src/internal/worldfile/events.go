@@ -51,6 +51,13 @@ type EventStep struct {
 	RoomSay   *RoomSay `yaml:"room_say"`
 	SetFlag   string   `yaml:"set_flag"`
 	ClearFlag string   `yaml:"clear_flag"`
+	Spawn     *Spawn   `yaml:"spawn"`
+}
+
+// Spawn puts one monster (an npc key) in a room when the step runs.
+type Spawn struct {
+	NPC  string `yaml:"npc"`
+	Room string `yaml:"room"`
 }
 
 // RoomSay is text shown to everyone in a room.
@@ -65,6 +72,7 @@ const (
 	StepRoomSay   = "room_say"
 	StepSetFlag   = "set_flag"
 	StepClearFlag = "clear_flag"
+	StepSpawn     = "spawn"
 )
 
 // ResolvedStep is a step with its time worked out.
@@ -74,6 +82,7 @@ type ResolvedStep struct {
 	Text   string // announce and room_say
 	Room   string // room_say
 	Flag   string // set_flag and clear_flag
+	NPC    string // spawn: the npc key
 }
 
 // ResolvedEvent is an event ready to run: an absolute start and parsed times.
@@ -120,6 +129,7 @@ func (s EventStep) kind() (name string, n int) {
 	add(StepRoomSay, s.RoomSay != nil)
 	add(StepSetFlag, s.SetFlag != "")
 	add(StepClearFlag, s.ClearFlag != "")
+	add(StepSpawn, s.Spawn != nil)
 	return
 }
 
@@ -218,6 +228,16 @@ func (w *World) resolveEvent(key string) (*ResolvedEvent, []string) {
 			rs.Room, rs.Text = s.RoomSay.Room, s.RoomSay.Text
 			if _, ok := w.Rooms[rs.Room]; !ok {
 				bad(where+".room_say.room", "%q is not a room", rs.Room)
+				return rs, false
+			}
+		case StepSpawn:
+			rs.NPC, rs.Room = s.Spawn.NPC, s.Spawn.Room
+			if _, ok := w.NPCs[rs.NPC]; !ok {
+				bad(where+".spawn.npc", "%q is not an npc", rs.NPC)
+				return rs, false
+			}
+			if _, ok := w.Rooms[rs.Room]; !ok {
+				bad(where+".spawn.room", "%q is not a room", rs.Room)
 				return rs, false
 			}
 		case StepSetFlag:

@@ -128,3 +128,27 @@ func TestRenderShowsEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestSpawnStepsAndBossNamesAreCheckedAndRendered(t *testing.T) {
+	world := func(step, npc string) map[string]string {
+		return map[string]string{"w.yaml": twoRooms + "\nnpcs:\n  warden: {race: WARDEN, hp: 5, combat_tick_ms: 1000, behavior: orc" + npc + "}\nevents:\n  duel:\n    title: Duel\n    at: \"2099-01-07 12:00 America/New_York\"\n    steps:\n      - " + step + "\n"}
+	}
+	if res := validate(t, world("{spawn: {npc: warden, room: hall}}", ", boss: true, name: Old Grak")); len(res.Errors) != 0 {
+		t.Errorf("a good spawn is an error: %v", res.Errors)
+	}
+	for step, want := range map[string]string{
+		"{spawn: {npc: ghost, room: hall}}":                `"ghost" is not an npc`,
+		"{spawn: {npc: warden, room: nowhere}}":            `"nowhere" is not a room`,
+		"{spawn: {npc: warden, room: hall}, announce: hi}": "has 2 things set",
+	} {
+		if res := validate(t, world(step, "")); !has(res.Errors, want) {
+			t.Errorf("step %s: want %q, got %v", step, want, res.Errors)
+		}
+	}
+	if res := validate(t, world("{spawn: {npc: warden, room: hall}}", ", name: '"+strings.Repeat("x", 41)+"'")); !has(res.Errors, "at most 40 characters") {
+		t.Errorf("a long name is accepted: %v", res.Errors)
+	}
+	if out := render(t, world("{spawn: {npc: warden, room: hall}}", "")); !strings.Contains(out, "spawn `warden` in `hall`") {
+		t.Errorf("the overview lacks the spawn step\n%s", out)
+	}
+}
