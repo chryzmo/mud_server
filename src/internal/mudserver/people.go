@@ -82,6 +82,16 @@ func (p *Person) topicList() string {
 	return strings.Join(words, ", ")
 }
 
+// personLinks joins names with commas, each in the bright magenta code, so the client makes each a button that
+// sends TALK <name> (the same marking as the "Also here" line).
+func personLinks(names []string) string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = mudutils.ColorString(n, mudutils.COLOR_BRIGHT_MAGENTA)
+	}
+	return strings.Join(out, ", ")
+}
+
 // talk answers TALK [person]. Loop only.
 func (mp *MudPlayer) talk(arguments string) {
 	query := strings.Join(strings.Fields(arguments), " ")
@@ -94,7 +104,7 @@ func (mp *MudPlayer) talk(arguments string) {
 		if len(mp.Location.People) == 1 {
 			query = mp.Location.People[0].Names[0]
 		} else {
-			mp.SendMessage("Talk to whom? " + strings.Join(mp.Location.peopleNames(), ", ") + ".")
+			mp.SendMessage("Talk to whom? " + personLinks(mp.Location.peopleNames()) + ".")
 			return
 		}
 	}
@@ -108,7 +118,7 @@ func (mp *MudPlayer) talk(arguments string) {
 		mp.SendMessage(msg)
 		mp.tourDid("talk")
 	case len(several) > 0:
-		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")
+		mp.SendMessage("Which do you mean: " + personLinks(several) + "?")
 	default:
 		mp.SendMessage("There is no one called that here.")
 	}
