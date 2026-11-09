@@ -93,11 +93,15 @@ func (mp *MudPlayer) applyLevels(announce bool) int {
 	return n
 }
 
+// xpLine formats an XP gain for the client: the line in italics (ESC[3m ... ESC[0m, which the client draws
+// as italic text) followed by a blank line, so the gain stands apart from the text around it.
+func xpLine(text string) string { return "\x1b[3m" + text + "\x1b[0m\n" }
+
 // discoverRoom is exploration XP for the first visit to a room (called from visit).
 func (mp *MudPlayer) discoverRoom() {
 	if mp.world != nil && mp.world.prog.XP.Room > 0 {
 		mp.addXP(xpExplore, mp.world.prog.XP.Room)
-		mp.SendMessage(fmt.Sprintf("You discover a new place. (+%d exploration XP)", mp.world.prog.XP.Room))
+		mp.SendMessage(xpLine(fmt.Sprintf("You discover a new place. (+%d exploration XP)", mp.world.prog.XP.Room)))
 	}
 }
 
@@ -113,7 +117,7 @@ func (mp *MudPlayer) discoverFeature(roomKey, featureKey string) {
 	mp.st().seen[id] = true
 	mp.persistState("seen", id, "1", false)
 	mp.addXP(xpExplore, mp.world.prog.XP.Feature)
-	mp.SendMessage(fmt.Sprintf("You notice something. (+%d exploration XP)", mp.world.prog.XP.Feature))
+	mp.SendMessage(xpLine(fmt.Sprintf("You notice something. (+%d exploration XP)", mp.world.prog.XP.Feature)))
 }
 
 // killedMonster is combat XP for a kill.

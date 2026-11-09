@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -170,5 +171,16 @@ func TestTheLeaderboardEndpointIsReadOnlyAndEmptyBeforeAnySnapshot(t *testing.T)
 	var out map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || rec.Code != 200 || out["overall"] == nil {
 		t.Errorf("answered %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// An XP gain reaches the client in italics (ESC[3m ... ESC[0m) with a blank line after it, so it stands
+// apart from the text around it.
+func TestXPGainsAreItalicWithABlankLineAfter(t *testing.T) {
+	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
+	conn := eventPlayer(t, wsURL, "scout")
+	got := expect(t, conn, "exploration XP") // the first room
+	if !strings.HasPrefix(got, "\x1b[3m") || !strings.HasSuffix(got, "\x1b[0m\n") {
+		t.Errorf("exploration XP line = %q, want it wrapped in the italic escape and followed by a newline", got)
 	}
 }
