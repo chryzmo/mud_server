@@ -200,9 +200,9 @@ func (r *Room) defeated(npc *BaddieNPC, killer *MudPlayer) {
 		if xp := npc.killXP(p.world); xp > 0 {
 			p.addXP(xpCombat, xp)
 			if p == killer {
-				p.SendMessage(fmt.Sprintf("(+%d combat XP)", xp))
+				p.SendMessage(xpLine(fmt.Sprintf("(+%d combat XP)", xp)))
 			} else {
-				p.SendMessage(fmt.Sprintf("You helped defeat %s. (+%d combat XP)", npc.Name, xp))
+				p.SendMessage(xpLine(fmt.Sprintf("You helped defeat %s. (+%d combat XP)", npc.Name, xp)))
 			}
 			p.dirty = true
 		}
