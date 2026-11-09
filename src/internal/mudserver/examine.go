@@ -182,6 +182,7 @@ func (mp *MudPlayer) examine(arguments string) {
 			mp.discoverFeature(mp.Location.Key, hit.key, hit.display) // the XP line first, then what they came to read
 		}
 		mp.SendMessage(hit.text)
+		mp.examined(hit.key) // rules for examining this thing, such as a clue noted in the journal
 		mp.tourDid("examine")
 	case len(several) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")
