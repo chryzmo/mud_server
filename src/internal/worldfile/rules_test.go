@@ -67,13 +67,16 @@ func TestRuleProblems(t *testing.T) {
 		{"no effects", "    rules:\n      - on: {verb: PULL, target: lever}\n        do: []\n", "", "needs at least one effect", false},
 		{"too many effects", "    rules:\n      - on: {verb: PULL, target: lever}\n        do: [" + strings.Repeat("{say: x}, ", MaxEffects+1) + "]\n", "", "at most 12 per rule", false},
 		{"named rule without an id", "    rules:\n      - do: [{say: x}]\n", "", "needs an id", false},
-		{"two triggers", "    rules:\n      - on: {verb: PULL, target: lever, say: hi}\n        do: [{say: x}]\n", "", "exactly one of verb, say or enter", false},
-		{"no trigger kind", "    rules:\n      - on: {target: lever}\n        do: [{say: x}]\n", "", "exactly one of verb, say or enter", false},
+		{"two triggers", "    rules:\n      - on: {verb: PULL, target: lever, say: hi}\n        do: [{say: x}]\n", "", "exactly one of verb, say, enter or examine", false},
+		{"no trigger kind", "    rules:\n      - on: {target: lever}\n        do: [{say: x}]\n", "", "exactly one of verb, say, enter or examine", false},
 		{"unknown verb", "    rules:\n      - on: {verb: DANCE, target: lever}\n        do: [{say: x}]\n", "", `"DANCE" is not a verb`, false},
 		{"unknown target", "    rules:\n      - on: {verb: PULL, target: levr}\n        do: [{say: x}]\n", "", `"levr" is not a feature or person`, false},
 		{"unknown with", "    rules:\n      - on: {verb: USE, target: lever, with: wand}\n        do: [{say: x}]\n", "", `"wand" is not an item`, false},
 		{"set needs a value", "    rules:\n      - on: {verb: SET, target: lever}\n        do: [{say: x}]\n", "", "SET needs a value", false},
 		{"value without set", "    rules:\n      - on: {verb: PULL, target: lever, value: '3'}\n        do: [{say: x}]\n", "", "value is only for SET", false},
+		{"examine unknown target", "    rules:\n      - on: {examine: levr}\n        do: [{set_flag: seen}]\n", "", `"levr" is not a feature or person`, false},
+		{"examine with a target", "    rules:\n      - on: {examine: lever, target: lever}\n        do: [{set_flag: seen}]\n", "", "go with a verb", false},
+		{"examine and a verb", "    rules:\n      - on: {examine: lever, verb: PULL}\n        do: [{set_flag: seen}]\n", "", "exactly one of verb, say, enter or examine", false},
 		{"say with a target", "    rules:\n      - on: {say: hi, target: lever}\n        do: [{say: x}]\n", "", "go with a verb", false},
 		{"two things in a condition", "    rules:\n      - on: {verb: PULL, target: lever}\n        if: [{flag: a, not_flag: b}]\n        do: [{say: x}]\n", "", "2 things set", false},
 		{"empty condition", "    rules:\n      - on: {verb: PULL, target: lever}\n        if: [{}]\n        do: [{say: x}]\n", "", "has nothing set", false},
@@ -110,6 +113,14 @@ func TestRuleProblems(t *testing.T) {
 				t.Errorf("want a problem containing %q; errors %v warnings %v", tc.want, res.Errors, res.Warnings)
 			}
 		})
+	}
+}
+
+func TestAnExamineRuleIsClean(t *testing.T) {
+	rules := "    rules:\n      - on: {verb: PULL, target: lever}\n        do: [{add: {counter: pulls, by: 1}}]\n      - on: {examine: lever}\n        do: [{set_flag: read-lever}]\n      - on: {examine: guard}\n        unless: [{flag: read-lever}]\n        do: [{set_flag: read-guard}]\n"
+	res := validate(t, ruled(rules, ""))
+	if len(res.Errors) != 0 {
+		t.Errorf("errors: %v", res.Errors)
 	}
 }
 

@@ -497,6 +497,8 @@ func ruleTrigger(r Rule) string {
 		return "rule `" + r.ID + "` (run by another rule)"
 	case t.Enter:
 		return "entering the room"
+	case t.Examine != "":
+		return "examining " + t.Examine
 	case t.Say != "":
 		return "saying \"" + t.Say + "\""
 	default:

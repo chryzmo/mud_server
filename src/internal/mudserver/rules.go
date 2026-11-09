@@ -420,6 +420,28 @@ func (mp *MudPlayer) entered() {
 	}
 }
 
+// examined runs every rule for examining this thing (a feature, person or item key) in the player's room whose
+// conditions hold, after the thing's own text has been shown. They normally only set flags (a clue found,
+// for the journal). Loop only.
+func (mp *MudPlayer) examined(key string) {
+	room := mp.Location
+	if room == nil || key == "" || len(room.Rules) == 0 {
+		return
+	}
+	for i := range room.Rules {
+		rule := &room.Rules[i]
+		if rule.On == nil || rule.On.Examine != key {
+			continue
+		}
+		rr := &ruleRun{p: mp, room: room}
+		if !rr.conditionsHold(rule) {
+			continue
+		}
+		rr.runEffects(rule, 0)
+		rr.finish()
+	}
+}
+
 // ---------------------------------------------------------------------------------------------
 // The verbs
 

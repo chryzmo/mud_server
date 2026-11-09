@@ -37,14 +37,17 @@ type Rule struct {
 }
 
 // Trigger is one of: a verb used on a target (with another thing, or a value), the words said,
-// or arriving in the room. Targets are feature, person or item keys; With is an item key.
+// arriving in the room, or examining a thing (a feature, person or item key). Targets are feature, person or
+// item keys; With is an item key. An examine rule runs after the thing's own text is shown; every examine rule
+// for it whose conditions hold runs, so a clue can set a flag (for the journal) each time it is read.
 type Trigger struct {
-	Verb   string `yaml:"verb" json:"verb,omitempty"`
-	Target string `yaml:"target" json:"target,omitempty"`
-	With   string `yaml:"with" json:"with,omitempty"`
-	Value  string `yaml:"value" json:"value,omitempty"` // SET <target> TO <value>
-	Say    string `yaml:"say" json:"say,omitempty"`
-	Enter  bool   `yaml:"enter" json:"enter,omitempty"`
+	Verb    string `yaml:"verb" json:"verb,omitempty"`
+	Target  string `yaml:"target" json:"target,omitempty"`
+	With    string `yaml:"with" json:"with,omitempty"`
+	Value   string `yaml:"value" json:"value,omitempty"` // SET <target> TO <value>
+	Say     string `yaml:"say" json:"say,omitempty"`
+	Enter   bool   `yaml:"enter" json:"enter,omitempty"`
+	Examine string `yaml:"examine" json:"examine,omitempty"`
 }
 
 // Condition has exactly one field set.
@@ -323,9 +326,19 @@ func (w *World) validateRules(res *Result) {
 				if t.Enter {
 					kinds++
 				}
+				if t.Examine != "" {
+					kinds++
+				}
 				switch {
 				case kinds != 1:
-					res.errorf(f, rp+".on", "needs exactly one of verb, say or enter")
+					res.errorf(f, rp+".on", "needs exactly one of verb, say, enter or examine")
+				case t.Examine != "":
+					if !targets[t.Examine] {
+						res.errorf(f, rp+".on.examine", "%q is not a feature or person of this room, or an item", t.Examine)
+					}
+					if t.Target != "" || t.With != "" || t.Value != "" {
+						res.errorf(f, rp+".on", "target, with and value go with a verb")
+					}
 				case t.Verb != "":
 					if !contains2(RuleVerbs, t.Verb) {
 						res.errorf(f, rp+".on.verb", "%q is not a verb a rule can use (%s)", t.Verb, strings.Join(RuleVerbs, ", "))
@@ -350,7 +363,7 @@ func (w *World) validateRules(res *Result) {
 					}
 				}
 				if len(rule.If) == 0 && len(rule.Unless) == 0 {
-					sig := fmt.Sprintf("%v|%v|%v|%v|%v|%v", t.Verb, t.Target, t.With, t.Value, t.Say, t.Enter)
+					sig := fmt.Sprintf("%v|%v|%v|%v|%v|%v|%v", t.Verb, t.Target, t.With, t.Value, t.Say, t.Enter, t.Examine)
 					for _, prev := range seenOn {
 						if prev == sig {
 							res.warnf(f, rp, "an earlier rule with the same trigger and no conditions always runs first; this one can never run")

@@ -17,6 +17,8 @@ func describeTrigger(t *Trigger) string {
 		return fmt.Sprintf("a player says %q", t.Say)
 	case t.Enter:
 		return "a player arrives"
+	case t.Examine != "":
+		return "a player examines " + t.Examine
 	}
 	s := strings.ToUpper(t.Verb) + " " + t.Target
 	if t.With != "" {
