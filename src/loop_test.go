@@ -10,6 +10,7 @@ import (
 // A message of only spaces used to index into an empty field list in the
 // reader goroutine, panicking and taking the whole server down.
 func TestWhitespaceOnlyMessageIsIgnored(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := passwordPlayer(t, wsURL, "spacer")
 
@@ -27,6 +28,7 @@ func TestWhitespaceOnlyMessageIsIgnored(t *testing.T) {
 }
 
 func TestLoginWhileAlreadyOnline(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	passwordPlayer(t, wsURL, "solo")
 
@@ -39,6 +41,7 @@ func TestLoginWhileAlreadyOnline(t *testing.T) {
 // Databases created before the unique index existed (production's, for one)
 // get it when the server starts.
 func TestStartupAddsUsernameIndex(t *testing.T) {
+	t.Parallel()
 	startTestServerWith(t, `ALTER TABLE player DROP CONSTRAINT player_username_key`)
 
 	db, err := pgx.Connect(context.Background(), testDatabaseURL(t))

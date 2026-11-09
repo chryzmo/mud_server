@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,17 +28,58 @@ import (
 	over a websocket, the same way the browser client does.
 
 	They need MUD_TEST_DATABASE_URL (scripts/test.sh sets it after starting the
-	local Postgres container) and are skipped without it.  The database is dropped
-	and reseeded from src/sql before each test.
+	local Postgres container) and are skipped without it.  Each test gets its own
+	database, seeded from src/sql, and runs in parallel with the others.
 */
 
+// testDBs maps a test's name to its own database, so a test that asks twice gets the same one.
+var testDBs sync.Map
+
+// testDatabaseURL is the URL of a database for this test alone, created on first use and dropped when the
+// test ends. Tests share nothing, so they can run in parallel (every test calls t.Parallel). The databases
+// are created beside MUD_TEST_DATABASE_URL's, named mud_t_<random>; one left behind by a killed run is
+// harmless and can be dropped by hand.
 func testDatabaseURL(t *testing.T) string {
 	t.Helper()
-	url := os.Getenv("MUD_TEST_DATABASE_URL")
-	if url == "" {
+	base := os.Getenv("MUD_TEST_DATABASE_URL")
+	if base == "" {
 		t.Skip("MUD_TEST_DATABASE_URL not set; run scripts/test.sh to start the test database")
 	}
-	return url
+	if u, ok := testDBs.Load(t.Name()); ok {
+		return u.(string)
+	}
+	parsed, err := url.Parse(base)
+	if err != nil {
+		t.Fatalf("parse MUD_TEST_DATABASE_URL: %v", err)
+	}
+	suffix := make([]byte, 6)
+	if _, err := rand.Read(suffix); err != nil {
+		t.Fatal(err)
+	}
+	name := "mud_t_" + hex.EncodeToString(suffix)
+
+	ctx := context.Background()
+	admin, err := pgx.Connect(ctx, base)
+	if err != nil {
+		t.Fatalf("connect to test database: %v", err)
+	}
+	defer admin.Close(ctx)
+	if _, err := admin.Exec(ctx, "CREATE DATABASE "+name); err != nil {
+		t.Fatalf("create %s: %v", name, err)
+	}
+	// Registered before the test starts its server, so it runs after the server has shut down.
+	t.Cleanup(func() {
+		conn, err := pgx.Connect(context.Background(), base)
+		if err != nil {
+			return
+		}
+		defer conn.Close(context.Background())
+		conn.Exec(context.Background(), "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)")
+	})
+	parsed.Path = "/" + name
+	u := parsed.String()
+	testDBs.Store(t.Name(), u)
+	return u
 }
 
 // resetDatabase drops and reseeds every table using the scripts in src/sql, in load_order.txt order.
@@ -275,6 +320,7 @@ func expect(t *testing.T, conn *websocket.Conn, want string) string {
 }
 
 func TestLoginLookAndMove(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 
@@ -295,6 +341,7 @@ func TestLoginLookAndMove(t *testing.T) {
 }
 
 func TestCommandsRequireLogin(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 
@@ -304,6 +351,7 @@ func TestCommandsRequireLogin(t *testing.T) {
 }
 
 func TestLoginRestoresSavedLocation(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 
 	first := dial(t, wsURL)
@@ -322,6 +370,7 @@ func TestLoginRestoresSavedLocation(t *testing.T) {
 }
 
 func TestLoginRejectsWrongPassword(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 
 	createAccount(t, "guarded", "secret")

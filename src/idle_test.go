@@ -22,6 +22,7 @@ func (g *guest) awaitIdleError() time.Time {
 }
 
 func TestIdleGuestIsToldThenGoesDormantThenLeaves(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(500, 700))
 	watcher := reader(passwordPlayer(t, wsURL, "Watcher")) // a password account is never idle-kicked
 	idler := joinGuest(t, wsURL, "Idler")
@@ -44,6 +45,7 @@ func TestIdleGuestIsToldThenGoesDormantThenLeaves(t *testing.T) {
 }
 
 func TestActiveGuestsAreNotKicked(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(700, 5000))
 	busy := joinGuest(t, wsURL, "Busy")
 	sleepy := joinGuest(t, wsURL, "Sleepy")
@@ -73,6 +75,7 @@ func TestActiveGuestsAreNotKicked(t *testing.T) {
 // Coming back counts as activity: after an idle kick, a resume within the grace
 // period works, and the clock restarts instead of kicking them again at once.
 func TestResumingAfterAnIdleKickRestartsTheClock(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(600, 10000))
 	g := joinGuest(t, wsURL, "Dozer")
 	g.awaitIdleError()
@@ -94,6 +97,7 @@ func TestResumingAfterAnIdleKickRestartsTheClock(t *testing.T) {
 }
 
 func TestPasswordPlayersAreNeverIdleKicked(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(300, 5000))
 	gm := passwordPlayer(t, wsURL, "Gamemaster")
 	time.Sleep(1500 * time.Millisecond)
@@ -105,6 +109,7 @@ func TestPasswordPlayersAreNeverIdleKicked(t *testing.T) {
 }
 
 func TestIdleReclaimCanBeDisabled(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, idleConfig(-1, 5000))
 	g := joinGuest(t, wsURL, "Forever")
 	time.Sleep(1500 * time.Millisecond)

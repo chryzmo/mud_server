@@ -47,6 +47,7 @@ func statsWhere(t *testing.T, conn *websocket.Conn, ok func(m map[string]any) bo
 }
 
 func TestExploringEarnsXPOnceAndLevelsUpWithStatGains(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
 	conn := eventPlayer(t, wsURL, "scout")
 	// Standing in the Hall is the first room: 10 XP, still level 1.
@@ -80,6 +81,7 @@ func TestExploringEarnsXPOnceAndLevelsUpWithStatGains(t *testing.T) {
 }
 
 func TestKillingAMonsterEarnsCombatXP(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 0, attackaccuracy = 0, defense = 0, hp = 5`)
@@ -97,6 +99,7 @@ func TestKillingAMonsterEarnsCombatXP(t *testing.T) {
 }
 
 func TestTheLeaderboardRanksPlayersLeavesOutGMsAndObeysHide(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, withContent(progressWorld(t)))
 	gm := eventGM(t, wsURL, "boss")
 	alice := eventPlayer(t, wsURL, "alice")
@@ -160,6 +163,7 @@ func TestTheLeaderboardRanksPlayersLeavesOutGMsAndObeysHide(t *testing.T) {
 }
 
 func TestTheLeaderboardEndpointIsReadOnlyAndEmptyBeforeAnySnapshot(t *testing.T) {
+	t.Parallel()
 	_, ms := startTestServerWithConfig(t, withContent(progressWorld(t)))
 	rec := httptest.NewRecorder()
 	ms.LeaderboardHandler(rec, httptest.NewRequest(http.MethodPost, "/api/leaderboard", nil))
@@ -177,6 +181,7 @@ func TestTheLeaderboardEndpointIsReadOnlyAndEmptyBeforeAnySnapshot(t *testing.T)
 // An XP gain reaches the client in italics (ESC[3m ... ESC[0m) with a blank line after it, so it stands
 // apart from the text around it.
 func TestXPGainsAreItalicWithABlankLineAfter(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
 	conn := eventPlayer(t, wsURL, "scout")
 	got := expect(t, conn, "exploration XP") // the first room
@@ -187,6 +192,7 @@ func TestXPGainsAreItalicWithABlankLineAfter(t *testing.T) {
 
 // The line for examining a feature the first time says what was looked at and that it earned XP.
 func TestFeatureXPLineNamesTheThing(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
 	conn := eventPlayer(t, wsURL, "scout")
 	send(t, conn, "EXAMINE lever")

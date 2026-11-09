@@ -5,7 +5,7 @@
 #   2. Scan the staged changes for secrets: gitleaks if it's installed, plus
 #      built-in patterns for private keys, cloud and API tokens, and credentials.
 #   3. Refuse merge-conflict markers and files over 1 MB.
-#   4. Run scripts/test.sh, unless this exact tree already passed.
+#   4. Run scripts/test.sh, unless the commit changes only Markdown or this exact tree already passed.
 #
 # A line that trips the secret scan but is safe can be marked with a
 # "pre-commit: allow-secret" comment. Bypass the whole hook only when the user
@@ -80,7 +80,13 @@ if [ "$failed" -ne 0 ]; then
 	exit 1
 fi
 
-# 4. Tests. They run against the working tree, so snapshot it the same way the
+# 4. Tests, unless the commit changes only Markdown (README, AGENTS, docs): there is no code to test.
+if ! printf '%s\n' "$staged" | grep -v -E '\.md$' | grep -q .; then
+	echo "pre-commit: only Markdown changed; skipping scripts/test.sh" >&2
+	exit 0
+fi
+
+# Tests run against the working tree, so snapshot it the same way the
 # agent Stop hook does and skip if this exact tree already passed.
 state="$git_dir/agent-tests-passed-tree"
 tmp_index="$(mktemp)"

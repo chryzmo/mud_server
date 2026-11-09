@@ -27,6 +27,7 @@ func startRoomLogin(t *testing.T, wsURL, name string) *websocket.Conn {
 }
 
 func TestSavedGearMovesToTheFiveSlotsAtLogin(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	createAccount(t, "knight", "secret")
 	execSQL(t, testDatabaseURL(t), fmt.Sprintf(
@@ -51,6 +52,7 @@ func TestSavedGearMovesToTheFiveSlotsAtLogin(t *testing.T) {
 }
 
 func TestACosmeticAddsNoStatsAndOthersSeeWhatYouWear(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	createAccount(t, "dandy", "secret")
 	createAccount(t, "watcher", "secret")

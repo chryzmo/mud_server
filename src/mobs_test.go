@@ -71,6 +71,7 @@ func monsterTap(t *testing.T, conn *websocket.Conn) string {
 }
 
 func TestAMonsterAppearsOnlyForPlayersAndFightsBackOnlyWhenAttacked(t *testing.T) {
+	t.Parallel()
 	wsURL := mobServer(t)
 	conn := mobPlayer(t, wsURL, "fighter")
 	name := monsterTap(t, conn) // it came after the player did, and tappably
@@ -91,6 +92,7 @@ func TestAMonsterAppearsOnlyForPlayersAndFightsBackOnlyWhenAttacked(t *testing.T
 }
 
 func TestEveryoneWhoHitAMonsterIsPaidInFull(t *testing.T) {
+	t.Parallel()
 	wsURL := mobServer(t)
 	a := mobPlayer(t, wsURL, "firstblow")
 	b := mobPlayer(t, wsURL, "secondblow")

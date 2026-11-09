@@ -63,6 +63,7 @@ func clockServer(t *testing.T, configure func(*mudserver.Configuration)) string 
 }
 
 func TestLookListsTheThingsToExamineButNotTheUnlisted(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	send(t, conn, "LOOK")
@@ -77,6 +78,7 @@ func TestLookListsTheThingsToExamineButNotTheUnlisted(t *testing.T) {
 }
 
 func TestExamineFindsThingsByNameAliasAndPrefix(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	for _, tc := range []struct{ line, want string }{
@@ -99,6 +101,7 @@ func TestExamineFindsThingsByNameAliasAndPrefix(t *testing.T) {
 }
 
 func TestExamineAsksWhichWhenSeveralFit(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	send(t, conn, "X clock") // both clocks have the alias "clock"
@@ -110,6 +113,7 @@ func TestExamineAsksWhichWhenSeveralFit(t *testing.T) {
 }
 
 func TestExamineRefusals(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	send(t, conn, "EXAMINE")
@@ -125,6 +129,7 @@ func TestExamineRefusals(t *testing.T) {
 }
 
 func TestExamineItemsInThePackPlayersAndYourself(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	other := hallPlayer(t, wsURL, "other")
@@ -146,6 +151,7 @@ func TestExamineItemsInThePackPlayersAndYourself(t *testing.T) {
 }
 
 func TestExamineIsListedInHelp(t *testing.T) {
+	t.Parallel()
 	wsURL := clockServer(t, nil)
 	conn := hallPlayer(t, wsURL, "viewer")
 	send(t, conn, "HELP")
@@ -153,6 +159,7 @@ func TestExamineIsListedInHelp(t *testing.T) {
 }
 
 func TestACopyOfARoomKeepsItsFeatures(t *testing.T) {
+	t.Parallel()
 	dir := contentDir(t, map[string]string{"w.yaml": clockWorld + "areas:\n  main: {rooms: [hall, yard]}\n"})
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.World.ContentDir = dir
@@ -170,6 +177,7 @@ func TestACopyOfARoomKeepsItsFeatures(t *testing.T) {
 }
 
 func TestApplyingContentAgainUpdatesFeatures(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	dir := contentDir(t, map[string]string{"w.yaml": clockWorld})
@@ -187,6 +195,7 @@ func TestApplyingContentAgainUpdatesFeatures(t *testing.T) {
 }
 
 func TestAWorldWithoutContentHasNoFeaturesAndStillExamines(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t) // the SQL seed: no features column data
 	conn := passwordPlayer(t, wsURL, "legacy")
 	send(t, conn, "LOOK")

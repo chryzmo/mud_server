@@ -44,6 +44,7 @@ events:
 `
 
 func TestABossArrivesByEventIsAnnouncedOneAtATimeAndPaysItsGuaranteedDrop(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(contentDir(t, map[string]string{"world.yaml": bossWorld})))
 	gm := eventGM(t, wsURL, "boss")
 	fighter := eventPlayer(t, wsURL, "visitor")

@@ -30,6 +30,7 @@ func chatLine(t *testing.T, g *guest) map[string]any {
 }
 
 func TestGlobalChatReachesEveryoneInTheWorldIncludingTheSender(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, noWait)
 	alice := guestIn(t, wsURL, "Alice")
 	bob := guestIn(t, wsURL, "Bob")
@@ -53,6 +54,7 @@ func TestGlobalChatReachesEveryoneInTheWorldIncludingTheSender(t *testing.T) {
 }
 
 func TestANewGuestWaitsBeforeUsingGlobalChat(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t) // the default wait
 	alice := guestIn(t, wsURL, "Alice")
 	send(t, alice.conn, "GLOBAL hi")
@@ -68,6 +70,7 @@ func TestANewGuestWaitsBeforeUsingGlobalChat(t *testing.T) {
 }
 
 func TestChatIsRateLimitedPerPlayerAndOverall(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		noWait(c)
 		c.Chat.PerPlayerSeconds, c.Chat.PlayerBurst = 600, 2
@@ -97,6 +100,7 @@ func TestChatIsRateLimitedPerPlayerAndOverall(t *testing.T) {
 }
 
 func TestBlockedWordsAreMaskedNotRefused(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, noWait)
 	alice := guestIn(t, wsURL, "Alice")
 	send(t, alice.conn, "GLOBAL what the f.u.c.k, Class! sh1t")
@@ -112,6 +116,7 @@ func TestBlockedWordsAreMaskedNotRefused(t *testing.T) {
 }
 
 func TestMutedPlayersAndLongLinesCannotUseGlobalChat(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, noWait)
 	gm := gmPlayer(t, wsURL, "boss")
 	alice := guestIn(t, wsURL, "Alice")
@@ -135,6 +140,7 @@ func TestMutedPlayersAndLongLinesCannotUseGlobalChat(t *testing.T) {
 }
 
 func TestTheGMCanSwitchChatOffAndSlowItDown(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, noWait)
 	gm := gmPlayer(t, wsURL, "boss")
 	alice := guestIn(t, wsURL, "Alice")

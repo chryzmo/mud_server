@@ -29,6 +29,7 @@ func joinAs(t *testing.T, wsURL, name string) (*websocket.Conn, map[string]any) 
 }
 
 func TestJoinCreatesAGuestAndStoresOnlyHashes(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn, auth := joinAs(t, wsURL, "Zed_1")
 	if auth["ok"] != true || !strings.Contains(auth["message"].(string), "Welcome, Zed_1!") {
@@ -71,6 +72,7 @@ func TestJoinCreatesAGuestAndStoresOnlyHashes(t *testing.T) {
 }
 
 func TestJoinRefusesBadNamesAndCreatesNothing(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	for name, reason := range map[string]string{
 		"ab":                 "at least 3",
@@ -97,6 +99,7 @@ func TestJoinRefusesBadNamesAndCreatesNothing(t *testing.T) {
 }
 
 func TestJoinNamesAreUniqueIgnoringCase(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	if _, auth := joinAs(t, wsURL, "Ann"); auth["ok"] != true {
 		t.Fatalf("first join = %v", auth)
@@ -113,6 +116,7 @@ func TestJoinNamesAreUniqueIgnoringCase(t *testing.T) {
 }
 
 func TestConcurrentJoinsOfOneNameHaveOneWinner(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	const racers = 12
 	var wg sync.WaitGroup
@@ -161,6 +165,7 @@ func TestConcurrentJoinsOfOneNameHaveOneWinner(t *testing.T) {
 }
 
 func TestJoinWhileAlreadyInTheGame(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn, _ := joinAs(t, wsURL, "Once")
 	writeRaw(t, conn, `{"t":"join","name":"Twice"}`)
@@ -180,6 +185,7 @@ func TestJoinWhileAlreadyInTheGame(t *testing.T) {
 }
 
 func TestJoinAtCapacityCreatesNoRow(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(1, 1))
 	if _, auth := joinAs(t, wsURL, "First"); auth["ok"] != true {
 		t.Fatalf("first join = %v", auth)
@@ -195,6 +201,7 @@ func TestJoinAtCapacityCreatesNoRow(t *testing.T) {
 
 // A database created before guest sessions gets its columns and indexes at startup.
 func TestSchemaUpgradeAddsGuestColumns(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	execSQL(t, url,

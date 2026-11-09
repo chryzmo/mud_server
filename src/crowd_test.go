@@ -33,6 +33,7 @@ func lookText(t *testing.T, conn *websocket.Conn) string {
 }
 
 func TestCrowdSpreadsPlayersAcrossCopies(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(2, 10))
 	ann := passwordPlayer(t, wsURL, "ann")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -75,6 +76,7 @@ whispered:
 }
 
 func TestCopiesAreNeverSavedAndPlayersSaveTheirTemplate(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(1, 10))
 	passwordPlayer(t, wsURL, "first")
 	second := passwordPlayer(t, wsURL, "second") // in a clone
@@ -97,6 +99,7 @@ func TestCopiesAreNeverSavedAndPlayersSaveTheirTemplate(t *testing.T) {
 }
 
 func TestAtCapacityRefusesNewcomersUntilSomeoneLeaves(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(1, 1))
 	ann := passwordPlayer(t, wsURL, "ann")
 
@@ -126,6 +129,7 @@ func TestAtCapacityRefusesNewcomersUntilSomeoneLeaves(t *testing.T) {
 // Arrivals open copies on the game loop while other logins are in flight on
 // connection readers; the race detector checks that no reader touches the map.
 func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfig(3, 100))
 	const players = 30
 	for i := 0; i < players; i++ {
@@ -166,6 +170,7 @@ func TestConcurrentArrivalsOpenCopiesSafely(t *testing.T) {
 }
 
 func TestCrowdedRoomRefusesMovesOverTheWire(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, crowdConfigCaps(5, 1, 10))
 	ann := passwordPlayer(t, wsURL, "ann")
 	bob := passwordPlayer(t, wsURL, "bob") // placement fills copy 0 up to the soft cap of 5

@@ -37,6 +37,7 @@ func tourServer(t *testing.T) string {
 }
 
 func TestANewPlayerIsOfferedTheWalkthroughAndEachStepBringsTheNext(t *testing.T) {
+	t.Parallel()
 	wsURL := tourServer(t)
 	conn := eventPlayer(t, wsURL, "newcomer")
 	expect(t, conn, "Gatewarden: Welcome, traveller.")
@@ -59,6 +60,7 @@ func TestANewPlayerIsOfferedTheWalkthroughAndEachStepBringsTheNext(t *testing.T)
 }
 
 func TestStepsDoneOutOfOrderStayQuietAndAreSkippedLater(t *testing.T) {
+	t.Parallel()
 	wsURL := tourServer(t)
 	conn := eventPlayer(t, wsURL, "eager")
 	expect(t, conn, "Gatewarden: Try LOOK.")
@@ -75,6 +77,7 @@ func TestStepsDoneOutOfOrderStayQuietAndAreSkippedLater(t *testing.T) {
 }
 
 func TestAFailedMoveOrExamineDoesNotCountAsAStep(t *testing.T) {
+	t.Parallel()
 	wsURL := tourServer(t)
 	conn := eventPlayer(t, wsURL, "clumsy")
 	expect(t, conn, "Gatewarden: Try LOOK.")
@@ -88,6 +91,7 @@ func TestAFailedMoveOrExamineDoesNotCountAsAStep(t *testing.T) {
 }
 
 func TestSkipEndsItAndStartTakesItAgain(t *testing.T) {
+	t.Parallel()
 	wsURL := tourServer(t)
 	conn := eventPlayer(t, wsURL, "busy")
 	expect(t, conn, "Gatewarden: Try LOOK.")
@@ -108,6 +112,7 @@ func TestSkipEndsItAndStartTakesItAgain(t *testing.T) {
 }
 
 func TestTheWalkthroughIsOfferedOnceAndResumesAfterReconnecting(t *testing.T) {
+	t.Parallel()
 	wsURL := tourServer(t)
 	conn := eventPlayer(t, wsURL, "returner")
 	expect(t, conn, "Gatewarden: Try LOOK.")
@@ -124,6 +129,7 @@ func TestTheWalkthroughIsOfferedOnceAndResumesAfterReconnecting(t *testing.T) {
 }
 
 func TestWithoutAnOnboardingBlockThereIsNoWalkthrough(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(contentDir(t, map[string]string{"world.yaml": "start_room: hall\nrooms:\n  hall:\n    name: Hall\n    description: A hall.\n"})))
 	conn := eventPlayer(t, wsURL, "plain")
 	send(t, conn, "TOUR")

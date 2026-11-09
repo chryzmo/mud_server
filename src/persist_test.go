@@ -59,6 +59,7 @@ func is(want string) func(string) bool { return func(v string) bool { return v =
 // Changes reach the database within one save interval, while the player is
 // still online: nothing waits for a disconnect or the hourly save any more.
 func TestChangesSavedWithinInterval(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(100))
 	conn := passwordPlayer(t, wsURL, "keeper")
 
@@ -75,6 +76,7 @@ func TestChangesSavedWithinInterval(t *testing.T) {
 // DROP never marked anything for saving before, so a dropped item came back
 // after a restart unless the player happened to disconnect.
 func TestDropIsSaved(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(100))
 	conn := passwordPlayer(t, wsURL, "keeper")
 
@@ -91,6 +93,7 @@ func TestDropIsSaved(t *testing.T) {
 // Logging back in right after disconnecting loads what was saved at the
 // disconnect. The periodic interval is far too long to be what saved it.
 func TestReloginSeesStateSavedAtDisconnect(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, saveEvery(600000))
 	conn := passwordPlayer(t, wsURL, "keeper")
 	send(t, conn, "GET KEY")
@@ -111,6 +114,7 @@ func TestReloginSeesStateSavedAtDisconnect(t *testing.T) {
 // Shutdown writes rooms as well as players, even when nothing has been
 // flushed yet.
 func TestShutdownSavesRooms(t *testing.T) {
+	t.Parallel()
 	wsURL, si := startTestServerWithConfig(t, saveEvery(600000))
 	conn := passwordPlayer(t, wsURL, "keeper")
 	send(t, conn, "GET KEY")

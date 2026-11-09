@@ -51,6 +51,7 @@ items:
 `
 
 func TestContentAdoptsTheSeededWorldWithoutMovingAnything(t *testing.T) {
+	t.Parallel()
 	startTestServerWithConfig(t, withContent(sampleWorld))
 
 	for _, tc := range []struct{ sql, want string }{
@@ -74,6 +75,7 @@ func TestContentAdoptsTheSeededWorldWithoutMovingAnything(t *testing.T) {
 }
 
 func TestContentWorldPlaysLikeTheSeededOne(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(sampleWorld))
 	conn := passwordPlayer(t, wsURL, "viewer")
 	send(t, conn, "GET KEY")
@@ -83,6 +85,7 @@ func TestContentWorldPlaysLikeTheSeededOne(t *testing.T) {
 }
 
 func TestApplyingTwiceChangesNothingAndKeepsWhatPlayersDid(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	_, first := serveTestServer(t, url, withContent(sampleWorld))
@@ -103,6 +106,7 @@ func TestApplyingTwiceChangesNothingAndKeepsWhatPlayersDid(t *testing.T) {
 }
 
 func TestContentCreatesRoomsAndLeavesTheOldOnesOutOfTheWorld(t *testing.T) {
+	t.Parallel()
 	dir := contentDir(t, map[string]string{"w.yaml": lobbyWorld})
 	wsURL, _ := startTestServerWithConfig(t, withContent(dir))
 
@@ -129,6 +133,7 @@ func TestContentCreatesRoomsAndLeavesTheOldOnesOutOfTheWorld(t *testing.T) {
 }
 
 func TestAPlayerSavedInARoomThatLeftTheWorldStartsAtTheStartRoom(t *testing.T) {
+	t.Parallel()
 	dir := contentDir(t, map[string]string{"w.yaml": lobbyWorld})
 	wsURL, _ := startTestServerWithConfig(t, withContent(dir))
 	// A password account is created in room 1, the seeded "Start Room", which the content dropped.
@@ -140,6 +145,7 @@ func TestAPlayerSavedInARoomThatLeftTheWorldStartsAtTheStartRoom(t *testing.T) {
 }
 
 func TestContentAreasCopyRoomsForACrowd(t *testing.T) {
+	t.Parallel()
 	dir := contentDir(t, map[string]string{"w.yaml": lobbyWorld + "areas:\n  main: {rooms: [lobby, garden]}\n"})
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.World.ContentDir = dir
@@ -164,6 +170,7 @@ func TestContentAreasCopyRoomsForACrowd(t *testing.T) {
 }
 
 func TestBrokenContentStopsTheServerFromStarting(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	broken := contentDir(t, map[string]string{"w.yaml": strings.Replace(lobbyWorld, "{N: garden}", "{N: nowhere}", 1)})
@@ -186,6 +193,7 @@ func TestBrokenContentStopsTheServerFromStarting(t *testing.T) {
 }
 
 func TestAWorldWithoutContentIsUnchanged(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {})
 	conn := passwordPlayer(t, wsURL, "legacy")
 	send(t, conn, "MOVE N")

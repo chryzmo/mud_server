@@ -76,6 +76,7 @@ func await(t *testing.T, ch <-chan string, want string) string {
 // Before sessions had their own queues, a client that stopped reading blocked
 // the shared command loop on a websocket write, freezing the game for everyone.
 func TestStalledClientDoesNotBlockOthers(t *testing.T) {
+	t.Parallel()
 	// Default queue size; a short write timeout so the stalled writer gives up quickly.
 	wsURL, ms := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.WriteTimeoutMS = 500
@@ -142,6 +143,7 @@ func TestStalledClientDoesNotBlockOthers(t *testing.T) {
 }
 
 func TestServerPingsClients(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.PingIntervalMS = 100
 	})
@@ -160,6 +162,7 @@ func TestServerPingsClients(t *testing.T) {
 }
 
 func TestUnresponsiveClientIsDisconnected(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.PingIntervalMS = 100
 		c.Connection.PongTimeoutMS = 500
@@ -201,6 +204,7 @@ func settle(t *testing.T, conn *websocket.Conn) {
 // A client that says goodbye and one whose connection just vanishes are
 // different reasons, and neither is a server-side drop.
 func TestSessionCloseReasonsForClientDisconnects(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, func(*mudserver.Configuration) {})
 
 	polite := passwordPlayer(t, wsURL, "polite")

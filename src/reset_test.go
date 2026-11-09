@@ -28,6 +28,7 @@ func resetFixture(t *testing.T) mudserver.Configuration {
 }
 
 func TestResetPlayersKeepsGMsByDefault(t *testing.T) {
+	t.Parallel()
 	c := resetFixture(t)
 	n, err := mudserver.ResetPlayers(c, false)
 	if err != nil || n != 2 {
@@ -45,6 +46,7 @@ func TestResetPlayersKeepsGMsByDefault(t *testing.T) {
 }
 
 func TestResetPlayersCanIncludeGMs(t *testing.T) {
+	t.Parallel()
 	c := resetFixture(t)
 	if n, err := mudserver.ResetPlayers(c, true); err != nil || n != 3 {
 		t.Fatalf("ResetPlayers = %d, %v; want 3, nil", n, err)
@@ -55,6 +57,7 @@ func TestResetPlayersCanIncludeGMs(t *testing.T) {
 }
 
 func TestResetPlayerDeletesOneAndFreesTheName(t *testing.T) {
+	t.Parallel()
 	c := resetFixture(t)
 	found, err := mudserver.ResetPlayer(c, "alice") // case does not matter
 	if err != nil || !found {
@@ -75,6 +78,7 @@ func TestResetPlayerDeletesOneAndFreesTheName(t *testing.T) {
 }
 
 func TestResetPlayerUnknownAndGM(t *testing.T) {
+	t.Parallel()
 	c := resetFixture(t)
 	if found, err := mudserver.ResetPlayer(c, "Nobody"); found || err != nil {
 		t.Errorf("unknown name = %v, %v; want false, nil", found, err)

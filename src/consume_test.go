@@ -42,6 +42,7 @@ npcs:
 `
 
 func TestAPotionHealsUpToTheMaximumAndIsUsedUp(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		withContent(contentDir(t, map[string]string{"world.yaml": consumeWorld}))(c)
 		c.Connection.CommandsPerSecond, c.Connection.CommandBurst = 1000, 1000

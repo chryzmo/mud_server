@@ -30,6 +30,7 @@ func recoveryConfig(graceMS, lockMS int) func(*mudserver.Configuration) {
 }
 
 func TestRecoverTakesBackADormantCharacterAndRotatesCredentials(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, recoveryConfig(10000, 0))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	lost := joinGuest(t, wsURL, "Lost")
@@ -82,6 +83,7 @@ func TestRecoverTakesBackADormantCharacterAndRotatesCredentials(t *testing.T) {
 }
 
 func TestRecoverWhileTheOldDeviceIsStillConnected(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, recoveryConfig(400, 0))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	phone := joinGuest(t, wsURL, "Phone")
@@ -117,6 +119,7 @@ func TestRecoverWhileTheOldDeviceIsStillConnected(t *testing.T) {
 }
 
 func TestRecoverAfterTheGracePeriodIsAnOrdinaryArrival(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, recoveryConfig(250, 0))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	lost := joinGuest(t, wsURL, "Lost")
@@ -141,6 +144,7 @@ func TestRecoverAfterTheGracePeriodIsAnOrdinaryArrival(t *testing.T) {
 }
 
 func TestWrongRecoveryCodesLockTheName(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, recoveryConfig(5000, 900))
 	victim := joinGuest(t, wsURL, "Victim")
 	victim.drop()
@@ -169,6 +173,7 @@ func TestWrongRecoveryCodesLockTheName(t *testing.T) {
 }
 
 func TestASuccessfulRecoveryClearsTheFailureCount(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, recoveryConfig(5000, 0))
 	g := joinGuest(t, wsURL, "Careful")
 	g.drop()
@@ -191,6 +196,7 @@ func TestASuccessfulRecoveryClearsTheFailureCount(t *testing.T) {
 }
 
 func TestRecoveryAnswersLeakNothingAboutWhichNamesExist(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	joinGuest(t, wsURL, "Realguest")
 	passwordPlayer(t, wsURL, "Passworded") // a password account has no recovery code
@@ -211,6 +217,7 @@ func TestRecoveryAnswersLeakNothingAboutWhichNamesExist(t *testing.T) {
 }
 
 func TestOnlyOneConcurrentRecoveryWins(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, recoveryConfig(5000, 0))
 	g := joinGuest(t, wsURL, "Contested")
 	g.drop()
@@ -258,6 +265,7 @@ func TestOnlyOneConcurrentRecoveryWins(t *testing.T) {
 }
 
 func TestRecoverRejectsMalformedRequestsAndLoggedInSessions(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")

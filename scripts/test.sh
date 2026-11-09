@@ -14,6 +14,8 @@ if [ -z "${MUD_TEST_DATABASE_URL:-}" ]; then
 fi
 
 go vet ./...
-go test -race -count=1 ./...
+# Tests run in parallel, each on its own database (src/main_test.go); the cap keeps the Postgres connection count
+# (a server holds a few each) well under its default limit of 100 on a many-core machine.
+go test -race -count=1 -parallel 16 ./...
 # The sample world must stay valid (the real world is checked in the mud_content repository).
 go run ./src -validate-world -strict world-sample

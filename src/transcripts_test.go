@@ -645,6 +645,7 @@ func wire(t *testing.T) []transcript {
 }
 
 func TestWireTranscripts(t *testing.T) {
+	t.Parallel()
 	got := transcriptFileBody{
 		Format: 1,
 		Notes: []string{
