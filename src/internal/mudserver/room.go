@@ -154,10 +154,24 @@ func (r *Room) lookDescription(viewer *MudPlayer) string {
 
 	if len(r.UserMap) > 0 {
 		desc.WriteString("\nThe players here are:\n")
-		for k, p := range r.UserMap {
-			desc.WriteString(mudutils.ColorString(k, mudutils.COLOR_BLUE))
+		// The viewer first, marked "(you)", then everyone else by name; each with their level.
+		writePlayer := func(name string, p *MudPlayer, suffix string) {
+			level, _, _ := p.xpFields()
+			desc.WriteString(mudutils.ColorString(name, mudutils.COLOR_BLUE))
 			desc.WriteString(p.lookMarker()) // the client draws the name with its colour and badge
-			desc.WriteByte('\n')
+			desc.WriteString(suffix + ", level " + strconv.Itoa(level) + "\n")
+		}
+		others := make([]string, 0, len(r.UserMap))
+		for k, p := range r.UserMap {
+			if p == viewer {
+				writePlayer(k, p, " (you)")
+			} else {
+				others = append(others, k)
+			}
+		}
+		sort.Slice(others, func(i, j int) bool { return strings.ToLower(others[i]) < strings.ToLower(others[j]) })
+		for _, k := range others {
+			writePlayer(k, r.UserMap[k], "")
 		}
 	}
 

@@ -67,7 +67,10 @@ func TestACosmeticAddsNoStatsAndOthersSeeWhatYouWear(t *testing.T) {
 	expect(t, dandy, "STATUPDATE:hp=20,maxhp=20,mp=10,maxmp=10,atk=5,atkbonus=0,def=10,defbonus=0")
 
 	send(t, watcher, "EXAMINE dandy")
-	expect(t, watcher, "They wear LEATHER CAP.")
+	out := expect(t, watcher, "They wear the leather cap.")
+	if !strings.Contains(out, "is here with you, level 1.") || !strings.Contains(out, "They look hale and healthy.") {
+		t.Errorf("examining another player lacks their level or their health: %q", out)
+	}
 
 	send(t, dandy, "UNEQUIP cosmetic")
 	expect(t, dandy, "You unequip LEATHER CAP and stow it in your inventory.")

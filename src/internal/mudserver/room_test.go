@@ -19,7 +19,7 @@ func TestLookDescriptionPreservesTextAndANSI(t *testing.T) {
 		}, "You are in 'Hall'\nBare walls.\n\nThe monsters here are:\n\x1b[1;31mGrak\x1b[0m\n\n"},
 		{"player", func(r *Room) {
 			r.UserMap["Ada"] = &MudPlayer{Username: "Ada"}
-		}, "You are in 'Hall'\nBare walls.\n\nThe players here are:\n\x1b[1;34mAda\x1b[0m\n\n"},
+		}, "You are in 'Hall'\nBare walls.\n\nThe players here are:\n\x1b[1;34mAda\x1b[0m, level 1\n\n"},
 		{"item", func(r *Room) {
 			r.Inventory.AddItem(&Item{Name: "KEY", Quantity: 2})
 		}, "You are in 'Hall'\nBare walls.\n\nYou see:\n\x1b[1;32mKEY\x1b[0m\n\n"},
@@ -32,7 +32,7 @@ func TestLookDescriptionPreservesTextAndANSI(t *testing.T) {
 			r.UserMap["Ada"] = &MudPlayer{Username: "Ada"}
 			r.Inventory.AddItem(&Item{Name: "KEY", Quantity: 2})
 			r.ExitMap = map[string]*Room{"W": {}, "N": {}, "E": {}}
-		}, "You are in 'Café'\nFirst line.\nSecond line.\n\nThe monsters here are:\n\x1b[1;31mGrak\x1b[0m\n\nThe players here are:\n\x1b[1;34mAda\x1b[0m\n\nYou see:\n\x1b[1;32mKEY\x1b[0m\n\nExits: [E] [N] [W]\n\n"},
+		}, "You are in 'Café'\nFirst line.\nSecond line.\n\nThe monsters here are:\n\x1b[1;31mGrak\x1b[0m\n\nThe players here are:\n\x1b[1;34mAda\x1b[0m, level 1\n\nYou see:\n\x1b[1;32mKEY\x1b[0m\n\nExits: [E] [N] [W]\n\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			room := &Room{Name: "Hall", Description: "Bare walls.", UserMap: make(map[string]*MudPlayer), BaddieMap: make(map[string]*BaddieNPC), Inventory: CreateInventory()}
@@ -65,7 +65,7 @@ func TestLookDescriptionListsEveryEntry(t *testing.T) {
 	}
 	for i, want := range [][]string{
 		{"The monsters here are:", "\x1b[1;31mGrak\x1b[0m", "\x1b[1;31mMorg\x1b[0m"},
-		{"The players here are:", "\x1b[1;34mAda\x1b[0m", "\x1b[1;34mBea\x1b[0m", "\x1b[1;34mCy\x1b[0m"},
+		{"The players here are:", "\x1b[1;34mAda\x1b[0m, level 1", "\x1b[1;34mBea\x1b[0m, level 1", "\x1b[1;34mCy\x1b[0m, level 1"},
 		{"You see:", "\x1b[1;32mGOLD\x1b[0m", "\x1b[1;32mKEY\x1b[0m"},
 	} {
 		got := strings.Split(sections[i+1], "\n")
