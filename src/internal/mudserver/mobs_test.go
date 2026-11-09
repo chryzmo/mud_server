@@ -170,13 +170,13 @@ func TestASpawnerWaitsForPlayersAndForRoomInTheWorld(t *testing.T) {
 	}
 
 	mobPlayer(room, w, "ann")
-	s.tick(now.Add(10*time.Second), w) // first sight: the interval starts now
+	s.tick(now.Add(10*time.Second), w) // first sight: the first monster is on its way
 	if len(room.BaddieMap) != 0 {
 		t.Fatalf("a monster appeared the moment a player arrived")
 	}
 	s.tick(now.Add(11*time.Second), w)
 	if len(room.BaddieMap) != 1 {
-		t.Fatalf("after the interval the room has %d monsters, want 1", len(room.BaddieMap))
+		t.Fatalf("after the wait the room has %d monsters, want 1", len(room.BaddieMap))
 	}
 	for _, b := range room.BaddieMap {
 		if !b.passive {
@@ -193,6 +193,40 @@ func TestASpawnerWaitsForPlayersAndForRoomInTheWorld(t *testing.T) {
 	s.tick(now.Add(13*time.Second), w)
 	if len(room.BaddieMap) != 2 || w.liveMobs != 5 {
 		t.Errorf("with room in the world: %d monsters, live count %d", len(room.BaddieMap), w.liveMobs)
+	}
+}
+
+func TestTheFirstMonsterComesSoonAfterAPlayerArrives(t *testing.T) {
+	room, w := mobRoom()
+	s := &BaddieSpawner{TotalNumber: 1, tickDurationMS: 30000, Location: room,
+		baddie: BaddieNPC{Name: "Rat", Race: "RAT", passive: true, combatTickerDurationInMS: 1000}}
+	now := time.Now()
+
+	mobPlayer(room, w, "ann")
+	s.tick(now, w) // arrival
+	s.tick(now.Add(firstSpawnDelay-time.Millisecond), w)
+	if len(room.BaddieMap) != 0 {
+		t.Fatalf("a monster came before the short wait")
+	}
+	s.tick(now.Add(firstSpawnDelay), w)
+	if len(room.BaddieMap) != 1 {
+		t.Fatalf("after the short wait the room has %d monsters, want 1 (not a 30 s wait)", len(room.BaddieMap))
+	}
+
+	// Kill it, step out and back in at once: the next one still waits out the interval since the last.
+	room.BaddieMap = map[string]*BaddieNPC{}
+	w.liveMobs = 0
+	room.UserMap = map[string]*MudPlayer{}
+	s.tick(now.Add(5*time.Second), w) // empty: the schedule is dropped
+	mobPlayer(room, w, "ann")
+	s.tick(now.Add(6*time.Second), w) // arrival again
+	s.tick(now.Add(10*time.Second), w)
+	if len(room.BaddieMap) != 0 {
+		t.Fatalf("leaving and returning made a monster sooner than the interval after the last one")
+	}
+	s.tick(now.Add(firstSpawnDelay+30*time.Second), w)
+	if len(room.BaddieMap) != 1 {
+		t.Errorf("a monster a full interval after the last: room has %d, want 1", len(room.BaddieMap))
 	}
 }
 
