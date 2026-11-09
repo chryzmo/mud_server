@@ -131,6 +131,7 @@ func (w *World) spawnMob(npcKey string, room *Room, now time.Time) (*BaddieNPC, 
 // provoke notes that the player attacked this monster: it will fight back at them, and a kill pays them.
 // The latest attacker is last. Loop only.
 func (npc *BaddieNPC) provoke(p *MudPlayer) {
+	p.markCombat(time.Now()) // the player is fighting: no regrowth until it quiets down
 	for i, h := range npc.hitters {
 		if h == p {
 			npc.hitters = append(npc.hitters[:i], npc.hitters[i+1:]...)

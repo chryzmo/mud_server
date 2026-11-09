@@ -60,6 +60,7 @@ func (npc *BaddieNPC) attack (player *MudPlayer, now time.Time) {
 		return
 	}
 	npc.nextAttackAt = now.Add(time.Millisecond * time.Duration(npc.combatTickerDurationInMS))
+	player.markCombat(now)
 	{
 		// Do attack logic
 		npcstyledname := (mudutils.ColorString(npc.Name,mudutils.COLOR_RED))
