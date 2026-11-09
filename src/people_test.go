@@ -94,6 +94,19 @@ func TestTalkMarksTheTopicsForTapping(t *testing.T) {
 	}
 }
 
+// Each person in the "Also here" line carries the bright magenta code, so the client can make each name a button
+// that starts a TALK.
+func TestLookMarksThePeopleNamesForTapping(t *testing.T) {
+	wsURL := cafeServer(t, cafeWorld, nil)
+	conn := cafeVisitor(t, wsURL, "visitor")
+	send(t, conn, "LOOK")
+	out := expect(t, conn, "Also here:")
+	const want = "Also here: \x1b[1;95mMira the Barista\x1b[0m, \x1b[1;95mMiro the Baker\x1b[0m. (TALK to them.)"
+	if !strings.Contains(out, want) {
+		t.Errorf("the people are not marked: %q, want it to contain %q", out, want)
+	}
+}
+
 func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")

@@ -12,6 +12,7 @@ const (
 	COLOR_CYAN = "36m"
 	COLOR_YELLOW = "33m"
 	COLOR_WHITE = "37m"
+	COLOR_BRIGHT_MAGENTA = "95m"
 )
 
 //\033[1;34m%s\033[0m

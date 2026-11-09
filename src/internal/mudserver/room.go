@@ -135,7 +135,12 @@ func (r *Room) lookDescription(viewer *MudPlayer) string {
 	}
 	if people := r.peopleNames(); len(people) > 0 {
 		desc.WriteString("\nAlso here: ")
-		desc.WriteString(strings.Join(people, ", "))
+		for i, name := range people {
+			if i > 0 {
+				desc.WriteString(", ")
+			}
+			desc.WriteString(mudutils.ColorString(name, mudutils.COLOR_BRIGHT_MAGENTA)) // the client makes it a button that talks
+		}
 		desc.WriteString(". (TALK to them.)\n")
 	}
 
