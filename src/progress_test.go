@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -178,15 +179,68 @@ func TestTheLeaderboardEndpointIsReadOnlyAndEmptyBeforeAnySnapshot(t *testing.T)
 	}
 }
 
-// An XP gain reaches the client in italics (ESC[3m ... ESC[0m) with a blank line after it, so it stands
-// apart from the text around it.
-func TestXPGainsAreItalicWithABlankLineAfter(t *testing.T) {
+// textsUntil reads frames until one holds want and returns the text of every frame read, in order, the last
+// being the one that matched. Colour codes are kept.
+func textsUntil(t *testing.T, conn *websocket.Conn, want string) []string {
+	t.Helper()
+	var seen []string
+	for {
+		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("waiting for %q: %v\nframes seen: %q", want, err, seen)
+		}
+		text := flatten(msg)
+		seen = append(seen, text)
+		if hasText(text, want) {
+			return seen
+		}
+	}
+}
+
+// indexOfText is the position of the first frame holding want, or -1.
+func indexOfText(texts []string, want string) int {
+	for i, tx := range texts {
+		if hasText(tx, want) {
+			return i
+		}
+	}
+	return -1
+}
+
+// An exploration XP line comes before the description it belongs to, so the description is what the player reads
+// last, and it reaches the client in italics (ESC[3m ... ESC[0m) with a blank line after it.
+func TestExplorationXPComesBeforeTheDescription(t *testing.T) {
 	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
-	conn := eventPlayer(t, wsURL, "scout")
-	got := expect(t, conn, "exploration XP") // the first room
-	if !strings.HasPrefix(got, "\x1b[3m") || !strings.HasSuffix(got, "\x1b[0m\n") {
-		t.Errorf("exploration XP line = %q, want it wrapped in the italic escape and followed by a newline", got)
+	conn := dial(t, wsURL)
+	expect(t, conn, "Welcome to the MUD!")
+	loginNew(t, conn, "scout")
+
+	// Arriving: the first room.
+	texts := textsUntil(t, conn, "You are in 'Hall'")
+	xp, room := indexOfText(texts, "You discover a new place"), indexOfText(texts, "You are in 'Hall'")
+	if xp < 0 || xp > room {
+		t.Fatalf("the first-room XP line is at %d and the room description at %d; want the XP line first: %q", xp, room, texts)
+	}
+	if got := texts[xp]; !strings.HasPrefix(got, "\x1b[3m") || !strings.HasSuffix(got, "\x1b[0m\n") {
+		t.Errorf("room XP line = %q, want it in italics followed by a newline", got)
+	}
+
+	// Moving: a new room.
+	send(t, conn, "MOVE N")
+	texts = textsUntil(t, conn, "You are in 'Vault'")
+	if xp, room := indexOfText(texts, "You discover a new place"), indexOfText(texts, "You are in 'Vault'"); xp < 0 || xp > room {
+		t.Fatalf("moving: XP line at %d, description at %d: %q", xp, room, texts)
+	}
+
+	// Examining scenery for the first time.
+	send(t, conn, "MOVE S")
+	expect(t, conn, "You are in 'Hall'")
+	send(t, conn, "EXAMINE lever")
+	texts = textsUntil(t, conn, "A lever.")
+	if xp, desc := indexOfText(texts, "You look closely at the lever. (+5 exploration XP)"), indexOfText(texts, "A lever."); xp < 0 || xp > desc {
+		t.Fatalf("examining: XP line at %d, text at %d: %q", xp, desc, texts)
 	}
 }
 

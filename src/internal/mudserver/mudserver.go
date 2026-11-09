@@ -413,6 +413,8 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.Location.AddPlayer(player)
 		player.SendWelcome(hello)
 		player.Location.BroadcastFrame(encodeArrive(player, ""), player.Username)
+		fresh := player.tourFresh() // before the first room counts as visited
+		player.visit(player.Location.Key) // the exploration XP line goes before the description
 		c, _ := ms.getCommand("LOOK")
 		c.action(player, "")
 		player.applyLevels(false) // repairs a crash between the XP write and the stat save
@@ -420,7 +422,6 @@ func (ms *MudServer) admit(player *MudPlayer, hello welcome) string {
 		player.sendCosmeticsIfAny()
 		player.sendSpellsIfAny()
 		player.sendEvents(ms.sched)
-		fresh := player.tourFresh() // before entered() counts the first room as visited
 		player.entered()
 		if fresh {
 			player.tourStart()
