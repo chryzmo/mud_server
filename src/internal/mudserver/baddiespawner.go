@@ -8,12 +8,18 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// firstSpawnDelay is how long after a player arrives the first monster appears, so someone looking for
+// monsters need not wait a whole interval. It never beats the interval itself, and never comes sooner than
+// an interval after the spawner's last monster, so leaving and returning cannot make them faster.
+const firstSpawnDelay = 3 * time.Second
+
 type BaddieSpawner struct {
 	ID int32
 	TotalNumber int
 	tickDurationMS int64
 	baddie BaddieNPC
 	nextSpawnAt time.Time
+	lastSpawnAt time.Time // when it last made a monster
 	Location *Room
 }
 
@@ -45,8 +51,13 @@ func (spawner *BaddieSpawner) tick (now time.Time, w *World) {
 		return
 	}
 	if spawner.nextSpawnAt.IsZero() {
-		// The first spawn comes one interval after startup, as with the old ticker.
-		spawner.nextSpawnAt = now.Add(time.Millisecond * time.Duration(spawner.tickDurationMS))
+		// Someone just arrived: the first monster comes after a short wait, not a whole interval.
+		interval := time.Millisecond * time.Duration(spawner.tickDurationMS)
+		next := now.Add(min(firstSpawnDelay, interval))
+		if ready := spawner.lastSpawnAt.Add(interval); next.Before(ready) {
+			next = ready
+		}
+		spawner.nextSpawnAt = next
 	}
 	if now.Before(spawner.nextSpawnAt) {
 		return
@@ -61,6 +72,7 @@ func (spawner *BaddieSpawner) tick (now time.Time, w *World) {
 			newbaddie := spawner.baddie.copyOf(now)
 			newbaddie.Location = spawner.Location
 			w.placeMob(newbaddie)
+			spawner.lastSpawnAt = now
 		}
 	}
 }
