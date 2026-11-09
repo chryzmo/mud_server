@@ -37,7 +37,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -150,7 +150,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mZed\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mZed\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -221,7 +221,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -329,7 +329,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\u001b[1;34mBob\u001b[0m\n\nExits: [E] [S]\n\n"
+                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\u001b[1;34mBob\u001b[0m, level 1\n\nExits: [E] [S]\n\n"
               }
             },
             {
@@ -379,7 +379,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -485,7 +485,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -643,7 +643,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -716,7 +716,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\u001b[1;34mBob\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\u001b[1;34mBob\u001b[0m, level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -824,7 +824,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -896,7 +896,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\u001b[1;34mBob\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\u001b[1;34mBob\u001b[0m, level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -967,7 +967,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1010,7 +1010,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nExits: [E] [S]\n\n"
+                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nExits: [E] [S]\n\n"
               }
             },
             {
@@ -1055,7 +1055,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nExits: [E] [S]\n\n"
+                "text": "You are in 'Balcony'\nYou are at a balcony overlooking the woods.  There is a door to the East and to the South.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nExits: [E] [S]\n\n"
               }
             },
             {
@@ -1154,7 +1154,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1261,7 +1261,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1330,7 +1330,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1457,7 +1457,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1632,7 +1632,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1710,7 +1710,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1821,7 +1821,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1913,7 +1913,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\u001b[1;34mBob\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\u001b[1;34mBob\u001b[0m, level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {
@@ -1984,7 +1984,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
+                "text": "You are in 'Start Room'\nYou find yourself in a generic looking room.  There is a door to the North.\n\nThe players here are:\n\u001b[1;34mAlice\u001b[0m (you), level 1\n\nYou see:\n\u001b[1;32mKEY\u001b[0m\n\nExits: [N]\n\n"
               }
             },
             {

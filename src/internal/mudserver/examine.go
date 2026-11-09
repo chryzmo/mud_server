@@ -2,6 +2,7 @@ package mudserver
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"mud_server/src/internal/mudutils"
@@ -143,7 +144,7 @@ func (mp *MudPlayer) examineTargets(packOnly bool) []examineTarget {
 				out = append(out, examineTarget{display: who, names: []string{who}, text: "That is you."})
 				continue
 			}
-			out = append(out, examineTarget{display: who, names: []string{who}, text: mudutils.ColorString(who, mudutils.COLOR_BLUE) + " is here with you." + wornSentence(p)})
+			out = append(out, examineTarget{display: who, names: []string{who}, text: playerDescription(who, p)})
 		}
 		for _, b := range room.BaddieMap {
 			out = append(out, examineTarget{
@@ -191,14 +192,75 @@ func (mp *MudPlayer) examine(arguments string) {
 	}
 }
 
-// wornSentence says what a player wears, for EXAMINE <player>; empty when they wear nothing.
-func wornSentence(p *MudPlayer) string {
-	if p.Equipment == nil {
-		return ""
+// playerDescription is what EXAMINE <player> says about another player: their level, what they wield, wear and
+// carry, and how hurt they look. Exact health stays hidden; only a look is given.
+func playerDescription(who string, p *MudPlayer) string {
+	level, _, _ := p.xpFields()
+	return mudutils.ColorString(who, mudutils.COLOR_BLUE) + " is here with you, level " + strconv.Itoa(level) + ". " + gearSentence(p) + " " + healthSentence(p)
+}
+
+// gearSentence says what a player wields (weapon), wears (armor, boots, cosmetic) and carries (shield).
+func gearSentence(p *MudPlayer) string {
+	e := p.Equipment
+	if e == nil {
+		return "They have no gear to speak of."
 	}
-	worn := p.Equipment.Worn()
-	if len(worn) == 0 {
-		return ""
+	the := func(it *EquipmentItem) string { return "the " + strings.ToLower(it.Name) }
+	var clauses []string
+	if e.Weapon != nil {
+		clauses = append(clauses, "wield "+the(e.Weapon))
 	}
-	return " They wear " + strings.Join(worn, ", ") + "."
+	var wear []string
+	for _, it := range []*EquipmentItem{e.Armor, e.Boots, e.Cosmetic} {
+		if it != nil {
+			wear = append(wear, the(it))
+		}
+	}
+	if len(wear) > 0 {
+		clauses = append(clauses, "wear "+joinList(wear, false))
+	}
+	if e.Shield != nil {
+		clauses = append(clauses, "carry "+the(e.Shield))
+	}
+	if len(clauses) == 0 {
+		return "They have no gear to speak of."
+	}
+	return "They " + joinList(clauses, true) + "."
+}
+
+// healthSentence is how hurt a player looks, from their health as a share of their maximum.
+func healthSentence(p *MudPlayer) string {
+	max := p.EffectiveMaxHP()
+	if max <= 0 {
+		return "They look hale and healthy."
+	}
+	switch pct := p.HP * 100 / max; {
+	case pct >= 90:
+		return "They look hale and healthy."
+	case pct >= 65:
+		return "They have a few scratches."
+	case pct >= 40:
+		return "They are wounded."
+	case pct >= 15:
+		return "They are badly hurt."
+	}
+	return "They are barely standing."
+}
+
+// joinList joins items with commas and "and" before the last; oxford puts a comma before that "and" when there
+// are three or more (for clauses that contain their own lists).
+func joinList(items []string, oxford bool) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
+	case 2:
+		return items[0] + " and " + items[1]
+	}
+	sep := " and "
+	if oxford {
+		sep = ", and "
+	}
+	return strings.Join(items[:len(items)-1], ", ") + sep + items[len(items)-1]
 }
