@@ -154,8 +154,9 @@ func (r *Room) lookDescription(viewer *MudPlayer) string {
 
 	if len(r.UserMap) > 0 {
 		desc.WriteString("\nThe players here are:\n")
-		for k := range r.UserMap {
+		for k, p := range r.UserMap {
 			desc.WriteString(mudutils.ColorString(k, mudutils.COLOR_BLUE))
+			desc.WriteString(p.lookMarker()) // the client draws the name with its colour and badge
 			desc.WriteByte('\n')
 		}
 	}
