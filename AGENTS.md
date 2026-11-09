@@ -65,6 +65,7 @@ stage files by name anyway.
   `boss: true` (`mudserver/mobs.go`). XP gains go through `xpLine` (`progress.go`): italic escape plus a trailing blank line.
   Health regrows through `regenHP` (`regen.go`, called for every player on the world tick; paused by `markCombat`); magic through `regenMP` (`cast.go`).
   Spells (`spells:` in content; `mudserver/spells.go`): learned from a bound scroll item (`teaches`, READ), the `teach` rule effect (`teach_room` teaches everyone in the room, so a co-op puzzle rewards every solver) or a drop, readied in three slots (READY, UNREADY, SPELLS); state kinds `spell` and `slot`. CAST (`mudserver/cast.go`): magic regrows lazily from a timestamp (one point per 6 s), cooldowns and the ward are timestamps; the `spells` frame goes to the client.
+  `USE <item>` with no target runs the one room rule that takes the item (`mudserver/usehere.go`; the pack's Use button sends it).
   Rooms may have `rules` and `gates` (puzzles; `mudserver/rules.go`: verbs, conditions, effects, per-player exits) and players carry
   `state` (flags, counters, sequences, gates; `mudserver/state.go`, persisted through a queue to `player_state`).
   `puzzles:` and `region` feed JOURNAL, HINT and MAP (`mudserver/guide.go`; rooms entered are `visited` state).
