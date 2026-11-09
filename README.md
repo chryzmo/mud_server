@@ -1,6 +1,6 @@
 # mud_server
 
-Go server for the MAGFest 2027 weekend MUD: a guest-only, phone-first text game over websockets,
+Go server for ConQuest, a weekend MUD: a guest-only, phone-first text game over websockets,
 built for up to 5,000 players on one small server. A player joins with a name and nothing else, and
 a dropped connection resumes the same character. The browser client is the sibling repo
 [mud_frontend](https://github.com/chryzmo/mud_frontend). Project rules for contributors and agents
