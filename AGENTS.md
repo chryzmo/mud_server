@@ -46,6 +46,10 @@ stage files by name anyway.
   and test-account seeder. See README.md for local usage and measurement limitations.
 - `src/internal/mudserver/gm.go`: the game master: the `GM` command (gmOnly commands are invisible to others), `AddGM` and
   `mud_server -add-gm NAME`, mutes (`muteduntil`) and the `gm_audit` table. One GM, the owner; guests are never GMs.
+- `src/internal/mudserver/reset.go`: `mud_server -reset-players [-include-gms] [-yes]` and `-reset-player NAME [-yes]` delete characters and their
+  `player_state` rows for testing (GMs kept unless `-include-gms`; a GM name is refused by `-reset-player`). Offline only: the game server must be
+  stopped first, or it saves its in-memory characters back. The production procedure is in README.md; the image's entrypoint is already
+  `/app/mud_server`, so `podman run` takes only the flag.
 - `src/internal/worldfile/` and `world-sample/`: the world content format (YAML: rooms, items, NPCs) and its
   validator, `mud_server -validate-world [-strict] DIR` (no database, no server), and `-render-world DIR` (a Markdown
   overview with a Mermaid map, for review). `world-sample/` is the small
@@ -57,6 +61,8 @@ stage files by name anyway.
   Rooms may have `people` (friendly characters with greeting and topics; `mudserver/people.go`: TALK and ASK).
   A person may have a `shop` (items for gold; `mudserver/shop.go`: SHOP and BUY; shopkeepers carry the `SHOP` verb in the room frame).
   An item may have `consume: {hp, mp}` (potions; `mudserver/consume.go`: USE <item> restores and uses it up).
+  Items may have `equipment` (five slots: weapon, armor, shield, boots, cosmetic; `mudserver/equipment.go`: EQUIP, UNEQUIP). Monsters may have `drops` and
+  `boss: true` (`mudserver/mobs.go`). XP gains go through `xpLine` (`progress.go`): italic escape plus a trailing blank line.
   Spells (`spells:` in content; `mudserver/spells.go`): learned from a bound scroll item (`teaches`, READ), the `teach` rule effect (`teach_room` teaches everyone in the room, so a co-op puzzle rewards every solver) or a drop, readied in three slots (READY, UNREADY, SPELLS); state kinds `spell` and `slot`. CAST (`mudserver/cast.go`): magic regrows lazily from a timestamp (one point per 6 s), cooldowns and the ward are timestamps; the `spells` frame goes to the client.
   Rooms may have `rules` and `gates` (puzzles; `mudserver/rules.go`: verbs, conditions, effects, per-player exits) and players carry
   `state` (flags, counters, sequences, gates; `mudserver/state.go`, persisted through a queue to `player_state`).
