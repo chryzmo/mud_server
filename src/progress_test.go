@@ -184,3 +184,19 @@ func TestXPGainsAreItalicWithABlankLineAfter(t *testing.T) {
 		t.Errorf("exploration XP line = %q, want it wrapped in the italic escape and followed by a newline", got)
 	}
 }
+
+// The line for examining a feature the first time says what was looked at and that it earned XP.
+func TestFeatureXPLineNamesTheThing(t *testing.T) {
+	wsURL, _ := startTestServerWithConfig(t, withContent(progressWorld(t)))
+	conn := eventPlayer(t, wsURL, "scout")
+	send(t, conn, "EXAMINE lever")
+	got := expect(t, conn, "You look closely at the lever. (+5 exploration XP)")
+	if !strings.HasPrefix(got, "\x1b[3m") {
+		t.Errorf("feature XP line = %q, want it in italics", got)
+	}
+	send(t, conn, "EXAMINE lever") // the second time earns nothing, so no second line
+	send(t, conn, "RANK")
+	if out := expect(t, conn, "Level"); strings.Contains(out, "look closely") {
+		t.Errorf("a repeat examine paid again: %q", out)
+	}
+}

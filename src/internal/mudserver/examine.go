@@ -180,7 +180,7 @@ func (mp *MudPlayer) examine(arguments string) {
 		mp.SendMessage(hit.text)
 		mp.tourDid("examine")
 		if hit.feature && mp.Location != nil {
-			mp.discoverFeature(mp.Location.Key, hit.key)
+			mp.discoverFeature(mp.Location.Key, hit.key, hit.display)
 		}
 	case len(several) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")

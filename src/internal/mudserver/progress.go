@@ -93,6 +93,14 @@ func (mp *MudPlayer) applyLevels(announce bool) int {
 	return n
 }
 
+// withThe puts "the" before a feature's name, without doubling one the name already starts with.
+func withThe(name string) string {
+	if len(name) > 4 && strings.EqualFold(name[:4], "the ") {
+		return "the " + name[4:]
+	}
+	return "the " + name
+}
+
 // xpLine formats an XP gain for the client: the line in italics (ESC[3m ... ESC[0m, which the client draws
 // as italic text) followed by a blank line, so the gain stands apart from the text around it.
 func xpLine(text string) string { return "\x1b[3m" + text + "\x1b[0m\n" }
@@ -105,8 +113,9 @@ func (mp *MudPlayer) discoverRoom() {
 	}
 }
 
-// discoverFeature is exploration XP the first time a feature is examined; key is "room/feature".
-func (mp *MudPlayer) discoverFeature(roomKey, featureKey string) {
+// discoverFeature is exploration XP the first time a feature is examined; key is "room/feature", and name is
+// what the feature is called, so the line says what the player looked at.
+func (mp *MudPlayer) discoverFeature(roomKey, featureKey, name string) {
 	if mp.world == nil || roomKey == "" || featureKey == "" || mp.world.prog.XP.Feature <= 0 {
 		return
 	}
@@ -117,7 +126,7 @@ func (mp *MudPlayer) discoverFeature(roomKey, featureKey string) {
 	mp.st().seen[id] = true
 	mp.persistState("seen", id, "1", false)
 	mp.addXP(xpExplore, mp.world.prog.XP.Feature)
-	mp.SendMessage(xpLine(fmt.Sprintf("You notice something. (+%d exploration XP)", mp.world.prog.XP.Feature)))
+	mp.SendMessage(xpLine(fmt.Sprintf("You look closely at %s. (+%d exploration XP)", withThe(name), mp.world.prog.XP.Feature)))
 }
 
 // killedMonster is combat XP for a kill.
