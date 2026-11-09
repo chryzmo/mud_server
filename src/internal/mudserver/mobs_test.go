@@ -230,6 +230,16 @@ func TestTheFirstMonsterComesSoonAfterAPlayerArrives(t *testing.T) {
 	}
 }
 
+// The spawn announcement opens with the monster's name in the red code, so the client can offer Attack on it.
+func TestASpawnAnnouncementMarksTheMonsterName(t *testing.T) {
+	room, w := mobRoom()
+	ann := mobPlayer(room, w, "ann")
+	w.placeMob(&BaddieNPC{Name: "Pikk", Race: "GOBLIN", Location: room, passive: true, combatTickerDurationInMS: 1000})
+	if got, want := mobText(ann), "\x1b[1;31mPikk\x1b[0m - GOBLIN - appears in the room!"; !strings.Contains(got, want) {
+		t.Errorf("announcement = %q, want it to contain %q", got, want)
+	}
+}
+
 func TestMonstersAreTappableInTheRoomFrame(t *testing.T) {
 	room, w := mobRoom()
 	ann := mobPlayer(room, w, "ann")

@@ -65,12 +65,23 @@ func cafeVisitor(t *testing.T, wsURL, name string) *websocket.Conn {
 	return conn
 }
 
+// The scenery in the "You notice" line is marked with the yellow code, so the client can make each name a button.
+func TestLookMarksTheSceneryNamesForTapping(t *testing.T) {
+	wsURL := cafeServer(t, cafeWorld, nil)
+	conn := cafeVisitor(t, wsURL, "visitor")
+	send(t, conn, "LOOK")
+	out := expect(t, conn, "You notice:")
+	if !strings.Contains(out, "You notice: \x1b[1;33mlong counter\x1b[0m.") {
+		t.Errorf("the scenery name is not marked: %q", out)
+	}
+}
+
 func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "LOOK")
 	out := expect(t, conn, "Also here: Mira the Barista, Miro the Baker. (TALK to them.)")
-	if !strings.Contains(out, "You notice: long counter.") {
+	if !hasText(out, "You notice: long counter.") {
 		t.Errorf("features are missing from LOOK: %q", out)
 	}
 	send(t, conn, "X mira")

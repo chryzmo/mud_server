@@ -125,7 +125,12 @@ func (r *Room) lookDescription(viewer *MudPlayer) string {
 
 	if listed := r.listedFeatures(); len(listed) > 0 {
 		desc.WriteString("\nYou notice: ")
-		desc.WriteString(strings.Join(listed, ", "))
+		for i, name := range listed {
+			if i > 0 {
+				desc.WriteString(", ")
+			}
+			desc.WriteString(mudutils.ColorString(name, mudutils.COLOR_YELLOW)) // the client makes it tappable
+		}
 		desc.WriteString(".\n")
 	}
 	if people := r.peopleNames(); len(people) > 0 {
