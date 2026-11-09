@@ -24,6 +24,17 @@ func (mp *MudPlayer) look() (color, badge string) {
 	return mp.state.active["color"], mp.state.active["badge"]
 }
 
+// lookMarker is what a server line attaches right after a player's name so the client can draw it with the
+// player's name colour and badge: ESC ] look ; colour ; badge BEL. It is empty when they wear neither. The
+// keys come from the fixed palette (lower-case letters), so nothing a player types can reach it.
+func (mp *MudPlayer) lookMarker() string {
+	color, badge := mp.look()
+	if color == "" && badge == "" {
+		return ""
+	}
+	return "\x1b]look;" + color + ";" + badge + "\a"
+}
+
 func (mp *MudPlayer) unlocked(kind, key string) bool { return mp.st().unlocks[kind+":"+key] }
 
 // unlockCosmetic adds a colour or badge to the player's set and makes it the active one.
