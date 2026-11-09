@@ -107,6 +107,22 @@ func TestLookMarksThePeopleNamesForTapping(t *testing.T) {
 	}
 }
 
+// The names TALK offers when it cannot tell whom you mean carry the same code as the "Also here" line, so a tap
+// on one starts the talk.
+func TestTalkPromptsMarkThePeopleNamesForTapping(t *testing.T) {
+	wsURL := cafeServer(t, cafeWorld, nil)
+	conn := cafeVisitor(t, wsURL, "visitor")
+	names := "\x1b[1;95mMira the Barista\x1b[0m, \x1b[1;95mMiro the Baker\x1b[0m"
+	send(t, conn, "TALK")
+	if out := expect(t, conn, "Talk to whom?"); !strings.Contains(out, "Talk to whom? "+names+".") {
+		t.Errorf("the whom prompt = %q", out)
+	}
+	send(t, conn, "TALK mir")
+	if out := expect(t, conn, "Which do you mean:"); !strings.Contains(out, "Which do you mean: "+names+"?") {
+		t.Errorf("the which prompt = %q", out)
+	}
+}
+
 func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
