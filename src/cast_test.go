@@ -32,7 +32,7 @@ spells:
 npcs:
   rat:
     race: RAT
-    hp: 12
+    hp: 9
     mp: 0
     attack: 2
     accuracy: 100
@@ -72,7 +72,8 @@ func TestSpellsAreCastWithMagicCooldownsAndEffects(t *testing.T) {
 	send(t, caster, "CAST 2")
 	expect(t, caster, "You are healed for")
 
-	// A bolt at the rat; it does not need a defence roll, and a kill pays XP.
+	// A bolt at the rat; it does not need a defence roll, and a kill pays XP. The rat has 9 health, so the bolt
+	// (attack 5 plus power 4) kills it whether or not the ATTACK above landed (it misses one time in a hundred).
 	send(t, caster, "CAST firebolt "+name)
 	expect(t, caster, "Firebolt hits "+name)
 	expect(t, caster, "You kill "+name)
