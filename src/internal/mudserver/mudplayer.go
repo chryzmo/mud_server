@@ -45,6 +45,8 @@ type MudPlayer struct {
 	dormant       bool                          // connection dropped, still in the world for a grace period (see resume.go)
 	lastQuiet     time.Time                     // the last line spoken in a quiet room (stage.go)
 	mpStamp       time.Time                     // magic regrows from here (cast.go)
+	lastCombatAt  time.Time                     // when this player last fought or was fought (regen.go)
+	hpNextAt      time.Time                     // when health next regrows; zero while full, fighting or down (regen.go)
 	wardUntil     time.Time                     // a ward spell lasts until then (cast.go)
 	wardBonus     int                           // the defence it adds
 	cooldowns     map[string]time.Time          // spell key -> when it can be cast again (cast.go)

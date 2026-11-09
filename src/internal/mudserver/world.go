@@ -146,6 +146,9 @@ func (w *World) tick(now time.Time) {
 	for _, room := range w.RoomMap {
 		room.tick(now)
 		w.ambientTick(room, now)
+		for _, p := range room.UserMap {
+			p.regenHP(now)
+		}
 		w.liveMobs += len(room.BaddieMap)
 	}
 	for _, spawner := range w.Spawners {
