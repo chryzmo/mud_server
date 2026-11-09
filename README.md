@@ -54,6 +54,16 @@ an existing password account is promoted and its password replaced; a guest's na
 the container: `ssh deploy@<host> podman exec -it mud-server /app/mud_server -add-gm NAME`. The GM logs in with `login` (the client's
 hidden staff route, planned) and plays as an ordinary character; password accounts are never idle-kicked.
 
+**Resetting characters for testing.** `mud_server -reset-players [-include-gms] [-yes]` deletes every character and its saved
+progress (the `player` and `player_state` rows); game masters are kept unless `-include-gms` is given. `mud_server -reset-player NAME
+[-yes]` deletes one character (any case) so the name can be joined again; a GM name is refused. The world, items, world flags, event
+progress, reports and the GM audit log are left alone. Both show the database they will change and ask for its name to be typed (`-yes`
+skips that, and is required without a terminal). **Stop the game server first**: a running server keeps characters in memory and saves them
+back. Locally: `MUD_DATABASE_URL=... mud_server -reset-players`. On the Droplet the container must not be serving, so stop the unit,
+run a one-off container from the same image and env file in the pod, then start it again (`systemctl --user stop mud-server`,
+`podman run --rm -it --pod mud --env-file ~/mud/secrets.env localhost/mud-server:current /app/mud_server -reset-players`,
+`systemctl --user start mud-server`); this exact live procedure has not been run from here.
+
 `GM` is one command with sub-commands, and for anyone else it does not exist ("Unknown command.", and `HELP` does not list it):
 
 | Command | Effect |

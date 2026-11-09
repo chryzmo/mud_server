@@ -33,6 +33,12 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-add-gm" {
 		os.Exit(mudserver.RunAddGM(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "-reset-players" {
+		os.Exit(mudserver.RunResetPlayers(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "-reset-player" {
+		os.Exit(mudserver.RunResetPlayer(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+	}
 
 	serverinstance := mudserver.CreateMudServer()
 
