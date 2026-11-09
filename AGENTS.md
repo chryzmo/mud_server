@@ -5,8 +5,8 @@ Go MUD server. Players connect over a websocket. Sibling repo: `../mud_frontend`
 
 ## Current goal and plans
 
-The project is being prepared for a weekend event at MAGFest 2027 (mid-January). The plan lives in
-`plans/magfest-2027.md`; read it before starting non-trivial work. `plans/` holds plans for this
+The project is being prepared for a weekend live-play event (mid-January). The plan lives in
+`plans/event-2027.md`; read it before starting non-trivial work. `plans/` holds plans for this
 project and any subsystem, and is gitignored, so it is local working state, not repo history. In a
 linked git worktree `plans` is a symlink to the main checkout's folder; `.gitignore` covers it, but
 stage files by name anyway.
@@ -20,7 +20,7 @@ stage files by name anyway.
 - This file is the shared source of project rules; `CLAUDE.md` points here. Keep rules here,
   not in separate tool-specific copies.
 - At startup or when resuming, read in order: this file, `../mud_frontend/AGENTS.md`,
-  `plans/README.md`, `plans/magfest-2027.md`, the active subsystem plan, then
+  `plans/README.md`, `plans/event-2027.md`, the active subsystem plan, then
   `plans/handoff.md` if present. If the handoff is missing, reconstruct state from the plans
   and git, and ask about unclear authorization before changing anything.
 - Verify each affected repo's branch, HEAD and working-tree changes. Handoff notes are a
