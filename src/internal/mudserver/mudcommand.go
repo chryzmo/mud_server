@@ -156,7 +156,8 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				// the gate's own message was sent
 			default:
 				player.dirty = true
-				// Send description of new room
+				// Send description of new room, after any exploration XP line, which is not what the player came for
+				player.visit(player.Location.Key)
 				player.SendLook()
 				player.entered()
 				player.tourDid("move")

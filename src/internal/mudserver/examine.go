@@ -177,11 +177,11 @@ func (mp *MudPlayer) examine(arguments string) {
 	hit, several := pickTarget(mp.examineTargets(packOnly), query)
 	switch {
 	case hit != nil:
+		if hit.feature && mp.Location != nil {
+			mp.discoverFeature(mp.Location.Key, hit.key, hit.display) // the XP line first, then what they came to read
+		}
 		mp.SendMessage(hit.text)
 		mp.tourDid("examine")
-		if hit.feature && mp.Location != nil {
-			mp.discoverFeature(mp.Location.Key, hit.key, hit.display)
-		}
 	case len(several) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(several, ", ") + "?")
 	case packOnly:

@@ -554,6 +554,7 @@ func relocatePlayer(p *MudPlayer, dest *Room) {
 	dest.BroadcastFrame(encodeArrive(p, ""), p.Username)
 	dest.AddPlayer(p)
 	p.dirty = true
+	p.visit(dest.Key) // the exploration XP line goes before the description
 	p.SendLook()
 	p.entered()
 }
