@@ -39,6 +39,7 @@ npcs:
 `
 
 func TestEveryFighterRollsForTheirOwnDropsAndACosmeticDropIsEarnedOnce(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		withContent(contentDir(t, map[string]string{"world.yaml": dropWorld}))(c)
 		noWait(c)

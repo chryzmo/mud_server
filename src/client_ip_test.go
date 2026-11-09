@@ -42,6 +42,7 @@ func perIP(limit int, trusted []string) func(*mudserver.Configuration) {
 }
 
 func TestPerIPCeilingUsesTheForwardedAddress(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, perIP(3, nil)) // default trust: loopback, which is where the test connects from
 	for i := 0; i < 3; i++ {
 		if got := joinFrom(t, wsURL, fmt.Sprintf("Venue%d", i), "203.0.113.50"); got["ok"] != true {
@@ -67,6 +68,7 @@ func TestPerIPCeilingUsesTheForwardedAddress(t *testing.T) {
 // An address that is not a trusted proxy cannot choose its own identity: the header
 // is ignored, so rotating it does not dodge the ceiling.
 func TestPerIPCeilingIgnoresTheHeaderFromAnUntrustedPeer(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, perIP(3, []string{"10.0.0.0/8"})) // the test connects from 127.0.0.1, which is not trusted now
 	refused := 0
 	for i := 0; i < 8; i++ {
@@ -81,6 +83,7 @@ func TestPerIPCeilingIgnoresTheHeaderFromAnUntrustedPeer(t *testing.T) {
 }
 
 func TestPerIPCeilingIsOffByDefault(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	for i := 0; i < 20; i++ {
 		if got := joinFrom(t, wsURL, fmt.Sprintf("Anyone%02d", i), "203.0.113.77"); got["ok"] != true {
@@ -90,6 +93,7 @@ func TestPerIPCeilingIsOffByDefault(t *testing.T) {
 }
 
 func TestBadTrustedProxiesRefuseToStart(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	c := mudserver.Configuration{}
@@ -132,6 +136,7 @@ func (l *logBuffer) String() string {
 }
 
 func TestJoinsAreLoggedWithTheClientAddress(t *testing.T) {
+	t.Parallel()
 	var log logBuffer
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) { c.Server.LogWriter = &log })
 	joinFrom(t, wsURL, "Logged", "203.0.113.7")
@@ -141,6 +146,7 @@ func TestJoinsAreLoggedWithTheClientAddress(t *testing.T) {
 }
 
 func TestRecoveryAttemptsAreLoggedWithTheClientAddress(t *testing.T) {
+	t.Parallel()
 	var log logBuffer
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) { c.Server.LogWriter = &log })
 	g := joinGuest(t, wsURL, "Forgetful")
@@ -164,6 +170,7 @@ func TestRecoveryAttemptsAreLoggedWithTheClientAddress(t *testing.T) {
 }
 
 func TestClientAddressLoggingCanBeSwitchedOff(t *testing.T) {
+	t.Parallel()
 	var log logBuffer
 	off := false
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) { c.Server.LogClientIPs = &off; c.Server.LogWriter = &log })

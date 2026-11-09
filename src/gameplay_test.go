@@ -35,6 +35,7 @@ func expectWithin(conn *websocket.Conn, want string, wait time.Duration) (string
 }
 
 func TestPlayersSeeEachOther(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	alice := passwordPlayer(t, wsURL, "alice")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -50,6 +51,7 @@ func TestPlayersSeeEachOther(t *testing.T) {
 }
 
 func TestWhisper(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	alice := passwordPlayer(t, wsURL, "alice")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -67,6 +69,7 @@ func TestWhisper(t *testing.T) {
 }
 
 func TestGetDropInventory(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := passwordPlayer(t, wsURL, "carrier")
 
@@ -92,6 +95,7 @@ func TestGetDropInventory(t *testing.T) {
 }
 
 func TestInventorySurvivesRelogin(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
@@ -110,6 +114,7 @@ func TestInventorySurvivesRelogin(t *testing.T) {
 }
 
 func TestEquipmentChangesStats(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE room SET inventoryidslice = json_build_object('i1', 1, 'i' || (SELECT id FROM item WHERE name = 'IRON SWORD'), 1) WHERE id = 1`)
 	conn := passwordPlayer(t, wsURL, "knight")
@@ -169,6 +174,7 @@ func swing(conn *websocket.Conn, done <-chan struct{}) {
 }
 
 func TestCombatPlayerKillsNPC(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 0, attackaccuracy = 0, defense = 0, hp = 5`)
@@ -192,6 +198,7 @@ func TestCombatPlayerKillsNPC(t *testing.T) {
 }
 
 func TestCombatNPCKillsPlayer(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWith(t,
 		`UPDATE baddiespawner SET tickdurationms = 100`,
 		`UPDATE baddienpc_generic SET combatTickerDurationInMS = 100, attackpower = 25, attackaccuracy = 100`)
@@ -210,6 +217,7 @@ func TestCombatNPCKillsPlayer(t *testing.T) {
 }
 
 func TestShutdownSavesAndDisconnects(t *testing.T) {
+	t.Parallel()
 	wsURL, si := startTestServerWith(t)
 	conn := passwordPlayer(t, wsURL, "saver")
 	send(t, conn, "MOVE N")
@@ -240,6 +248,7 @@ func TestShutdownSavesAndDisconnects(t *testing.T) {
 }
 
 func TestStartupFailsWithoutDatabase(t *testing.T) {
+	t.Parallel()
 	c := mudserver.Configuration{}
 	c.Database.DatabaseURL = "postgres://mud:mud@127.0.0.1:1/mud"
 	c.Database.StartupWaitSeconds = 1

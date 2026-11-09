@@ -32,6 +32,7 @@ func unlockServer(t *testing.T) string {
 }
 
 func TestAQuestRuleUnlocksACosmeticOnceAndOthersSeeIt(t *testing.T) {
+	t.Parallel()
 	wsURL := unlockServer(t)
 	alice := eventPlayer(t, wsURL, "alice")
 	bob := eventPlayer(t, wsURL, "bob")
@@ -64,6 +65,7 @@ func TestAQuestRuleUnlocksACosmeticOnceAndOthersSeeIt(t *testing.T) {
 }
 
 func TestAnUnlockedCosmeticSurvivesLoggingBackIn(t *testing.T) {
+	t.Parallel()
 	wsURL := unlockServer(t)
 	conn := eventPlayer(t, wsURL, "keeper")
 	send(t, conn, "READ plaque")
@@ -78,6 +80,7 @@ func TestAnUnlockedCosmeticSurvivesLoggingBackIn(t *testing.T) {
 }
 
 func TestStickerCodesAreGone(t *testing.T) {
+	t.Parallel()
 	wsURL := unlockServer(t)
 	conn := eventPlayer(t, wsURL, "hopeful")
 	for _, line := range []string{"REDEEM ABCD-2345", "PROGRESS"} {

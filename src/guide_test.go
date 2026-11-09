@@ -13,6 +13,7 @@ import (
 const hintWait = 2100 * time.Millisecond // a little over the cooldown that stops a double tap burning a hint
 
 func TestJournalShowsOnlyWhatThePlayerHasLearned(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "scribe")
 	send(t, conn, "JOURNAL")
 	out := expect(t, conn, "Rooms discovered: 1 of 6.")
@@ -36,6 +37,7 @@ func TestJournalShowsOnlyWhatThePlayerHasLearned(t *testing.T) {
 }
 
 func TestHintsComeOneTierAtATimeAndFollowTheLastPuzzle(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "stuck")
 	send(t, conn, "HINT")
 	expect(t, conn, "Hint 1 of 3 for The Hall Clocks: The clocks can be turned.")
@@ -66,6 +68,7 @@ func TestHintsComeOneTierAtATimeAndFollowTheLastPuzzle(t *testing.T) {
 }
 
 func TestHintWithNothingBegunSaysSo(t *testing.T) {
+	t.Parallel()
 	// A world with no puzzles at all: the plain sample world.
 	conn := passwordPlayer(t, startTestServer(t), "plain")
 	send(t, conn, "HINT")
@@ -77,6 +80,7 @@ func TestHintWithNothingBegunSaysSo(t *testing.T) {
 }
 
 func TestMapNamesOnlyRoomsTheyHaveBeenIn(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "walker")
 	send(t, conn, "MAP")
 	out := expect(t, conn, "Discovered 1 of 6 rooms.")
@@ -96,6 +100,7 @@ func TestMapNamesOnlyRoomsTheyHaveBeenIn(t *testing.T) {
 }
 
 func TestDiscoveryAndHintsSurviveARestart(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	wsA, serverA := serveTestServer(t, url, func(c *mudserver.Configuration) { c.World.ContentDir = puzzleDir })

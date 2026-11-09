@@ -54,6 +54,7 @@ func neverSaw(t *testing.T, seen []string, unwanted string) {
 }
 
 func TestSocialsAloneAndAtSomeoneInTheRoom(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	ann, bob, cy := eventPlayer(t, wsURL, "ann"), eventPlayer(t, wsURL, "bob"), eventPlayer(t, wsURL, "cy")
 
@@ -80,6 +81,7 @@ func TestSocialsAloneAndAtSomeoneInTheRoom(t *testing.T) {
 }
 
 func TestEveryAnnouncedSocialIsARealCommand(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	ann := eventPlayer(t, wsURL, "ann")
 	for _, verb := range mudserver.SocialNames() {
@@ -92,6 +94,7 @@ func TestEveryAnnouncedSocialIsARealCommand(t *testing.T) {
 }
 
 func TestEmoteIsSharedMaskedAndRefusedWhenMuted(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	ann, bob := eventPlayer(t, wsURL, "ann"), eventPlayer(t, wsURL, "bob")
@@ -112,6 +115,7 @@ func TestEmoteIsSharedMaskedAndRefusedWhenMuted(t *testing.T) {
 }
 
 func TestIgnoreHidesSayWhispersEmotesSocialsAndGlobalChat(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	ann, bob, cy := eventPlayer(t, wsURL, "ann"), eventPlayer(t, wsURL, "bob"), eventPlayer(t, wsURL, "cy")
 
@@ -147,6 +151,7 @@ func TestIgnoreHidesSayWhispersEmotesSocialsAndGlobalChat(t *testing.T) {
 }
 
 func TestIgnoreRefusesGMsYourselfAndTooMany(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	eventGM(t, wsURL, "boss")
 	bob := eventPlayer(t, wsURL, "bob")
@@ -167,6 +172,7 @@ func TestIgnoreRefusesGMsYourselfAndTooMany(t *testing.T) {
 }
 
 func TestWhoGivesCountsAndTheNamesInYourRoomOnly(t *testing.T) {
+	t.Parallel()
 	wsURL := socialServer(t)
 	ann := eventPlayer(t, wsURL, "ann")
 	send(t, ann, "WHO")

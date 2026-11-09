@@ -91,7 +91,7 @@ stage files by name anyway.
 scripts/db.sh up        # start local Postgres 17 (podman-compose or docker compose); seeds `mud` on first start
 go build ./src          # build
 go run ./src            # run from the repo root; config path is relative to the cwd
-scripts/test.sh         # go vet + all tests with -race against the `mud_test` database
+scripts/test.sh         # go vet + all tests with -race, in parallel (about 40 s); each test gets its own database next to `mud_test`
 scripts/db.sh reset     # wipe the database volume and reseed
 ```
 
@@ -130,7 +130,7 @@ script there.
   in the same coordinated pair of PRs. `scripts/check-transcripts.sh` fails if the copies differ.
 
 Integration tests (`src/main_test.go`) run a real server and talk to it over a websocket; they
-drop and reseed `mud_test` before each test, and skip when `MUD_TEST_DATABASE_URL` is unset.
+get a database of their own (`mud_t_<random>`, created next to `MUD_TEST_DATABASE_URL`'s and dropped when the test ends), seeded from `src/sql`, and skip when `MUD_TEST_DATABASE_URL` is unset. Every test in `src` calls `t.Parallel()`: a new test must too, and must not share state (a database, a port, a package variable) with another.
 Prefer that style for gameplay behavior: send the command a player would type, assert on what
 comes back. Helpers: `startTestServerWithConfig` (build a `Configuration` in the test; defaults apply),
 `passwordPlayer`/`createAccount`/`send`/`expect` for a password player with text-style assertions (`flatten` renders frames the

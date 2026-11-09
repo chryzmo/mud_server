@@ -17,6 +17,7 @@ import (
 // tests. Password hashing is fixture-only cost 4; production login cost is not
 // being benchmarked. Game code and all websocket/queue/persistence paths are real.
 func TestTwoHundredBotsKeepPlaying(t *testing.T) {
+	t.Parallel()
 	const count = 200
 	ctx := context.Background()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
@@ -53,6 +54,7 @@ func TestTwoHundredBotsKeepPlaying(t *testing.T) {
 }
 
 func TestBotSeedFixtureUsesNormalLoginData(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	ctx := context.Background()

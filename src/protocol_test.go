@@ -50,6 +50,7 @@ func writeRaw(t *testing.T, conn *websocket.Conn, frame string) {
 }
 
 func TestMalformedFramesGetBadFrameAndConnectionSurvives(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	for _, frame := range []string{
 		"MOVE N",            // legacy plain text
@@ -74,6 +75,7 @@ func TestMalformedFramesGetBadFrameAndConnectionSurvives(t *testing.T) {
 
 // The protocol version rides in the websocket subprotocol, once per connection.
 func TestClientWithoutSubprotocolIsRefusedAndClosed(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil) // offers no subprotocol
 	if err != nil {
@@ -92,6 +94,7 @@ func TestClientWithoutSubprotocolIsRefusedAndClosed(t *testing.T) {
 }
 
 func TestSubprotocolIsNegotiated(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	if got := conn.Subprotocol(); got != mudserver.Subprotocol {
@@ -100,6 +103,7 @@ func TestSubprotocolIsNegotiated(t *testing.T) {
 }
 
 func TestUnknownTypeAndBadPayloads(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
@@ -127,6 +131,7 @@ func TestUnknownTypeAndBadPayloads(t *testing.T) {
 }
 
 func TestAuthStatsAndRoomMessages(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
@@ -169,6 +174,7 @@ func TestAuthStatsAndRoomMessages(t *testing.T) {
 // Fan-out and chatter are typed events, not coloured text: the client owns the
 // wording and colour.
 func TestRoomEventsAreTypedAndCompact(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	alice := passwordPlayer(t, wsURL, "alice")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -213,6 +219,7 @@ func TestRoomEventsAreTypedAndCompact(t *testing.T) {
 }
 
 func TestInventoryAndErrorTypes(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := passwordPlayer(t, wsURL, "pack")
 	send(t, conn, "INVENTORY")
@@ -226,6 +233,7 @@ func TestInventoryAndErrorTypes(t *testing.T) {
 }
 
 func TestLoginRestoresAndWrongPasswordCodes(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	first := passwordPlayer(t, wsURL, "again")
 	first.Close()
@@ -256,6 +264,7 @@ func TestLoginRestoresAndWrongPasswordCodes(t *testing.T) {
 
 // Malformed frames still cost a limiter token: a flood of garbage is dropped.
 func TestGarbageFramesAreRateLimited(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.Connection.CommandsPerSecond = 1
 		c.Connection.CommandBurst = 2

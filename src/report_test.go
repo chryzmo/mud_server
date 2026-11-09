@@ -17,6 +17,7 @@ func reportServer(t *testing.T) string {
 }
 
 func TestAReportReachesTheGMWithTheTalkAroundIt(t *testing.T) {
+	t.Parallel()
 	wsURL := reportServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	alice := eventPlayer(t, wsURL, "alice")
@@ -51,6 +52,7 @@ func TestAReportReachesTheGMWithTheTalkAroundIt(t *testing.T) {
 }
 
 func TestReportsAreLimitedAndRefuseNonsense(t *testing.T) {
+	t.Parallel()
 	wsURL := reportServer(t)
 	alice := eventPlayer(t, wsURL, "alice")
 	send(t, alice, "REPORT")
@@ -66,6 +68,7 @@ func TestReportsAreLimitedAndRefuseNonsense(t *testing.T) {
 }
 
 func TestSeveralDifferentReportersMuteThePlayerForAWhile(t *testing.T) {
+	t.Parallel()
 	wsURL := reportServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	bob := eventPlayer(t, wsURL, "bob")
@@ -94,6 +97,7 @@ func TestSeveralDifferentReportersMuteThePlayerForAWhile(t *testing.T) {
 }
 
 func TestOneReporterRepeatingThemselvesDoesNotMuteAndAGMIsNeverAutoMuted(t *testing.T) {
+	t.Parallel()
 	wsURL := reportServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	bob := eventPlayer(t, wsURL, "bob")

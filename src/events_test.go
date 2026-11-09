@@ -100,6 +100,7 @@ func eventGM(t *testing.T, wsURL, name string) *websocket.Conn {
 }
 
 func TestAnEventAnnouncesOpensAGateForEveryoneAndClosesItAgain(t *testing.T) {
+	t.Parallel()
 	wsURL := eventsServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	guest := eventPlayer(t, wsURL, "visitor")
@@ -135,6 +136,7 @@ func TestAnEventAnnouncesOpensAGateForEveryoneAndClosesItAgain(t *testing.T) {
 }
 
 func TestEventsListsWhatIsOnAndLeavesOutHiddenOnes(t *testing.T) {
+	t.Parallel()
 	wsURL := eventsServer(t)
 	gm := eventGM(t, wsURL, "boss")
 	guest := eventPlayer(t, wsURL, "asker")
@@ -169,6 +171,7 @@ func TestEventsListsWhatIsOnAndLeavesOutHiddenOnes(t *testing.T) {
 }
 
 func TestAnEventThatStartedBeforeTheServerStillSetsItsFlags(t *testing.T) {
+	t.Parallel()
 	wsURL := eventsServer(t)
 	late := eventPlayer(t, wsURL, "newcomer")
 	// The late event began two minutes ago: its flag is set, so the lever works.
@@ -191,6 +194,7 @@ func TestAnEventThatStartedBeforeTheServerStillSetsItsFlags(t *testing.T) {
 }
 
 func TestGMFlagOpensTheGateAndSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	dir := eventsWorld(t)
@@ -224,6 +228,7 @@ func TestGMFlagOpensTheGateAndSurvivesARestart(t *testing.T) {
 }
 
 func TestPlayersAreSentTheScheduleAtLoginAndWhenItChanges(t *testing.T) {
+	t.Parallel()
 	wsURL := eventsServer(t)
 	titles := func(frame map[string]any, key string) string {
 		var out []string

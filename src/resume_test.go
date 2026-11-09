@@ -132,6 +132,7 @@ func sayLines(replayed []map[string]any) []string {
 }
 
 func TestResumeWithinGraceKeepsTheCharacterAndAnnouncesNothing(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(5000, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	dropper := joinGuest(t, wsURL, "Dropper")
@@ -175,6 +176,7 @@ func TestResumeWithinGraceKeepsTheCharacterAndAnnouncesNothing(t *testing.T) {
 }
 
 func TestResumeAfterGraceIsAnOrdinaryArrival(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(300, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	leaver := joinGuest(t, wsURL, "Leaver")
@@ -203,6 +205,7 @@ func TestResumeAfterGraceIsAnOrdinaryArrival(t *testing.T) {
 }
 
 func TestResumeReplacesALiveConnection(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, graceConfig(400, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	phone := joinGuest(t, wsURL, "Phone")
@@ -247,6 +250,7 @@ func TestResumeReplacesALiveConnection(t *testing.T) {
 }
 
 func TestResumeRefusesBadTokens(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	alice := joinGuest(t, wsURL, "Alice")
 	bob := joinGuest(t, wsURL, "Bob")
@@ -294,6 +298,7 @@ func TestResumeRefusesBadTokens(t *testing.T) {
 // Counts stay consistent through gaps and repeated reconnects: a client that
 // applies base and processes what it is sent never replays or misses a frame.
 func TestReplayGapResyncsAndCountsStayConsistent(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		graceConfig(5000, 5)(c)
 		c.Connection.SayPerSecond, c.Connection.SayBurst = 1000, 1000 // this test talks a lot
@@ -344,6 +349,7 @@ func TestReplayGapResyncsAndCountsStayConsistent(t *testing.T) {
 }
 
 func TestResumeSurvivesARestartAsAnOrdinaryArrival(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	wsA, serverA := serveTestServer(t, url, graceConfig(5000, 50))
@@ -383,6 +389,7 @@ func TestResumeSurvivesARestartAsAnOrdinaryArrival(t *testing.T) {
 // Several devices resuming at once: the race detector watches, exactly one
 // connection is left in control, and the character is in the room once.
 func TestConcurrentResumesOfOneToken(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(400, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	target := joinGuest(t, wsURL, "Target")
@@ -444,6 +451,7 @@ func TestConcurrentResumesOfOneToken(t *testing.T) {
 
 // Only guests get a grace period; a password account that drops leaves at once.
 func TestPasswordPlayersStillLeaveImmediately(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(60000, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	pw := passwordPlayer(t, wsURL, "Passworded")
@@ -456,6 +464,7 @@ func TestPasswordPlayersStillLeaveImmediately(t *testing.T) {
 // "I remember nothing": a gap and a fresh look, never old chatter replayed into a
 // blank page (which is what a missing field used to mean: received = 0).
 func TestResumeWithoutReceivedIsAGapNotAReplay(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, graceConfig(5000, 50))
 	watcher := joinGuest(t, wsURL, "Watcher")
 	page := joinGuest(t, wsURL, "Page")
@@ -484,6 +493,7 @@ func TestResumeWithoutReceivedIsAGapNotAReplay(t *testing.T) {
 // A connection that is taken over is told why before it is closed, so a client
 // can stop instead of reconnecting and fighting for the character.
 func TestReplacedConnectionIsToldWhy(t *testing.T) {
+	t.Parallel()
 	wsURL, ms := startTestServerWithConfig(t, graceConfig(5000, 50))
 	phone := joinGuest(t, wsURL, "Phone")
 

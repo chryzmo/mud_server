@@ -9,6 +9,7 @@ import (
 // world says), so the client can tell them apart. The text around them is left plain.
 
 func TestYourOwnSpeechIsColouredAndTheRestIsNot(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := passwordPlayer(t, wsURL, "talker")
 	send(t, conn, "SAY hello there")
@@ -23,6 +24,7 @@ func TestYourOwnSpeechIsColouredAndTheRestIsNot(t *testing.T) {
 }
 
 func TestACharactersSpokenWordsAreColoured(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "TALK barista")

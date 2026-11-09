@@ -18,6 +18,7 @@ func paddedCmd(size int) string {
 }
 
 func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		loggedIn   bool
@@ -95,6 +96,7 @@ func TestReadLimitDisconnectsOversizedMessages(t *testing.T) {
 }
 
 func TestCommandFloodIsLimitedBeforeAndAfterLogin(t *testing.T) {
+	t.Parallel()
 	for _, loggedIn := range []bool{false, true} {
 		name := "before login"
 		if loggedIn {

@@ -95,7 +95,7 @@ Requires Go 1.24+ and either `podman-compose` or `docker compose`.
 ```sh
 scripts/db.sh up      # start Postgres 17 on 127.0.0.1:5432 (seeds the `mud` database on first start)
 go run ./src          # run the server on 127.0.0.1:8080, from the repo root
-scripts/test.sh       # go vet + all tests with -race, against the `mud_test` database
+scripts/test.sh       # go vet + all tests with -race, in parallel, each test on its own database beside `mud_test`
 scripts/db.sh reset   # wipe the database volume and reseed
 ```
 

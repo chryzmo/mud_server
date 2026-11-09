@@ -70,6 +70,7 @@ items:
 `
 
 func TestSpellsAreLearnedFromScrollsAndRulesReadiedAndRemembered(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(contentDir(t, map[string]string{"world.yaml": spellWorld})))
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")
@@ -159,6 +160,7 @@ spells:
 `
 
 func TestTeachRoomTeachesEveryoneInTheRoomButNobodyElse(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, withContent(contentDir(t, map[string]string{"world.yaml": teachRoomWorld})))
 	join := func(name string) *websocket.Conn {
 		c := dial(t, wsURL)

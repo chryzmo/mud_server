@@ -62,6 +62,7 @@ func turns(t *testing.T, conn *websocket.Conn, line string, n int) {
 }
 
 func TestCountersWrapAndAppearInText(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "clockwise")
 	send(t, conn, "X first clock")
 	expect(t, conn, "The first clock says 0.") // a counter nobody touched reads as 0
@@ -78,6 +79,7 @@ func TestCountersWrapAndAppearInText(t *testing.T) {
 }
 
 func TestSolvingAPuzzleOpensAGateForThatPlayerOnly(t *testing.T) {
+	t.Parallel()
 	wsURL := puzzleServer(t, nil)
 	solver := puzzler(t, wsURL, "solver")
 	other := puzzler(t, wsURL, "other")
@@ -107,6 +109,7 @@ func TestSolvingAPuzzleOpensAGateForThatPlayerOnly(t *testing.T) {
 }
 
 func TestALockedGateSaysWhyAndARiddleByWordsOpensIt(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "riddler")
 	send(t, conn, "LOOK")
 	expect(t, conn, "Sealed: [D]")
@@ -127,6 +130,7 @@ func TestALockedGateSaysWhyAndARiddleByWordsOpensIt(t *testing.T) {
 }
 
 func TestSequencesGiveABoundTokenAndAWrongRunResets(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "ringer")
 	send(t, conn, "RING red bell")
 	expect(t, conn, "A bright note.")
@@ -155,6 +159,7 @@ func TestSequencesGiveABoundTokenAndAWrongRunResets(t *testing.T) {
 }
 
 func TestEnteringARoomRunsItsRuleOnce(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "visitor") // the first arrival already showed the text
 	send(t, conn, "MOVE E")
 	expect(t, conn, "You are in 'Study'")
@@ -166,6 +171,7 @@ func TestEnteringARoomRunsItsRuleOnce(t *testing.T) {
 }
 
 func TestGivingAnItemToAPerson(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "giver")
 	send(t, conn, "GIVE ticket TO porter")
 	expect(t, conn, "You are not carrying that.")
@@ -193,6 +199,7 @@ func TestGivingAnItemToAPerson(t *testing.T) {
 }
 
 func TestUsingAnItemOnAThingTeleportsAndTellsTheRoom(t *testing.T) {
+	t.Parallel()
 	wsURL := puzzleServer(t, nil)
 	conn := puzzler(t, wsURL, "traveller")
 	watcher := puzzler(t, wsURL, "watcher")
@@ -214,6 +221,7 @@ func TestUsingAnItemOnAThingTeleportsAndTellsTheRoom(t *testing.T) {
 }
 
 func TestPressurePlatesNeedTwoPlayersOrAWeight(t *testing.T) {
+	t.Parallel()
 	wsURL := puzzleServer(t, nil)
 	a := puzzler(t, wsURL, "alpha")
 	b := puzzler(t, wsURL, "bravo")
@@ -262,6 +270,7 @@ func TestPressurePlatesNeedTwoPlayersOrAWeight(t *testing.T) {
 }
 
 func TestVerbRefusals(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "fumbler")
 	for _, tc := range []struct{ line, want string }{
 		{"TURN fountain", "Nothing happens."},
@@ -283,6 +292,7 @@ func TestVerbRefusals(t *testing.T) {
 }
 
 func TestPuzzleVerbsAreInHelp(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "reader")
 	send(t, conn, "HELP")
 	out := expect(t, conn, "Available commands")
@@ -294,6 +304,7 @@ func TestPuzzleVerbsAreInHelp(t *testing.T) {
 }
 
 func TestPuzzleStateSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	wsA, serverA := serveTestServer(t, url, func(c *mudserver.Configuration) { c.World.ContentDir = puzzleDir })
@@ -348,6 +359,7 @@ func loginAgain(t *testing.T, wsURL, name string) *websocket.Conn {
 }
 
 func TestRulesAndStateWorkInACrowdCopy(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		c.World.ContentDir = "testdata/puzzle-world-areas"
 		c.Crowd = mudserver.CrowdConfig{SoftCap: 1, MaxCopies: 5}
@@ -367,6 +379,7 @@ func TestRulesAndStateWorkInACrowdCopy(t *testing.T) {
 }
 
 func TestSayRulesIgnoreHowItIsWritten(t *testing.T) {
+	t.Parallel()
 	wsURL := puzzleServer(t, nil)
 	for i, phrase := range []string{"an echo", "AN ECHO", "  an   echo  ", "An echo.", `"an echo!"`} {
 		conn := puzzler(t, wsURL, fmt.Sprintf("speaker%d", i))

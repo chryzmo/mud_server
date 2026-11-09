@@ -11,6 +11,7 @@ import (
 // Automatic moderation (plans/event-systems.md track E2) through a real server.
 
 func TestRepeatingTheSameMessageEarnsAnEscalatingMuteAndNeverAKick(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		withContent(progressWorld(t))(c)
 		noWait(c)
@@ -47,6 +48,7 @@ func TestRepeatingTheSameMessageEarnsAnEscalatingMuteAndNeverAKick(t *testing.T)
 }
 
 func TestHammeringTheRateLimitEarnsAMute(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		withContent(progressWorld(t))(c)
 		noWait(c)
@@ -60,6 +62,7 @@ func TestHammeringTheRateLimitEarnsAMute(t *testing.T) {
 }
 
 func TestANewGuestWaitsAboutAMinuteByDefault(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	g := guestIn(t, wsURL, "Newcomer")
 	send(t, g.conn, "GLOBAL hi")

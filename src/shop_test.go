@@ -55,6 +55,7 @@ npcs:
 `
 
 func TestAShopkeeperSellsForGoldAndOnlyWhatIsListed(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		withContent(contentDir(t, map[string]string{"world.yaml": shopWorld}))(c)
 		c.Connection.CommandsPerSecond, c.Connection.CommandBurst = 1000, 1000

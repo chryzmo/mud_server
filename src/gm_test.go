@@ -27,6 +27,7 @@ func gmPlayer(t *testing.T, wsURL, name string) *websocket.Conn {
 }
 
 func TestGMCommandDoesNotExistForOthers(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	conn := passwordPlayer(t, wsURL, "player")
 	send(t, conn, "GM WHO")
@@ -44,6 +45,7 @@ func TestGMCommandDoesNotExistForOthers(t *testing.T) {
 }
 
 func TestAGuestIsNeverAGM(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	wsA, serverA := serveTestServer(t, url, nil)
@@ -77,6 +79,7 @@ func joinGuestResume(t *testing.T, wsURL string, auth map[string]any) *websocket
 }
 
 func TestGMWhoCountsAndNames(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	passwordPlayer(t, wsURL, "walker")
@@ -96,6 +99,7 @@ func TestGMWhoCountsAndNames(t *testing.T) {
 }
 
 func TestGMMuteBlocksSpeechAndSurvivesInTheDatabase(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -132,6 +136,7 @@ func TestGMMuteBlocksSpeechAndSurvivesInTheDatabase(t *testing.T) {
 }
 
 func TestAMuteIsLoadedAgainAfterARestart(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	wsA, serverA := serveTestServer(t, url, nil)
@@ -155,6 +160,7 @@ func TestAMuteIsLoadedAgainAfterARestart(t *testing.T) {
 }
 
 func TestGMTeleportAndSummon(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	bob := passwordPlayer(t, wsURL, "bob")
@@ -179,6 +185,7 @@ func TestGMTeleportAndSummon(t *testing.T) {
 }
 
 func TestGMAnnounceReachesEveryone(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	far := passwordPlayer(t, wsURL, "far")
@@ -194,6 +201,7 @@ func TestGMAnnounceReachesEveryone(t *testing.T) {
 }
 
 func TestGMLockRefusesNewVisitorsButNotThoseAlreadyIn(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	conn, auth := joinAs(t, wsURL, "Early")
@@ -224,6 +232,7 @@ func TestGMLockRefusesNewVisitorsButNotThoseAlreadyIn(t *testing.T) {
 }
 
 func TestGMCommandsAreAudited(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	execSQL(t, testDatabaseURL(t), "DELETE FROM gm_audit") // other tests leave rows behind
 	gm := gmPlayer(t, wsURL, "boss")
@@ -240,6 +249,7 @@ func TestGMCommandsAreAudited(t *testing.T) {
 }
 
 func TestAddGMCreatesAndPromotesAccounts(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	c := mudserver.Configuration{}
@@ -291,6 +301,7 @@ func TestAddGMCreatesAndPromotesAccounts(t *testing.T) {
 // resume was writing it). The window is tiny, so this is a stress test: run under -race it
 // fails reliably only on a loaded machine.
 func TestJoinThenResumeAtOnceDoesNotRace(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	for i := 0; i < 40; i++ {
 		conn, auth := joinAs(t, wsURL, fmt.Sprintf("Quick_%d", i))
@@ -307,6 +318,7 @@ func TestJoinThenResumeAtOnceDoesNotRace(t *testing.T) {
 }
 
 func TestGMKickRemovesTheCharacterAndRefusesItsReturn(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	victim, auth := joinAs(t, wsURL, "Victim")
@@ -351,6 +363,7 @@ func TestGMKickRemovesTheCharacterAndRefusesItsReturn(t *testing.T) {
 }
 
 func TestGMKickAlsoStopsAPasswordAccountLoggingBackIn(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	rowdy := passwordPlayer(t, wsURL, "rowdy")
@@ -368,6 +381,7 @@ func TestGMKickAlsoStopsAPasswordAccountLoggingBackIn(t *testing.T) {
 }
 
 func TestGMKickRefusals(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	gm := gmPlayer(t, wsURL, "boss")
 	send(t, gm, "GM KICK")

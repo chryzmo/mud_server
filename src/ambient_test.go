@@ -6,6 +6,7 @@ import "testing"
 // internal/mudserver cover the clock, the schedule and the budget with a fixed clock).
 
 func TestLookShowsTheDayNoteForTheCurrentTimeOfDay(t *testing.T) {
+	t.Parallel()
 	notes := `{dawn: "The Hall wakes.", day: "The Hall wakes.", dusk: "The Hall wakes.", night: "The Hall wakes."}`
 	dir := contentDir(t, map[string]string{"world.yaml": `
 start_room: hall

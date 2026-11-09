@@ -31,6 +31,7 @@ func tryJoin(t *testing.T, wsURL, name string) map[string]any {
 }
 
 func TestJoinLimitRefusesPastTheBurstWithoutCreatingAnything(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, joinLimit(2, 3))
 	var refused []string
 	ok := 0
@@ -65,6 +66,7 @@ func TestJoinLimitRefusesPastTheBurstWithoutCreatingAnything(t *testing.T) {
 // The limit protects every way in, before any database work: a resume with a bad
 // token gets rate_limited, not bad_token, once the bucket is spent.
 func TestJoinLimitCoversResumeRecoverAndLogin(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, joinLimit(1, 2))
 	tryJoin(t, wsURL, "Spender1")
 	tryJoin(t, wsURL, "Spender2") // the bucket is now empty
@@ -87,6 +89,7 @@ func TestJoinLimitCoversResumeRecoverAndLogin(t *testing.T) {
 // Messages that never reach the database do not spend the shared bucket: someone
 // already in the game, or sending a bad request, cannot starve everyone else.
 func TestJoinLimitIsNotSpentByRequestsThatDoNoWork(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		joinLimit(1, 2)(c)
 		c.Connection.CommandsPerSecond, c.Connection.CommandBurst = 1000, 1000
@@ -109,6 +112,7 @@ func TestJoinLimitIsNotSpentByRequestsThatDoNoWork(t *testing.T) {
 }
 
 func TestJoinLimitCanBeDisabled(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, joinLimit(-1, 1))
 	for i := 0; i < 30; i++ {
 		if got := tryJoin(t, wsURL, fmt.Sprintf("Free%02d", i)); got["ok"] != true {
@@ -121,6 +125,7 @@ func TestJoinLimitCanBeDisabled(t *testing.T) {
 // every guest still gets in, every cut guest still comes back, and the report
 // says how often the server said wait.
 func TestStormBotsWaitOutTheJoinLimit(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		lotsOfTalk(c)
 		joinLimit(80, 10)(c)

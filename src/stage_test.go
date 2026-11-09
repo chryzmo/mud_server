@@ -47,6 +47,7 @@ func enterArena(t *testing.T, wsURL, name string) *websocket.Conn {
 }
 
 func TestARoomHoldsItsOwnCapacity(t *testing.T) {
+	t.Parallel()
 	wsURL := arenaServer(t)
 	for i := 0; i < 4; i++ {
 		enterArena(t, wsURL, fmt.Sprintf("guest%d", i))
@@ -59,6 +60,7 @@ func TestARoomHoldsItsOwnCapacity(t *testing.T) {
 }
 
 func TestAQuietRoomLimitsTalkButNotGMsOrTheStage(t *testing.T) {
+	t.Parallel()
 	wsURL := arenaServer(t)
 	a := enterArena(t, wsURL, "alice")
 	send(t, a, "SAY one") // alone: not quiet yet
@@ -101,6 +103,7 @@ func TestAQuietRoomLimitsTalkButNotGMsOrTheStage(t *testing.T) {
 }
 
 func TestRaffleDrawsAGuestNotAGM(t *testing.T) {
+	t.Parallel()
 	wsURL := arenaServer(t)
 	lucky := enterArena(t, wsURL, "lucky")
 	faraway := eventPlayer(t, wsURL, "faraway") // in the hall
@@ -121,6 +124,7 @@ func TestRaffleDrawsAGuestNotAGM(t *testing.T) {
 }
 
 func TestRaffleWithNoGuestsSaysSo(t *testing.T) {
+	t.Parallel()
 	wsURL := arenaServer(t)
 	gm := eventGM(t, wsURL, "warden")
 	send(t, gm, "GM RAFFLE")

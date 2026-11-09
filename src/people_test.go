@@ -67,6 +67,7 @@ func cafeVisitor(t *testing.T, wsURL, name string) *websocket.Conn {
 
 // The scenery in the "You notice" line is marked with the yellow code, so the client can make each name a button.
 func TestLookMarksTheSceneryNamesForTapping(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "LOOK")
@@ -79,6 +80,7 @@ func TestLookMarksTheSceneryNamesForTapping(t *testing.T) {
 // A talk hint marks each topic with the white code, after the person's name in red, so the client can make
 // each topic a button that asks that person.
 func TestTalkMarksTheTopicsForTapping(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "TALK barista")
@@ -97,6 +99,7 @@ func TestTalkMarksTheTopicsForTapping(t *testing.T) {
 // Each person in the "Also here" line carries the bright magenta code, so the client can make each name a button
 // that starts a TALK.
 func TestLookMarksThePeopleNamesForTapping(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "LOOK")
@@ -110,6 +113,7 @@ func TestLookMarksThePeopleNamesForTapping(t *testing.T) {
 // The names TALK offers when it cannot tell whom you mean carry the same code as the "Also here" line, so a tap
 // on one starts the talk.
 func TestTalkPromptsMarkThePeopleNamesForTapping(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	names := "\x1b[1;95mMira the Barista\x1b[0m, \x1b[1;95mMiro the Baker\x1b[0m"
@@ -124,6 +128,7 @@ func TestTalkPromptsMarkThePeopleNamesForTapping(t *testing.T) {
 }
 
 func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "LOOK")
@@ -140,6 +145,7 @@ func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
 }
 
 func TestTalkGivesTheGreetingAndTheTopics(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "TALK barista")
@@ -161,6 +167,7 @@ func TestTalkGivesTheGreetingAndTheTopics(t *testing.T) {
 }
 
 func TestAskFindsATopicByKeywordAliasOrPrefix(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	for _, tc := range []struct{ line, want string }{
@@ -187,6 +194,7 @@ func TestAskFindsATopicByKeywordAliasOrPrefix(t *testing.T) {
 }
 
 func TestPeopleBelongToTheirRoom(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "MOVE N")
@@ -204,6 +212,7 @@ func TestPeopleBelongToTheirRoom(t *testing.T) {
 }
 
 func TestPeopleAppearInHelp(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "HELP")
@@ -216,6 +225,7 @@ func TestPeopleAppearInHelp(t *testing.T) {
 }
 
 func TestACopyOfARoomKeepsItsPeople(t *testing.T) {
+	t.Parallel()
 	wsURL := cafeServer(t, cafeWorld+"areas:\n  main: {rooms: [cafe, back]}\n", func(c *mudserver.Configuration) {
 		c.Crowd = mudserver.CrowdConfig{SoftCap: 1, MaxCopies: 5}
 	})
@@ -226,6 +236,7 @@ func TestACopyOfARoomKeepsItsPeople(t *testing.T) {
 }
 
 func TestApplyingContentAgainChangesWhatPeopleSay(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	dir := contentDir(t, map[string]string{"w.yaml": cafeWorld})
@@ -242,6 +253,7 @@ func TestApplyingContentAgainChangesWhatPeopleSay(t *testing.T) {
 }
 
 func TestTalkInAWorldWithNoPeople(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t) // the SQL seed
 	conn := passwordPlayer(t, wsURL, "legacy")
 	send(t, conn, "TALK")

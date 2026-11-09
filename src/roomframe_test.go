@@ -19,6 +19,7 @@ func names(v any) []string {
 }
 
 func TestRoomFrameListsThingsPeopleAndSealedExits(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "framer")
 	send(t, conn, "LOOK")
 	room := expectMessage(t, conn, "room")
@@ -47,6 +48,7 @@ func TestRoomFrameListsThingsPeopleAndSealedExits(t *testing.T) {
 }
 
 func TestRoomFrameFollowsGatesForThePlayerWhoOpenedThem(t *testing.T) {
+	t.Parallel()
 	conn := puzzler(t, puzzleServer(t, nil), "opener")
 	send(t, conn, "SAY an echo")
 	for {
@@ -69,6 +71,7 @@ func contains(v any, s string) bool {
 
 // Items change under everyone's feet: both players get a fresh frame when one takes or drops.
 func TestRoomFrameIsResentWhenAnItemMoves(t *testing.T) {
+	t.Parallel()
 	wsURL := startTestServer(t)
 	alice := passwordPlayer(t, wsURL, "alice")
 	bob := passwordPlayer(t, wsURL, "bob")

@@ -29,6 +29,7 @@ func lotsOfTalk(c *mudserver.Configuration) {
 // kept, in both storms, which also proves the frame counts stay consistent
 // through repeated reconnects (a drift would show up as gaps in storm two).
 func TestReconnectStormWithinGraceKeepsEveryCharacter(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		lotsOfTalk(c)
 		c.Connection.ResumeGraceMS = 20000
@@ -58,6 +59,7 @@ func TestReconnectStormWithinGraceKeepsEveryCharacter(t *testing.T) {
 // A storm longer than the grace period: characters were removed, so each resume
 // is an ordinary arrival, reported as a gap, and nobody is lost.
 func TestReconnectStormPastGraceResumesWithAGap(t *testing.T) {
+	t.Parallel()
 	wsURL, _ := startTestServerWithConfig(t, func(c *mudserver.Configuration) {
 		lotsOfTalk(c)
 		c.Connection.ResumeGraceMS = 150
@@ -102,6 +104,7 @@ func listenAt(t *testing.T, addr string, handler http.Handler) (string, func()) 
 // backoff while the server is down, and resumes into the new process as an
 // ordinary arrival with a gap.
 func TestServerRestartStorm(t *testing.T) {
+	t.Parallel()
 	url := testDatabaseURL(t)
 	resetDatabase(t, url)
 	configure := func(c *mudserver.Configuration) { lotsOfTalk(c); c.Connection.ResumeGraceMS = 20000 }
