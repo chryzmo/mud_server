@@ -512,7 +512,7 @@ func (mp *MudPlayer) doVerb(verb, arguments string) {
 	}
 	var withKey string
 	if verb == "USE" && withText == "" {
-		if mp.useConsumable(targetText) {
+		if mp.useConsumable(targetText) || mp.useHere(targetText) {
 			return
 		}
 	}
