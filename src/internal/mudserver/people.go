@@ -70,11 +70,13 @@ func (mp *MudPlayer) findPerson(query string) (*Person, []string) {
 }
 
 // topicList is the sentence TALK ends with.
+// topicList is the topics a person can be asked about, each in the white code so the client can make it a
+// button (it asks with the red-coloured name earlier in the same line).
 func (p *Person) topicList() string {
 	var words []string
 	for _, t := range p.Topics {
 		if len(t.Keywords) > 0 {
-			words = append(words, t.Keywords[0])
+			words = append(words, mudutils.ColorString(t.Keywords[0], mudutils.COLOR_WHITE)) // the client makes each a button
 		}
 	}
 	return strings.Join(words, ", ")
@@ -101,7 +103,7 @@ func (mp *MudPlayer) talk(arguments string) {
 	case p != nil:
 		msg := npcSpeech(strings.TrimSpace(p.Greeting))
 		if list := p.topicList(); list != "" {
-			msg += "\n(You could ask " + p.Names[0] + " about: " + list + ".  ASK <name> ABOUT <topic>)"
+			msg += "\n(You could ask " + mudutils.ColorString(p.Names[0], mudutils.COLOR_RED) + " about: " + list + ".  ASK <name> ABOUT <topic>)"
 		}
 		mp.SendMessage(msg)
 		mp.tourDid("talk")
@@ -142,7 +144,7 @@ func (mp *MudPlayer) ask(arguments string) {
 		mp.SendMessage("There is no one called that here.")
 		return
 	case strings.TrimSpace(topic) == "":
-		mp.SendMessage("Ask " + p.Names[0] + " about what? " + p.topicList() + ".")
+		mp.SendMessage("Ask " + mudutils.ColorString(p.Names[0], mudutils.COLOR_RED) + " about what? " + p.topicList() + ".")
 		return
 	}
 	query := strings.ToUpper(strings.Join(strings.Fields(topic), " "))
