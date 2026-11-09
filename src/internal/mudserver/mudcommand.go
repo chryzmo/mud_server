@@ -49,8 +49,7 @@ func GenerateCommandList(db *muddatabase.MudDatabase, findPlayer func(username s
 				return muddata.MUD_OK
 			}
 
-			message := "You say: \"" + msg + "\""
-			player.SendMessage(message)
+			player.SendMessage("You say: " + mudutils.ColorString("\""+strings.ReplaceAll(msg, "\x1b", "")+"\"", mudutils.COLOR_CYAN))
 
 			if player.lineSink != nil && player.Location != nil {
 				player.lineSink(player.Location.Name, player.Username, msg)

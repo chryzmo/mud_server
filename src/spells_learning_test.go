@@ -114,7 +114,11 @@ func TestSpellsAreLearnedFromScrollsAndRulesReadiedAndRemembered(t *testing.T) {
 	expect(t, conn, "Firebolt is ready in slot 1.")
 
 	// What they know and have readied survives logging out and back in.
-	waitForStateRows(t, "scholar", 4) // spell bolt, spell mend, slot 1, slot 3 (plus any others)
+	// The two readied slots are the last things written. Wait for those rows, not for a count: other state
+	// rows (the rule's flag) can bring the count to four before the slot 1 row lands, and logging out then
+	// loses the race with the state writer.
+	waitForStateValue(t, "scholar", "slot", "1", "bolt")
+	waitForStateValue(t, "scholar", "slot", "3", "mend")
 	conn.Close()
 	again, msg := loginWhenFree(t, wsURL, "scholar", "secret")
 	if !strings.Contains(msg, "Welcome back") {

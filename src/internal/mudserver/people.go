@@ -3,6 +3,8 @@ package mudserver
 import (
 	"regexp"
 	"strings"
+
+	"mud_server/src/internal/mudutils"
 )
 
 /*
@@ -97,7 +99,7 @@ func (mp *MudPlayer) talk(arguments string) {
 	p, several := mp.findPerson(query)
 	switch {
 	case p != nil:
-		msg := strings.TrimSpace(p.Greeting)
+		msg := npcSpeech(strings.TrimSpace(p.Greeting))
 		if list := p.topicList(); list != "" {
 			msg += "\n(You could ask " + p.Names[0] + " about: " + list + ".  ASK <name> ABOUT <topic>)"
 		}
@@ -151,12 +153,23 @@ func (mp *MudPlayer) ask(arguments string) {
 	hit, many := pickTarget(targets, query)
 	switch {
 	case hit != nil:
-		mp.SendMessage(strings.TrimSpace(hit.text))
+		mp.SendMessage(npcSpeech(strings.TrimSpace(hit.text)))
 	case len(many) > 0:
 		mp.SendMessage("Which do you mean: " + strings.Join(many, ", ") + "?")
 	case strings.TrimSpace(p.Shrug) != "":
-		mp.SendMessage(strings.TrimSpace(p.Shrug))
+		mp.SendMessage(npcSpeech(strings.TrimSpace(p.Shrug)))
 	default:
 		mp.SendMessage(p.Names[0] + " does not seem to know anything about that.")
 	}
+}
+
+// speechQuote is a spoken passage: words between double quotes, on one line.
+var speechQuote = regexp.MustCompile(`"[^"\n]*"`)
+
+// npcSpeech colours the quoted words in a character's text (violet in the client) and leaves the narration
+// around them alone.
+func npcSpeech(text string) string {
+	return speechQuote.ReplaceAllStringFunc(text, func(q string) string {
+		return mudutils.ColorString(q, mudutils.COLOR_MAGENTA)
+	})
 }

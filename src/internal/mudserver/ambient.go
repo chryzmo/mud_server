@@ -63,7 +63,7 @@ func buildAmbient(w *worldfile.World) map[string]*roomAmbient {
 			if len(pe.IdleEvery) == 2 {
 				lo, hi = pe.IdleEvery[0], pe.IdleEvery[1]
 			}
-			ra.entries = append(ra.entries, ambientEntry{min: time.Duration(lo) * time.Second, max: time.Duration(hi) * time.Second, lines: trimLines(pe.Idle)})
+			ra.entries = append(ra.entries, ambientEntry{min: time.Duration(lo) * time.Second, max: time.Duration(hi) * time.Second, lines: speechLines(trimLines(pe.Idle))})
 		}
 		for phase, note := range r.DayNotes {
 			if note = strings.TrimSpace(note); note != "" {
@@ -73,6 +73,15 @@ func buildAmbient(w *worldfile.World) map[string]*roomAmbient {
 		if len(ra.entries) > 0 || len(ra.notes) > 0 {
 			out[key] = ra
 		}
+	}
+	return out
+}
+
+// speechLines colours the quoted words in each of a character's lines (see npcSpeech).
+func speechLines(in []string) []string {
+	out := make([]string, len(in))
+	for i, l := range in {
+		out[i] = npcSpeech(l)
 	}
 	return out
 }

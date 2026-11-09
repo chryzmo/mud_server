@@ -64,7 +64,7 @@ func await(t *testing.T, ch <-chan string, want string) string {
 			if !ok {
 				t.Fatalf("connection closed while waiting for %q", want)
 			}
-			if strings.Contains(msg, want) {
+			if hasText(msg, want) {
 				return msg
 			}
 		case <-timeout:

@@ -28,7 +28,7 @@ func expectWithin(conn *websocket.Conn, want string, wait time.Duration) (string
 		if err != nil {
 			return "", false
 		}
-		if text := flatten(msg); strings.Contains(text, want) {
+		if text := flatten(msg); hasText(text, want) {
 			return text, true
 		}
 	}
