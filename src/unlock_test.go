@@ -38,7 +38,7 @@ func TestAQuestRuleUnlocksACosmeticOnceAndOthersSeeIt(t *testing.T) {
 	bob := eventPlayer(t, wsURL, "bob")
 
 	send(t, alice, "READ plaque")
-	expect(t, alice, "You earned the crown badge.")
+	expect(t, alice, "You earned the crown badge. The Style button changes it.")
 	if c := expectMessage(t, alice, "cosmetics"); c["badge"] != "crown" {
 		t.Errorf("cosmetics = %v", c)
 	}
@@ -58,7 +58,7 @@ func TestAQuestRuleUnlocksACosmeticOnceAndOthersSeeIt(t *testing.T) {
 	}
 
 	send(t, alice, "READ ribbon")
-	expect(t, alice, "Your name now shows in gold.")
+	expect(t, alice, "Your name now shows in gold. The Style button changes it.") // the client's button is Style (COSMETIC is the typed command)
 	if c := expectMessage(t, alice, "cosmetics"); c["color"] != "gold" {
 		t.Errorf("cosmetics = %v", c)
 	}

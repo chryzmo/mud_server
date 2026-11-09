@@ -55,9 +55,9 @@ func (mp *MudPlayer) grantCosmetic(kind, key string) {
 	}
 	mp.unlockCosmetic(kind, key)
 	if kind == "color" {
-		mp.SendMessage(fmt.Sprintf("Your name now shows in %s. COSMETIC changes it.", key))
+		mp.SendMessage(fmt.Sprintf("Your name now shows in %s. The Style button changes it.", key))
 	} else {
-		mp.SendMessage(fmt.Sprintf("You earned the %s badge. COSMETIC changes it.", key))
+		mp.SendMessage(fmt.Sprintf("You earned the %s badge. The Style button changes it.", key))
 	}
 	mp.SendCosmetics()
 }
