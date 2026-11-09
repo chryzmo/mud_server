@@ -142,7 +142,7 @@ func TestResumeWithinGraceKeepsTheCharacterAndAnnouncesNothing(t *testing.T) {
 	for _, line := range []string{"one", "two", "three"} {
 		send(t, watcher.conn, "SAY "+line)
 		watcher.until(func(typ string, m map[string]any) bool {
-			return typ == "text" && strings.Contains(m["text"].(string), `You say: "`+line+`"`)
+			return typ == "text" && hasText(m["text"].(string), `You say: "`+line+`"`)
 		})
 	}
 	send(t, watcher.conn, "LOOK")
@@ -463,7 +463,7 @@ func TestResumeWithoutReceivedIsAGapNotAReplay(t *testing.T) {
 
 	page.drop()
 	send(t, watcher.conn, "SAY stale")
-	watcher.until(func(typ string, m map[string]any) bool { return typ == "text" && strings.Contains(m["text"].(string), `You say: "stale"`) })
+	watcher.until(func(typ string, m map[string]any) bool { return typ == "text" && hasText(m["text"].(string), `You say: "stale"`) })
 
 	conn := dial(t, wsURL)
 	expect(t, conn, "Welcome to the MUD!")

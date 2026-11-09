@@ -35,7 +35,7 @@ func readUntil(t *testing.T, conn *websocket.Conn, want string) []string {
 			t.Fatalf("waiting for %q: %v\nseen: %v", want, err, seen)
 		}
 		text := flatten(msg)
-		if strings.Contains(text, want) {
+		if hasText(text, want) {
 			return seen
 		}
 		seen = append(seen, text)

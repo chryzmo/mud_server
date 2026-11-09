@@ -198,7 +198,7 @@ func isT(typ string) func(map[string]any) bool {
 func textHas(sub string) func(map[string]any) bool {
 	return func(f map[string]any) bool {
 		s, _ := f["text"].(string)
-		return f["t"] == "text" && strings.Contains(s, sub)
+		return f["t"] == "text" && hasText(s, sub)
 	}
 }
 
@@ -286,7 +286,7 @@ func say(t *testing.T, g *guest, text string) {
 	t.Helper()
 	send(t, g.conn, "SAY "+text)
 	g.until(func(typ string, m map[string]any) bool {
-		return typ == "text" && strings.Contains(m["text"].(string), `You say: "`+text+`"`)
+		return typ == "text" && hasText(m["text"].(string), `You say: "`+text+`"`)
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -246,6 +247,15 @@ func send(t *testing.T, conn *websocket.Conn, line string) {
 }
 
 // expect reads messages until one contains want, failing after a short timeout.
+// colourCodes are the colour escapes a line may carry: a bold colour (names, spoken words) and the reset.
+var colourCodes = regexp.MustCompile("\x1b\\[(?:1;3[0-7]|0)m")
+
+// hasText is whether a frame's text holds want, as it came or with its colour escapes taken out, so a test can
+// name the words without the colour codes around them.
+func hasText(text, want string) bool {
+	return strings.Contains(text, want) || strings.Contains(colourCodes.ReplaceAllString(text, ""), want)
+}
+
 func expect(t *testing.T, conn *websocket.Conn, want string) string {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -257,7 +267,7 @@ func expect(t *testing.T, conn *websocket.Conn, want string) string {
 			t.Fatalf("waiting for %q: %v\nmessages seen:\n%s", want, err, strings.Join(seen, "\n---\n"))
 		}
 		text := flatten(msg)
-		if strings.Contains(text, want) {
+		if hasText(text, want) {
 			return text
 		}
 		seen = append(seen, text)

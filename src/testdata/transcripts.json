@@ -270,7 +270,7 @@
             {
               "recv": {
                 "t": "text",
-                "text": "You say: \"hello\""
+                "text": "You say: \u001b[1;36m\"hello\"\u001b[0m"
               }
             },
             {
