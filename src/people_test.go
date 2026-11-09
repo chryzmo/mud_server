@@ -65,12 +65,41 @@ func cafeVisitor(t *testing.T, wsURL, name string) *websocket.Conn {
 	return conn
 }
 
+// The scenery in the "You notice" line is marked with the yellow code, so the client can make each name a button.
+func TestLookMarksTheSceneryNamesForTapping(t *testing.T) {
+	wsURL := cafeServer(t, cafeWorld, nil)
+	conn := cafeVisitor(t, wsURL, "visitor")
+	send(t, conn, "LOOK")
+	out := expect(t, conn, "You notice:")
+	if !strings.Contains(out, "You notice: \x1b[1;33mlong counter\x1b[0m.") {
+		t.Errorf("the scenery name is not marked: %q", out)
+	}
+}
+
+// A talk hint marks each topic with the white code, after the person's name in red, so the client can make
+// each topic a button that asks that person.
+func TestTalkMarksTheTopicsForTapping(t *testing.T) {
+	wsURL := cafeServer(t, cafeWorld, nil)
+	conn := cafeVisitor(t, wsURL, "visitor")
+	send(t, conn, "TALK barista")
+	out := expect(t, conn, "You could ask")
+	const want = "\x1b[1;31mMira the Barista\x1b[0m about: \x1b[1;37mcoffee\x1b[0m, \x1b[1;37mmap\x1b[0m."
+	if !strings.Contains(out, want) {
+		t.Errorf("the hint = %q, want it to contain %q", out, want)
+	}
+	send(t, conn, "ASK barista")
+	const prompt = "Ask \x1b[1;31mMira the Barista\x1b[0m about what? \x1b[1;37mcoffee\x1b[0m, \x1b[1;37mmap\x1b[0m."
+	if out := expect(t, conn, "about what?"); !strings.Contains(out, prompt) {
+		t.Errorf("the ask prompt = %q, want it to contain %q", out, prompt)
+	}
+}
+
 func TestLookNamesThePeopleAndEveryoneCanBeExamined(t *testing.T) {
 	wsURL := cafeServer(t, cafeWorld, nil)
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "LOOK")
 	out := expect(t, conn, "Also here: Mira the Barista, Miro the Baker. (TALK to them.)")
-	if !strings.Contains(out, "You notice: long counter.") {
+	if !hasText(out, "You notice: long counter.") {
 		t.Errorf("features are missing from LOOK: %q", out)
 	}
 	send(t, conn, "X mira")
@@ -86,7 +115,7 @@ func TestTalkGivesTheGreetingAndTheTopics(t *testing.T) {
 	conn := cafeVisitor(t, wsURL, "visitor")
 	send(t, conn, "TALK barista")
 	out := expect(t, conn, "Welcome in")
-	if !strings.Contains(out, "about: coffee, map.") {
+	if !hasText(out, "about: coffee, map.") {
 		t.Errorf("TALK should list the topics: %q", out)
 	}
 	send(t, conn, "TALK to the baker")

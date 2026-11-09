@@ -9,6 +9,7 @@ import (
 
 	muddatabase "mud_server/src/internal/database"
 
+	"mud_server/src/internal/mudutils"
 	"mud_server/src/internal/worldfile"
 )
 
@@ -77,7 +78,7 @@ func (w *World) placeMob(m *BaddieNPC) {
 	if w != nil {
 		w.liveMobs++
 	}
-	m.Location.Broadcast(m.Name+" - "+m.Race+" - appears in the room!", "")
+	m.Location.Broadcast(mudutils.ColorString(m.Name, mudutils.COLOR_RED)+" - "+m.Race+" - appears in the room!", "")
 	m.Location.roomChanged()
 }
 
