@@ -32,7 +32,8 @@ import (
 	database, seeded from src/sql, and runs in parallel with the others.
 */
 
-// testDBs maps a test's name to its own database, so a test that asks twice gets the same one.
+// testDBs maps a test to its own database, so a test that asks twice gets the same one. It is keyed by the
+// *testing.T, not the name: with -count the same name runs again and must not find the last run's dropped database.
 var testDBs sync.Map
 
 // testDatabaseURL is the URL of a database for this test alone, created on first use and dropped when the
@@ -45,7 +46,7 @@ func testDatabaseURL(t *testing.T) string {
 	if base == "" {
 		t.Skip("MUD_TEST_DATABASE_URL not set; run scripts/test.sh to start the test database")
 	}
-	if u, ok := testDBs.Load(t.Name()); ok {
+	if u, ok := testDBs.Load(t); ok {
 		return u.(string)
 	}
 	parsed, err := url.Parse(base)
@@ -78,7 +79,7 @@ func testDatabaseURL(t *testing.T) string {
 	})
 	parsed.Path = "/" + name
 	u := parsed.String()
-	testDBs.Store(t.Name(), u)
+	testDBs.Store(t, u)
 	return u
 }
 
