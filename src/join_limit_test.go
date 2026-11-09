@@ -132,6 +132,7 @@ func TestStormBotsWaitOutTheJoinLimit(t *testing.T) {
 		c.Connection.ResumeGraceMS = 20000
 	})
 	cfg := stormConfig(wsURL, 50)
+	cfg.JoinWorkers = 16 // many at once, so the guests join faster than the limit even when the machine is busy and each join is slow (with 4 a busy runner can stay under it)
 	cfg.Cycles, cfg.Fraction, cfg.Jitter = 1, 1, 0 // everyone cut at once, nobody waits before redialling
 	cfg.GiveUp, cfg.Between = 30*time.Second, 500*time.Millisecond
 	report, err := mudbot.RunStorm(context.Background(), cfg)
