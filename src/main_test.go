@@ -248,7 +248,7 @@ func send(t *testing.T, conn *websocket.Conn, line string) {
 
 // expect reads messages until one contains want, failing after a short timeout.
 // colourCodes are the colour escapes a line may carry: a bold colour (names, spoken words) and the reset.
-var colourCodes = regexp.MustCompile("\x1b\\[(?:1;3[0-7]|0)m")
+var colourCodes = regexp.MustCompile("\x1b\\[(?:1;(?:3|9)[0-7]|0)m")
 
 // hasText is whether a frame's text holds want, as it came or with its colour escapes taken out, so a test can
 // name the words without the colour codes around them.
