@@ -61,8 +61,10 @@ progress, reports and the GM audit log are left alone. Both show the database th
 skips that, and is required without a terminal). **Stop the game server first**: a running server keeps characters in memory and saves them
 back. Locally: `MUD_DATABASE_URL=... mud_server -reset-players`. On the Droplet the container must not be serving, so stop the unit,
 run a one-off container from the same image and env file in the pod, then start it again (`systemctl --user stop mud-server`,
-`podman run --rm -it --pod mud --env-file ~/mud/secrets.env localhost/mud-server:current /app/mud_server -reset-players`,
-`systemctl --user start mud-server`); this exact live procedure has not been run from here.
+`podman run --rm -it --pod mud --env-file ~/mud/secrets.env localhost/mud-server:current -reset-players`,
+`systemctl --user start mud-server`). The image's entrypoint is already `/app/mud_server`, so pass only the flag: with the path too, the
+server sees it as its first argument, ignores the flag and starts serving. If the output says "Server starting" instead of "About to delete", press
+Ctrl-C at once. `podman exec ... /app/mud_server -add-gm` is different: `exec` does not use the entrypoint.
 
 `GM` is one command with sub-commands, and for anyone else it does not exist ("Unknown command.", and `HELP` does not list it):
 
